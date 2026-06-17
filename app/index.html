@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Company Phone Lookup</title>
+  </head>
+  <body>
+    <main class="container">
+      <h1>Company Phone Lookup</h1>
+
+      <section>
+        <label for="companies">Company names (one per line)</label>
+        <textarea id="companies" rows="5" placeholder="Acme Ltd&#10;Example Widgets Inc"></textarea>
+        <button id="lookup-btn">Look up</button>
+      </section>
+
+      <section>
+        <table id="results-table">
+          <thead>
+            <tr>
+              <th>Company</th>
+              <th>Phone</th>
+              <th>Source</th>
+              <th>Status</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </section>
+
+      <section>
+        <button id="export-btn">Export CSV</button>
+        <span id="status-message"></span>
+      </section>
+    </main>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

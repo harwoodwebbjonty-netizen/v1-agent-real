@@ -1,0 +1,67 @@
+name: 'release'
+
+# Builds installers for macOS and Windows. Note: the desktop app currently
+# defaults to talking to a backend at http://localhost:8000 (see
+# app/src-tauri/src/backend_client.rs) since the backend is local-only for
+# now. Installers built by this workflow will only work on a machine that
+# also runs the backend, until a real backend host exists and
+# BACKEND_BASE_URL is set as a repository variable below.
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  publish-tauri:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: 'macos-latest'
+            args: '--target aarch64-apple-darwin'
+          - platform: 'macos-latest'
+            args: '--target x86_64-apple-darwin'
+          - platform: 'windows-latest'
+            args: ''
+
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './app/src-tauri -> target'
+
+      - name: install frontend dependencies
+        working-directory: ./app
+        run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Set this repository variable once a real backend host exists.
+          # Falls back to the localhost default baked into backend_client.rs.
+          BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+        with:
+          projectPath: ./app
+          tagName: v__VERSION__
+          releaseName: 'Company Phone Lookup v__VERSION__'
+          releaseBody: 'See the assets below to download and install.'
+          releaseDraft: true
+          prerelease: false
+          args: ${{ matrix.args }}
