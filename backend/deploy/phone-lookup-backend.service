@@ -1,0 +1,21 @@
+[Unit]
+Description=Company Phone Lookup backend (FastAPI/uvicorn)
+After=network.target
+
+[Service]
+Type=simple
+User=appuser
+Group=appuser
+WorkingDirectory=/opt/v1-agent/backend
+ExecStart=/opt/v1-agent/backend/.venv/bin/uvicorn app.main:app --host 127.0.0.1 --port 8000
+Restart=on-failure
+RestartSec=5
+
+# Mild hardening — backend only needs to read/write its own data dir.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/v1-agent/backend/data
+
+[Install]
+WantedBy=multi-user.target

@@ -28,8 +28,8 @@ EXTRACTION_SCHEMA = {
 }
 
 RESEARCH_TOOLS = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 8},
-    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 8},
+    {"type": "web_search_20260209", "name": "web_search", "max_uses": 5},
+    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 5},
 ]
 
 
@@ -102,7 +102,7 @@ async def _extract(company: str, research_text: str) -> LookupResult:
     client = _client()
 
     response = await client.messages.create(
-        model=settings.model,
+        model=settings.extraction_model,
         max_tokens=1024,
         system=(
             "Extract the structured result from the research notes below. "

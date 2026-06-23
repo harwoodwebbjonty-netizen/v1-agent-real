@@ -3,21 +3,46 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.responses import JSONResponse
 
+from app import db
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.dependencies import CurrentUser, get_current_user
+from app.routers import auth, brand_voice, calendar, email_oauth, email_templates, email_writer, lead_lists, leads, users
 from app.schemas import LookupRequest, LookupResult
+from app.schemas_chat import LeadChatRequest, LeadChatResponse
+from app.schemas_enrichment import EnrichLeadRequest, EnrichLeadResult
 from app.services import usage_log
 from app.services.anthropic_service import lookup_company_phone
+from app.services.chat_service import chat_about_lead
+from app.services.enrichment_service import enrich_lead
 
 app = FastAPI(title="Company Phone Lookup Backend")
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
+app.include_router(auth.router)
+app.include_router(users.router)
+app.include_router(leads.router)
+app.include_router(lead_lists.router)
+app.include_router(calendar.router)
+app.include_router(brand_voice.router)
+app.include_router(email_templates.router)
+app.include_router(email_writer.router)
+app.include_router(email_oauth.router)
+
+
+@app.on_event("startup")
+def on_startup() -> None:
+    db.init_db()
 
 
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded. Try again shortly."})
+
+
+@app.get("/health")
+async def health() -> dict[str, str]:
+    return {"status": "ok"}
 
 
 @app.post("/lookup-company-phone", response_model=LookupResult)
@@ -35,3 +60,24 @@ async def lookup_company_phone_route(
         success=result.status != "not_found",
     )
     return result
+
+
+@app.post("/enrich-lead", response_model=EnrichLeadResult)
+@limiter.limit(get_settings().rate_limit)
+async def enrich_lead_route(
+    request: Request,
+    body: EnrichLeadRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> EnrichLeadResult:
+    return await enrich_lead(body.company, body.notes, body.industry)
+
+
+@app.post("/lead-chat", response_model=LeadChatResponse)
+@limiter.limit(get_settings().rate_limit)
+async def lead_chat_route(
+    request: Request,
+    body: LeadChatRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> LeadChatResponse:
+    reply = await chat_about_lead(body.context, body.message, body.history)
+    return LeadChatResponse(reply=reply)

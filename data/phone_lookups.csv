@@ -5,3 +5,81 @@ timestamp,company,phone_number,source_url,status,notes
 2026-06-17T13:40:54.881610+00:00,DESTINY COURIERS SAMEDAY LIMITED,0333 344 4695,https://destinycouriers.co.uk/,verified,"Listed as 'National' number, shown first in header/footer. Identity confirmed via Companies House no. 10790523 (reg. office 13 Hastings Road, London N11 2RJ). Alternate 'London' line also listed: 0203 137 1099. Note: a different, unrelated entity 'Same Day Courier Services Ltd' (no. 10731827) appeared in search results - not this company."
 2026-06-17T13:41:31.367046+00:00,SUNDRIDGE SEARCH LIMITED,0113 426 5390,https://www.sundridgesearch.com/,verified,"Confirmed on official site footer/contact area; company name matches header text; area code (0113, Leeds) consistent with Companies House record (no. 11719929, Leeds)."
 2026-06-17T13:42:11.760321+00:00,GLENTWORTH PRECISION ENGINEERING (UK) LIMITED,+44 (0)118 977 1955,https://www.glentworth.co.uk/,verified,"Confirmed in header/footer of official homepage; name and address (Glentworth House, Molly Millar's Bridge, Wokingham, RG41 2WY) match company records."
+2026-06-18T08:06:53.150762+00:00,FENSTAR IT LIMITED,01354 638701,https://www.fenstar.co.uk/contact-us/,verified,"Confirmed via company number 10993688 in page footer, matching Companies House record; distinct from similarly-named Fenstar Limited and Fenstar Business Limited."
+2026-06-18T08:08:59.939085+00:00,C.P. PROPERTY LIMITED,not_found,n/a,not_found,"No phone on Companies House record (co. no. 03245762, Aberdare, Wales). No official company website found. Similarly-named 'CP Property' (0131 510 9120) is a separate, unrelated Edinburgh company - not used. Directory listings that might have a number (city-advisor.uk, companieslist.co.uk) blocked automated access (403)."
+2026-06-18T08:10:10.887213+00:00,KOREA FOODS COMPANY LIMITED,020 8949 2238,https://www.koreafoods.co.uk/contact/,verified,"Listed as the main number (per search-indexed contact page content; direct fetch of koreafoods.co.uk blocked, 403). HR department has a separate number (020 8329 2900), not used. Address matches Companies House record (Unit 5 Wyvern Industrial Estate, New Malden, KT3 4PH, co. no. 03896933)."
+2026-06-18T08:10:57.138057+00:00,INCLINE IT LIMITED,0845 330 3225,https://www.incline-it.com/contact,verified,"Confirmed in header/footer/contact section of official site; address matches Companies House record (Century House, Gadbrook Business Centre, Northwich, CW9 7TL, co. no. 11864190)."
+2026-06-18T08:12:13.799539+00:00,IMMERSIFY EDUCATION LTD,0161 222 9366,third-party data aggregators (Lusha/ContactOut/RocketReach),unverified,"Official site (immersify.com) and LinkedIn list no phone number - contact is via email/form only. This number (Manchester area code, consistent with registered office at Chester Road, Salford M16 9EA) appears across multiple data-broker sites but is not confirmed by the company's own channels."
+2026-06-18T08:13:05.500815+00:00,MEPACK LIMITED,+44 20 3813 0016,https://mepackltd.co.uk/contacts.html,verified,Confirmed in header and contact section of official site; company name 'Mepack Ltd' matches.
+2026-06-18T08:13:57.228641+00:00,GEMINI AGRICULTURE LTD,+44 (0)20 3011 5515,https://geminiag.com/contact/,verified,"Company registration number 09340604 matches exactly between official site and Companies House; distinct from similarly-named Gemini Group Limited, Gemini Group (UK) Limited, and Gemini Foods."
+2026-06-22T08:07:54.993694+00:00,BREW YORK LIMITED,01904 848448,https://brewyork.co.uk/contact-us/,verified,Found on official contact page and footer. Confirmed company reg 09607690.
+2026-06-22T08:07:55.028105+00:00,C & W SEALS LIMITED,+44 (0)1903 235784,https://candwseals.co.uk/,verified,Found prominently in site header and footer on official website.
+2026-06-22T08:07:55.057868+00:00,LANGDALES LIMITED,+44 (0)1635 860694,https://www.langdales.co.uk/,verified,Found in site header on official company website langdales.co.uk.
+2026-06-22T08:07:55.089839+00:00,TECHDECISION LTD,not_found,n/a,not_found,"Website (techdecision.co.uk) is JS-rendered, no phone visible. Endole confirms telephone unreported. No number found on any source."
+2026-06-22T08:13:52.914122+00:00,ACE REAL ESTATE LTD,not_found,n/a,not_found,"Registered at residential address 15 Waterslea Drive, Bolton BL1 5FA. No public-facing phone found on any source."
+2026-06-22T08:13:52.950087+00:00,J.P. REIS (UK) LIMITED,+44 (0)20 7680 7900,https://jpreis.com/contact/,verified,London office number confirmed on official jpreis.com contact page.
+2026-06-22T08:13:52.985018+00:00,REXTEC UK LIMITED,01761 433896,http://www.rextec.co.uk/contact/,verified,Confirmed across multiple directory sources; matches rextec.co.uk contact page.
+2026-06-22T08:13:53.021893+00:00,GOLDEN CASKET (GREENOCK) LIMITED,+44 (0)1475 721099,https://goldencasket.co.uk/contact/,verified,Found in footer and contact page of official goldencasket.co.uk site.
+2026-06-22T08:13:53.058709+00:00,JUICE MOTORS LIMITED,01732 750695,https://www.juicemotors.com/contact-us,verified,Found on official juicemotors.com contact page and footer.
+2026-06-22T08:13:53.093887+00:00,ALECTO RECRUITMENT LTD,01329 221399,https://alectorecruitment.com/contact/,verified,Found on official alectorecruitment.com contact page.
+2026-06-22T08:13:53.127214+00:00,HODGSON ENGINEERING LIMITED,01642 440888,https://hodgson-engineering.com/index.php/contact,verified,Confirmed on official hodgson-engineering.com contact page and Yell listing.
+2026-06-22T08:13:53.159345+00:00,TROIKA RECRUITMENT LIMITED,020 7839 0130,https://troikarecruitment.co.uk/contact/,verified,Found on official troikarecruitment.co.uk contact page.
+2026-06-22T08:13:53.191409+00:00,MY COMPLIANCE CENTRE LIMITED,+44 (0)20 8017 8273,https://mycompliancecentre.com/contact-us/,verified,Found on official mycompliancecentre.com contact page.
+2026-06-22T08:13:53.224447+00:00,TRIDENT PROPERTY INVESTMENTS LTD,not_found,n/a,not_found,"Small holding company at 591 London Road, Cheam, Sutton. No website or public phone found."
+2026-06-22T08:13:53.257319+00:00,ROLLER SHUTTERS LTD,07817 634117,n/a,unverified,"Number appears in business directory for Whitfield Mill, Whitworth, Rochdale OL12 8DN. No official company website to verify against."
+2026-06-22T08:13:53.290181+00:00,22 STREET LANE HOLDINGS LIMITED,0333 043 2222,https://www.22streetlanenursery.co.uk/contact/,verified,Number confirmed on 22streetlanenursery.co.uk - the operating business of the holding company.
+2026-06-22T08:13:53.324030+00:00,RECYCLING SERVICES LTD,0333 323 7511,https://www.recyclingservicesltd.co.uk/,unverified,Number consistent across multiple search results for recyclingservicesltd.co.uk but not confirmed directly from their website (contact page failed to load).
+2026-06-22T08:13:53.358809+00:00,DENTATA CHARTA LIMITED,01638 662295,https://dentatacharta.co.uk/contact-us/,verified,Confirmed on official dentatacharta.co.uk contact page. Dental practice in Newmarket.
+2026-06-22T08:21:07.299446+00:00,LINX-TO PROJECT CONTROLS LIMITED,+44 (0)7872 823368,https://www.linxto.co.uk/contact,verified,Mobile number listed as primary contact on official website
+2026-06-22T08:21:07.334466+00:00,HAWORTH TOMPKINS LIMITED,+44 (0)20 7250 3225,https://www.haworthtompkins.com/contact,verified,Confirmed on official contact page
+2026-06-22T08:21:07.366504+00:00,ARMAN LTD,not_found,n/a,not_found,"Derby restaurant/cafe at residential address, no website or public phone found"
+2026-06-22T08:21:07.400681+00:00,FORCES SOLUTIONS LIMITED,0116 473 5473,https://forcessolutions.co.uk/contact-us/,unverified,"Official contact page JS-rendered, could not verify; number confirmed consistently in multiple directories"
+2026-06-22T08:21:07.430479+00:00,COVERITE UPHOLSTERY LTD,01787 282084,https://www.coveriteupholstery.co.uk/contact,verified,Confirmed on official contact page
+2026-06-22T08:21:07.460227+00:00,CPS HANDIWORKS LTD,+44 7956 719886,https://www.cpshandiworks.com,verified,Mobile number confirmed on official website
+2026-06-22T08:21:07.490398+00:00,A METHOD LTD,not_found,n/a,not_found,"London W1T 3BL, no website or public phone found"
+2026-06-22T08:21:07.520433+00:00,HAWKINS STEEL LIMITED,+44 (0)1295 252363,https://www.hawkins-group.co.uk/contact-us/,verified,Confirmed on Hawkins Group contact page
+2026-06-22T08:21:07.550304+00:00,ELECTRICAL ACADEMY LTD,01622 962455,https://www.theelectricalacademy.co.uk/contact-us/,verified,Confirmed on official contact page
+2026-06-22T08:21:07.580006+00:00,ARCAM RESOURCES LIMITED,01920 877111,http://arcamresources.com/contact/,verified,"Confirmed on official contact page; IT recruitment, Hoddesdon"
+2026-06-22T08:21:07.609810+00:00,CAFFEINE LIMITED,01707 278400,https://caffeinelimited.com/,verified,"Confirmed in website footer; coffee machine supplier, Welwyn Garden City"
+2026-06-22T08:21:07.639695+00:00,COGNITION KIT LIMITED,not_found,n/a,not_found,"JV software entity (Cambridge Cognition + Ctrl Group), website has no phone number"
+2026-06-22T08:21:07.669399+00:00,PARAMOUNT WASTE EXTRACTION LIMITED,01276 691463,https://www.paramountwaste.co.uk,unverified,Contact page returned no content; number confirmed in multiple directories
+2026-06-22T08:21:07.700489+00:00,HOUSE TO HOME REMOVALS OF DERBY LIMITED,01332 672077,https://www.housetohomeremovals.co.uk/contact/,verified,Confirmed on official contact page
+2026-06-22T08:43:11.330588+00:00,VELOCETEC LTD,023 9400 2002,https://velocetec.com/contact-us/,verified,
+2026-06-22T08:43:11.368414+00:00,BOND DEMOLITION LTD,02920 888 788,https://bonddemolition.co.uk/contactus.htm,verified,
+2026-06-22T08:43:11.399941+00:00,ANSIBLE EDUCATION CONSULTING LIMITED,07917 754459,https://ansible-consulting.co.uk,verified,Mobile number listed as primary contact
+2026-06-22T08:43:11.437883+00:00,CONFIANCE BUSINESS SOLUTIONS LIMITED,+44 (0) 203 868 2860,https://confiancebizsol.com/contact/,verified,US-based company; London WC2H office confirmed on official contact page
+2026-06-22T08:43:11.475181+00:00,ULTRASEAL INTERNATIONAL GROUP LIMITED,+44 (0) 24 7625 8444,https://ultraseal-impregnation.com/contact-us/,verified,
+2026-06-22T08:43:11.508078+00:00,O'REILLY PRECAST LIMITED,0121 630 3472,https://oreillyprecast.com/contact/,verified,
+2026-06-22T08:43:11.540009+00:00,SUB2 TECHNOLOGIES LIMITED,020 3633 8068,https://sub2tech.com/contact,verified,
+2026-06-22T08:43:11.572319+00:00,GMAC TOOL AND PLANT HIRE LTD,07703 834764,https://gmactoolandplanthire.co.uk,verified,Mobile listed as primary contact on website
+2026-06-22T08:43:11.606426+00:00,ALLIGATOR RESEARCH LIMITED,+44 (0)20 7490 9111,https://www.mrs.org.uk/researchcompany/alligator-research,unverified,Trading as Alligator Digital; acquired by Ipsos June 2025; number from MRS Research Buyers Guide
+2026-06-22T08:43:11.638351+00:00,VAPE SHACK LTD,not_found,n/a,not_found,Company 09884209; Ulceby DN39 6TE; multiple Vape Shack entities in UK; no phone confirmed for this specific company
+2026-06-22T08:43:24.910139+00:00,DEEP DIVE AI TECHNOLOGY LIMITED,not_found,n/a,not_found,Company 10789570; 128 City Road London EC1V 2NX; no website or phone found
+2026-06-22T08:43:24.941546+00:00,REACH ACTIVE LIMITED,+44 (0)1992 663080,https://reachactive.com/contact/,verified,
+2026-06-22T08:43:24.972282+00:00,CALITEK UK LIMITED,not_found,n/a,not_found,Croydon CR0 2LX; no phone found
+2026-06-22T08:43:25.002431+00:00,RJV CONSTRUCTION LTD,not_found,n/a,not_found,Website shows coming soon; email-only contact
+2026-06-22T08:43:25.031925+00:00,CYBERSAFE LIMITED,not_found,n/a,not_found,Company 03245350; Oxford registered office; cybersafe.com SAP security company now part of SecurityBridge; no public UK phone
+2026-06-22T08:43:25.062036+00:00,SAGA CONSULTANCY LIMITED,not_found,n/a,not_found,"Company 12088005; Shenley Church End, Milton Keynes MK5 6DN; no website or phone found"
+2026-06-22T08:43:25.091813+00:00,HRH LIMITED,+44 (0) 1224 347070,https://www.hrhgeology.com/contact/,verified,Scottish company SC117311; Aberdeen petroleum geology; operates as HRH Geology
+2026-06-22T08:43:25.122295+00:00,13 AMP LIMITED,01455 251411,https://www.yell.com/biz/13-amp-ltd-hinckley-1550972/,unverified,Hinckley knitwear/ladieswear manufacturer; number from Yell directory
+2026-06-22T08:43:25.151964+00:00,RENAISSANCE ASSET FINANCE LIMITED,01268 269 500,https://renaissanceaf.com/contact/,verified,
+2026-06-22T08:43:25.181382+00:00,PURE CONSTRUCTION (SOUTHERN) LIMITED,02392 375 263,https://pure-construction.co.uk/contact-us/,verified,
+2026-06-22T08:43:41.009700+00:00,MR WOOD LTD,not_found,n/a,not_found,"Company 11295152; mrwood.london fashion brand; website email/form only, no phone published"
+2026-06-22T08:43:41.039669+00:00,ESSENTIAL COUTURE LIMITED,0203 441 9260,https://essentialcouture.co.uk/contact/,unverified,Wedding decorations; contact page JS-rendered; number confirmed by search result snippet
+2026-06-22T08:43:41.072619+00:00,BAILES & KIDLEY LIMITED,020 8595 6076,https://jjeng.com/contact-us/,verified,"Trades as JJ Engineering Co., Dagenham; confirmed on official website"
+2026-06-22T08:43:41.103902+00:00,EARTHBOUND SCIENTIFIC LTD,not_found,n/a,not_found,York YO10 5DD; earthboundscientific.com has no phone listed
+2026-06-22T08:43:41.133490+00:00,MACKELLAR SCHWERDT LLP,01273 480608,https://www.mackellarschwerdt.co.uk/contact-us,unverified,"Architects, Lewes BN7 2BQ; website JS-rendered; number confirmed by multiple directory sources"
+2026-06-22T08:43:41.163133+00:00,SAFFRON HAIRDRESSING LIMITED,01296 338344,https://www.salonspy.com/en-gb/in/buckinghamshire/aylesbury/saffron-hairdressing/,unverified,Company 10077759; Duck Farm Court Aylesbury HP20 2SQ; number from Salonspy directory
+2026-06-22T08:43:41.192771+00:00,PROFILE RESOURCING LIMITED,01908 012012,https://www.profileresourcing.co.uk,unverified,"Milton Keynes MK12; recruitment agency; website timed out, number confirmed by multiple search results"
+2026-06-22T08:43:41.222678+00:00,BIGCAT CONTRACTS LIMITED,07754 099125,https://bigcat-contracts.co.uk/contact/,verified,Mobile for Andrew Herd (director); Willem Herd also listed 07835 722265
+2026-06-22T08:43:41.252486+00:00,ABSOLUTE ROOFING SOLUTIONS LIMITED,0121 268 3213,https://absoluteroofingsolutions.co.uk,verified,
+2026-06-22T08:43:41.282206+00:00,RUTLAND CRICKET CENTRE LTD,01572 359889,https://www.rutlandcricketcentre.co.uk/contact-us.html,verified,Also has WhatsApp 07949 300611
+2026-06-22T08:43:53.164135+00:00,UNITED KINGDOM CONSTRUCTION & ENGINEERING COMPANY LTD,not_found,n/a,not_found,Southport PR9 0NS; no website or phone found
+2026-06-22T08:43:53.197562+00:00,VISION LINENS LIMITED,+44 (0)1254 589 550,https://corp.visionlinens.com/contact-us/,verified,Head office Blackburn Lancashire; Company 06603416
+2026-06-22T08:43:53.227469+00:00,BYFORD ROOFING SERVICES LIMITED,01622 892510,https://www.byfordroofing.com/contact-us/,verified,"Headcorn, Kent; Registered No. 1940450"
+2026-06-22T08:43:53.261294+00:00,CENTRAL TRAINING ACADEMY LIMITED,0800 783 2901,https://centraltraininggroup.com/contact/,verified,Trading as Central Training Group; Companies House 02703089
+2026-06-22T08:43:53.292383+00:00,HOLMBURY LIMITED,+44 (0) 1732 378912,https://www.holmbury.com/contact-us/,verified,"Tonbridge, Kent; hydraulic couplings; Registered 1849424"
+2026-06-22T08:43:53.322893+00:00,PYL ASSOCIATES LIMITED,not_found,n/a,not_found,Dissolved 6 January 2026
+2026-06-22T08:43:53.354407+00:00,PROOF PRODUCTIONS LTD,not_found,n/a,not_found,Preston PR2 3AQ; no website or phone found
+2026-06-22T08:43:53.385252+00:00,HENDLER WHOLESALE LTD,01405 480000,https://www.hendler.co.uk/contact-us,verified,"Motorcycle parts wholesale; Thorne, Doncaster"
+2026-06-22T08:43:53.414394+00:00,PAD CONTRACTS LIMITED,01992 767676,https://www.padcontracts.co.uk/contact-us/,verified,"Architectural metalwork; Waltham Abbey, Essex"

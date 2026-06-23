@@ -1,0 +1,516 @@
+import { invoke } from "@tauri-apps/api/core";
+
+export interface PhoneEntry {
+  id: string;
+  phone_number: string;
+  source: "scraped" | "manual";
+}
+
+export interface EmailEntry {
+  id: string;
+  email: string;
+  source: "scraped" | "manual";
+}
+
+export interface Lead {
+  id: string;
+  timestamp: string;
+  company: string;
+  phone_number: string;
+  source_url: string;
+  status: "verified" | "unverified" | "not_found";
+  notes: string;
+  industry: string;
+  contact_status: string;
+  lead_notes: string;
+  contact_name: string;
+  contact_title: string;
+  website: string;
+  linkedin: string;
+  owner_user_id: string | null;
+  owner_name: string | null;
+  assigned_user_id: string | null;
+  assigned_name: string | null;
+  list_id: string | null;
+  phones: PhoneEntry[];
+  emails: EmailEntry[];
+  intelligence: LeadIntelligence | null;
+}
+
+export interface ScoreBreakdown {
+  company_maturity: number;
+  hiring_intensity: number;
+  growth_signals: number;
+  buying_intent: number;
+  accessibility_fit: number;
+}
+
+export interface PainPoints {
+  operational: string[];
+  sales_revenue: string[];
+  recruitment_scaling: string[];
+}
+
+export interface ObjectionResponse {
+  category: "price" | "timing" | "competitor" | "internal_solution" | "other";
+  objection: string;
+  response: string;
+}
+
+export interface LeadIntelligence {
+  executive_summary: string;
+  sales_summary: string;
+  pain_points: PainPoints;
+  buying_signals: string[];
+  conversation_starters: string[];
+  discovery_questions: string[];
+  objection_handling: ObjectionResponse[];
+  pitch_angle: string;
+  call_brief: string;
+  score_breakdown: ScoreBreakdown;
+  lead_score: number;
+  lead_temperature: "Hot" | "Warm" | "Cold";
+  confidence_note: string;
+  generated_at: string;
+  updated_at: string;
+  version_count: number;
+}
+
+export interface LeadIntelligenceVersion {
+  id: string;
+  executive_summary: string;
+  sales_summary: string;
+  pain_points: PainPoints;
+  buying_signals: string[];
+  conversation_starters: string[];
+  discovery_questions: string[];
+  objection_handling: ObjectionResponse[];
+  pitch_angle: string;
+  call_brief: string;
+  score_breakdown: ScoreBreakdown;
+  lead_score: number;
+  lead_temperature: "Hot" | "Warm" | "Cold";
+  confidence_note: string;
+  created_at: string;
+}
+
+export interface LeadList {
+  id: string;
+  name: string;
+  owner_user_id: string;
+  owner_name: string | null;
+  created_at: string;
+  lead_count: number;
+}
+
+export interface LeadPatch {
+  industry?: string;
+  contactStatus?: string;
+  leadNotes?: string;
+  contactName?: string;
+  contactTitle?: string;
+  website?: string;
+  linkedin?: string;
+}
+
+// Mirrors the backend's validation — for instant feedback before the round-trip; the backend stays authoritative.
+export const PHONE_PATTERN = /^[+]?[0-9\s\-()]{7,20}$/;
+export const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+export interface UserInfo {
+  id: string;
+  name: string;
+  role: "admin" | "member";
+  avatar: string | null;
+}
+
+// --- Auth ---
+// No passwords — typing an existing name signs in as that person, typing a
+// new one creates a profile on the spot (small trusted team).
+
+export async function identify(name: string): Promise<UserInfo> {
+  return invoke<UserInfo>("identify", { name });
+}
+
+export async function logout(): Promise<void> {
+  await invoke("logout");
+}
+
+export async function getCurrentSession(): Promise<UserInfo | null> {
+  return invoke<UserInfo | null>("get_current_session");
+}
+
+// --- Team management ---
+
+export async function listTeamMembers(): Promise<UserInfo[]> {
+  return invoke<UserInfo[]>("list_team_members");
+}
+
+export async function createTeamMember(name: string, role: "admin" | "member"): Promise<UserInfo> {
+  return invoke<UserInfo>("create_team_member", { name, role });
+}
+
+export async function updateTeamMember(userId: string, patch: { name?: string; role?: "admin" | "member" }): Promise<UserInfo> {
+  return invoke<UserInfo>("update_team_member", { userId, ...patch });
+}
+
+export async function deleteTeamMember(userId: string): Promise<void> {
+  await invoke("delete_team_member", { userId });
+}
+
+export async function setUserAvatar(userId: string, avatar: string | null): Promise<UserInfo> {
+  return invoke<UserInfo>("set_user_avatar", { userId, avatar });
+}
+
+/** Reads a local file picked via the file dialog and returns it as a data URL. */
+export async function readImageAsDataUrl(path: string): Promise<string> {
+  return invoke<string>("read_image_as_data_url", { path });
+}
+
+// --- Backend connection ---
+
+export async function getBackendBaseUrl(): Promise<string> {
+  return invoke<string>("get_backend_base_url");
+}
+
+export async function setBackendBaseUrl(url: string): Promise<void> {
+  await invoke("set_backend_base_url", { url });
+}
+
+export async function checkBackendHealth(): Promise<void> {
+  await invoke("check_backend_health");
+}
+
+// --- Leads (shared team workspace) ---
+
+export async function lookupCompanyPhone(company: string, listId?: string): Promise<void> {
+  await invoke("lookup_company_phone", { company, listId: listId ?? null });
+}
+
+export async function getLogEntries(): Promise<Lead[]> {
+  return invoke<Lead[]>("get_log_entries");
+}
+
+export async function updateLead(id: string, patch: LeadPatch): Promise<Lead> {
+  return invoke<Lead>("update_lead", { id, ...patch });
+}
+
+export async function assignLead(id: string, assignedUserId: string | null): Promise<Lead> {
+  return invoke<Lead>("assign_lead", { id, assignedUserId });
+}
+
+// --- Phone numbers (manual CRUD) ---
+
+export async function addLeadPhone(leadId: string, phoneNumber: string): Promise<Lead> {
+  return invoke<Lead>("add_lead_phone", { leadId, phoneNumber });
+}
+
+export async function updateLeadPhone(leadId: string, phoneId: string, phoneNumber: string): Promise<Lead> {
+  return invoke<Lead>("update_lead_phone", { leadId, phoneId, phoneNumber });
+}
+
+export async function deleteLeadPhone(leadId: string, phoneId: string): Promise<Lead> {
+  return invoke<Lead>("delete_lead_phone", { leadId, phoneId });
+}
+
+// --- Email addresses (manual CRUD, fully independent of phones) ---
+
+export async function addLeadEmail(leadId: string, email: string): Promise<Lead> {
+  return invoke<Lead>("add_lead_email", { leadId, email });
+}
+
+export async function updateLeadEmail(leadId: string, emailId: string, email: string): Promise<Lead> {
+  return invoke<Lead>("update_lead_email", { leadId, emailId, email });
+}
+
+export async function deleteLeadEmail(leadId: string, emailId: string): Promise<Lead> {
+  return invoke<Lead>("delete_lead_email", { leadId, emailId });
+}
+
+/** Independent AI email scraper — manual trigger only, never runs automatically. */
+export async function scrapeLeadEmail(leadId: string): Promise<Lead> {
+  return invoke<Lead>("scrape_lead_email", { leadId });
+}
+
+export async function exportLogCsv(destPath: string): Promise<void> {
+  await invoke("export_log_csv", { destPath });
+}
+
+export async function migrateLocalLeadsToTeam(): Promise<number> {
+  return invoke<number>("migrate_local_leads_to_team");
+}
+
+// --- Cold call lists (private per-user lead lists; admins reach all of them) ---
+
+export async function createLeadList(name: string): Promise<LeadList> {
+  return invoke<LeadList>("create_lead_list", { name });
+}
+
+export async function listLeadLists(): Promise<LeadList[]> {
+  return invoke<LeadList[]>("list_lead_lists");
+}
+
+export async function getListLeads(listId: string): Promise<Lead[]> {
+  return invoke<Lead[]>("get_list_leads", { listId });
+}
+
+export async function importLeadsCsv(listId: string, csvPath: string): Promise<number> {
+  return invoke<number>("import_leads_csv", { listId, csvPath });
+}
+
+// --- AI Sales Intelligence — manual trigger only, full version history kept ---
+
+/** Manual trigger only — also used for "Refresh" (same backend action). Never runs automatically. */
+export async function generateLeadIntelligence(leadId: string): Promise<Lead> {
+  return invoke<Lead>("generate_lead_intelligence", { leadId });
+}
+
+export async function getLeadIntelligenceHistory(leadId: string): Promise<LeadIntelligenceVersion[]> {
+  return invoke<LeadIntelligenceVersion[]>("get_lead_intelligence_history", { leadId });
+}
+
+// --- Lead chat — read-only Q&A about a single lead (pre-existing backend endpoint) ---
+
+export interface ChatTurn {
+  role: "user" | "assistant";
+  content: string;
+}
+
+export async function chatAboutLead(context: string, message: string, history: ChatTurn[]): Promise<string> {
+  return invoke<string>("chat_about_lead", { context, message, history });
+}
+
+// --- Calendar events — private per-owner, same admin-override pattern as lead lists ---
+
+export interface CalendarEvent {
+  id: string;
+  owner_user_id: string;
+  title: string;
+  date: string;
+  time: string;
+  type: "call" | "followup" | "task";
+  lead_id: string | null;
+  description: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CalendarEventPatch {
+  title?: string;
+  date?: string;
+  time?: string;
+  type?: CalendarEvent["type"];
+  leadId?: string;
+}
+
+export async function listCalendarEvents(): Promise<CalendarEvent[]> {
+  return invoke<CalendarEvent[]>("list_calendar_events");
+}
+
+export async function createCalendarEvent(
+  title: string,
+  date: string,
+  time: string,
+  type: CalendarEvent["type"],
+  leadId?: string
+): Promise<CalendarEvent> {
+  return invoke<CalendarEvent>("create_calendar_event", { title, date, time, eventType: type, leadId });
+}
+
+export async function updateCalendarEvent(id: string, patch: CalendarEventPatch): Promise<CalendarEvent> {
+  const { type, ...rest } = patch;
+  return invoke<CalendarEvent>("update_calendar_event", { id, ...rest, eventType: type });
+}
+
+export async function deleteCalendarEvent(id: string): Promise<void> {
+  await invoke("delete_calendar_event", { id });
+}
+
+// --- AI Email Writer: brand voice ---
+
+export interface BrandVoice {
+  company_name: string;
+  company_description: string;
+  industry: string;
+  target_audience: string;
+  core_services: string;
+  unique_selling_points: string;
+  preferred_writing_style: string;
+  preferred_cta_style: string;
+  preferred_email_length: string;
+  website: string;
+  booking_link: string;
+  signature: string;
+}
+
+export async function getBrandVoice(): Promise<BrandVoice> {
+  return invoke<BrandVoice>("get_brand_voice");
+}
+
+export async function updateBrandVoice(brandVoice: BrandVoice): Promise<BrandVoice> {
+  return invoke<BrandVoice>("update_brand_voice", { brandVoice });
+}
+
+// --- AI Email Writer: templates (private per creator) ---
+
+export interface EmailTemplate {
+  id: string;
+  owner_user_id: string;
+  owner_name: string | null;
+  name: string;
+  subject: string;
+  body: string;
+  tone: string;
+  length: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export async function createEmailTemplate(
+  name: string,
+  subject: string,
+  body: string,
+  tone: string,
+  length: string
+): Promise<EmailTemplate> {
+  return invoke<EmailTemplate>("create_email_template", { name, subject, body, tone, length });
+}
+
+export async function listEmailTemplates(): Promise<EmailTemplate[]> {
+  return invoke<EmailTemplate[]>("list_email_templates");
+}
+
+export async function updateEmailTemplate(
+  id: string,
+  patch: { name?: string; subject?: string; body?: string; tone?: string; length?: string }
+): Promise<EmailTemplate> {
+  return invoke<EmailTemplate>("update_email_template", { id, ...patch });
+}
+
+export async function deleteEmailTemplate(id: string): Promise<void> {
+  await invoke("delete_email_template", { id });
+}
+
+export async function applyEmailTemplate(templateId: string, leadId: string): Promise<{ subject: string; body: string }> {
+  return invoke<{ subject: string; body: string }>("apply_email_template", { templateId, leadId });
+}
+
+// --- AI Email Writer: drafts (lead-scoped) ---
+
+export const EMAIL_PRESETS = [
+  "Cold Outreach",
+  "Follow Up",
+  "Breakup Email",
+  "Meeting Request",
+  "Proposal Follow Up",
+  "Recruitment Outreach",
+  "Partnership Outreach",
+  "Re-Engagement",
+  "Customer Retention",
+  "Custom",
+] as const;
+export type EmailPreset = (typeof EMAIL_PRESETS)[number];
+
+export const EMAIL_LENGTHS = ["Short", "Medium", "Long"] as const;
+export type EmailLength = (typeof EMAIL_LENGTHS)[number];
+
+export interface EmailDraft {
+  id: string;
+  lead_id: string;
+  owner_user_id: string;
+  subject: string;
+  body: string;
+  tone: string;
+  length: string;
+  status: "draft" | "sent";
+  sent_via: string | null;
+  sent_at: string | null;
+  estimated_open_rate: number | null;
+  estimated_reply_rate: number | null;
+  estimated_readability_score: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Manual trigger only — spends Anthropic credits. */
+export async function generateEmailDraft(
+  leadId: string,
+  instruction: string,
+  preset: EmailPreset,
+  length: EmailLength
+): Promise<EmailDraft> {
+  return invoke<EmailDraft>("generate_email_draft", { leadId, instruction, preset, length });
+}
+
+/** Manual trigger only — spends Anthropic credits. */
+export async function refineEmailDraft(draftId: string, instruction: string): Promise<EmailDraft> {
+  return invoke<EmailDraft>("refine_email_draft", { draftId, instruction });
+}
+
+export async function updateEmailDraft(id: string, patch: { subject?: string; body?: string }): Promise<EmailDraft> {
+  return invoke<EmailDraft>("update_email_draft", { id, ...patch });
+}
+
+export async function listEmailDrafts(leadId: string): Promise<EmailDraft[]> {
+  return invoke<EmailDraft[]>("list_email_drafts", { leadId });
+}
+
+export async function deleteEmailDraft(id: string): Promise<void> {
+  await invoke("delete_email_draft", { id });
+}
+
+// --- AI Email Writer: personalisation, CTA suggestions, activity timeline ---
+
+export interface PersonalisationOption {
+  hook: string;
+  pain_point_observation: string;
+  growth_observation: string;
+  opportunity_statement: string;
+}
+
+/** Manual trigger only — spends Anthropic credits. */
+export async function generateEmailPersonalisation(leadId: string, count = 3): Promise<PersonalisationOption[]> {
+  return invoke<PersonalisationOption[]>("generate_email_personalisation", { leadId, count });
+}
+
+/** Manual trigger only — spends Anthropic credits. */
+export async function getEmailCtaSuggestions(leadId: string, goal: string): Promise<string[]> {
+  return invoke<string[]>("get_email_cta_suggestions", { leadId, goal });
+}
+
+export interface TimelineEntry {
+  timestamp: string;
+  type: string;
+  summary: string;
+}
+
+export async function getLeadTimeline(leadId: string): Promise<TimelineEntry[]> {
+  return invoke<TimelineEntry[]>("get_lead_timeline", { leadId });
+}
+
+// --- AI Email Writer: OAuth email accounts (real sending — Gmail/Microsoft) ---
+
+export type EmailProvider = "gmail" | "microsoft";
+
+export interface EmailOAuthAccount {
+  provider: EmailProvider;
+  email_address: string;
+}
+
+/** Opens the OAuth consent flow in the system browser — never an embedded webview. */
+export async function connectEmailAccount(provider: EmailProvider): Promise<void> {
+  await invoke("connect_email_account", { provider });
+}
+
+export async function listEmailOAuthAccounts(): Promise<EmailOAuthAccount[]> {
+  return invoke<EmailOAuthAccount[]>("list_email_oauth_accounts");
+}
+
+export async function disconnectEmailOAuthAccount(provider: EmailProvider): Promise<void> {
+  await invoke("disconnect_email_oauth_account", { provider });
+}
+
+/** Manual trigger only — actually sends the email via the connected account. */
+export async function sendEmailDraft(draftId: string, provider: EmailProvider): Promise<EmailDraft> {
+  return invoke<EmailDraft>("send_email_draft", { draftId, provider });
+}

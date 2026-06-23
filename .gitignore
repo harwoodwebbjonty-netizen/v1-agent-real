@@ -7,6 +7,9 @@
 # Unrelated stray file, not part of this project
 kickbacks.vsix
 
+# macOS
+.DS_Store
+
 # Python (backend/ has its own .gitignore for venv/cache; this catches root-level strays)
 __pycache__/
 *.pyc

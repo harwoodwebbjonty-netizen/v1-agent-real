@@ -12,8 +12,18 @@ class Settings(BaseSettings):
 
     anthropic_api_key: str
     model: str = "claude-sonnet-4-6"
+    extraction_model: str = "claude-haiku-4-5-20251001"
     rate_limit: str = "10/minute"
-    max_pause_turn_continuations: int = 5
+    max_pause_turn_continuations: int = 3
+
+    # AI Email Writer — real sending via OAuth. Empty by default; the
+    # Connect buttons return a clear "not configured" error until these are
+    # filled in with real credentials from Google Cloud Console / Azure AD.
+    google_oauth_client_id: str = ""
+    google_oauth_client_secret: str = ""
+    microsoft_oauth_client_id: str = ""
+    microsoft_oauth_client_secret: str = ""
+    oauth_redirect_base_url: str = "http://localhost:8000"
 
 
 @lru_cache
