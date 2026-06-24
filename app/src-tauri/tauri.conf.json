@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "company-phone-lookup",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "identifier": "com.jontyhw.phonelookup",
   "build": {
     "frontendDist": "../dist",
@@ -52,7 +52,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDI1MDRCNzlGRTBDOTc2NzIKUldSeWRzbmduN2NFSmZ3L0RDOFhnYmozZi95cFdrSE5yemVqV0pmcWNQWDVuRVdVSmZXL1NrT2cK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IENGQkFDOTBBNzU4OEExQ0MKUldUTW9ZaDFDc202enkvRjJLdEpQQTVpQXBpKzRheEZ3UEpsbjZuTWVqcG1XSFZRNGxJcDZnZU0K",
       "endpoints": [
         "https://github.com/harwoodwebbjonty-netizen/v1-agent-real/releases/latest/download/latest.json"
       ]
