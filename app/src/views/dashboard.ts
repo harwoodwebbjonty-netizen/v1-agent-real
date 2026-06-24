@@ -63,12 +63,36 @@ export function initDashboard(): void {
   let searchText = "";
   let isInitialLoad = true;
 
+  // Animates a stat card's number from its current displayed value to the
+  // new one — purely cosmetic, runs once per data refresh, cheap (a single
+  // short rAF loop per call, four numbers total).
+  const statAnimations = new WeakMap<HTMLElement, number>();
+  function animateStatValue(el: HTMLElement, target: number): void {
+    const from = Number(el.textContent) || 0;
+    if (from === target) return;
+    const existing = statAnimations.get(el);
+    if (existing) cancelAnimationFrame(existing);
+    const start = performance.now();
+    const duration = 500;
+    const tick = (now: number): void => {
+      const progress = Math.min(1, (now - start) / duration);
+      const eased = 1 - Math.pow(1 - progress, 3);
+      el.textContent = String(Math.round(from + (target - from) * eased));
+      if (progress < 1) {
+        statAnimations.set(el, requestAnimationFrame(tick));
+      } else {
+        statAnimations.delete(el);
+      }
+    };
+    statAnimations.set(el, requestAnimationFrame(tick));
+  }
+
   function updateStats(): void {
     const leads = getLeads();
-    statTotal.textContent = String(leads.length);
-    statVerified.textContent = String(leads.filter((l) => l.status === "verified").length);
-    statUnverified.textContent = String(leads.filter((l) => l.status === "unverified").length);
-    statNotFound.textContent = String(leads.filter((l) => l.status === "not_found").length);
+    animateStatValue(statTotal, leads.length);
+    animateStatValue(statVerified, leads.filter((l) => l.status === "verified").length);
+    animateStatValue(statUnverified, leads.filter((l) => l.status === "unverified").length);
+    animateStatValue(statNotFound, leads.filter((l) => l.status === "not_found").length);
   }
 
   function updateSortIndicators(): void {

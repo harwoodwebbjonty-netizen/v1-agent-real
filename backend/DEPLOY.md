@@ -74,11 +74,16 @@ Back as `root`:
 
 ```bash
 exit   # back out of the appuser shell if still in it
+mkdir -p /opt/v1-agent/backend/data && chown appuser:appuser /opt/v1-agent/backend/data
 cp /opt/v1-agent/backend/deploy/phone-lookup-backend.service /etc/systemd/system/
 systemctl daemon-reload
 systemctl enable --now phone-lookup-backend
 systemctl status phone-lookup-backend   # should say "active (running)"
 ```
+
+The `mkdir` matters on a fresh clone: `backend/data/` is gitignored (it holds
+the database), so it won't exist yet, and the service file's sandboxing
+(`ReadWritePaths=.../data`) fails to start without it already present.
 
 This binds uvicorn to `127.0.0.1:8000` — not exposed to the internet
 directly. Nginx (next step) is what's actually public-facing.
