@@ -51,14 +51,28 @@ jobs:
         working-directory: ./app
         run: npm ci
 
+      # GitHub's secret text box has repeatedly saved a trailing newline no
+      # matter how carefully it's pasted/typed, which breaks the updater's
+      # base64 key decoding. Strip any stray whitespace/newlines here once,
+      # in code, instead of relying on perfect manual entry every release.
+      - name: sanitize signing secrets
+        shell: bash
+        run: |
+          KEY=$(printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | tr -d '\n\r ')
+          PASS=$(printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" | tr -d '\n\r ')
+          echo "::add-mask::$KEY"
+          echo "::add-mask::$PASS"
+          echo "CLEAN_SIGNING_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "CLEAN_SIGNING_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           # Set this repository variable once a real backend host exists.
           # Falls back to the localhost default baked into backend_client.rs.
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
-          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
-          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLEAN_SIGNING_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLEAN_SIGNING_KEY_PASSWORD }}
         with:
           projectPath: ./app
           tagName: v__VERSION__
