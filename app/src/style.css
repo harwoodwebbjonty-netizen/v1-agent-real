@@ -352,6 +352,36 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+.update-banner {
+  position: fixed;
+  bottom: var(--space-5);
+  right: var(--space-5);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: 0 18px 50px rgba(16, 24, 40, 0.2);
+  animation: au-up 0.3s ease;
+}
+
+.update-banner.hidden {
+  display: none;
+}
+
+.update-banner-label {
+  font-size: var(--text-sm);
+  font-weight: 500;
+}
+
+.update-banner-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
 .top-nav {
   display: flex;
   flex-direction: column;

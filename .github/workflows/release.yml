@@ -1,11 +1,11 @@
 name: 'release'
 
-# Builds installers for macOS and Windows. Note: the desktop app currently
-# defaults to talking to a backend at http://localhost:8000 (see
-# app/src-tauri/src/backend_client.rs) since the backend is local-only for
-# now. Installers built by this workflow will only work on a machine that
-# also runs the backend, until a real backend host exists and
-# BACKEND_BASE_URL is set as a repository variable below.
+# Builds installers for macOS and Windows, signs them, and publishes
+# latest.json so already-installed copies can auto-update (see
+# app/src/updater.ts and the "plugins.updater" section of tauri.conf.json).
+# Requires two repository secrets: TAURI_SIGNING_PRIVATE_KEY and
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD — without them this step fails loudly
+# rather than silently shipping unsigned/non-updatable artifacts.
 on:
   push:
     tags:
@@ -57,6 +57,8 @@ jobs:
           # Set this repository variable once a real backend host exists.
           # Falls back to the localhost default baked into backend_client.rs.
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
           projectPath: ./app
           tagName: v__VERSION__

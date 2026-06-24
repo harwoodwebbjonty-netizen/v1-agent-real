@@ -5,6 +5,7 @@ import { initIdentitySwitcher } from "./identitySwitcher";
 import { initTabRouter } from "./router";
 import { initSidebarToggle } from "./sidebarToggle";
 import { initTheme, toggleTheme } from "./theme";
+import { initUpdater } from "./updater";
 import { initAnalytics } from "./views/analytics";
 import { initCalendar } from "./views/calendar";
 import { initColdCallLists } from "./views/coldCallLists";
@@ -31,3 +32,4 @@ document.querySelector<HTMLButtonElement>("#theme-toggle-btn")!.addEventListener
 });
 
 void initAuth();
+void initUpdater();
