@@ -18,6 +18,8 @@ source .venv/bin/activate
 pip install -q -r requirements.txt
 
 echo "==> Restarting service"
+echo "    (appuser has no passwordless sudo configured — if this fails,"
+echo "    run as root instead: systemctl restart phone-lookup-backend)"
 sudo systemctl restart phone-lookup-backend
 sleep 1
 sudo systemctl --no-pager status phone-lookup-backend | head -5
