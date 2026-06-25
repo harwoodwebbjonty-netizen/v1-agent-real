@@ -69,6 +69,14 @@ class EmailDraftsResponse(BaseModel):
     drafts: list[EmailDraftOut]
 
 
+class PendingEmailDraftOut(EmailDraftOut):
+    lead_company: str
+
+
+class PendingEmailDraftsResponse(BaseModel):
+    drafts: list[PendingEmailDraftOut]
+
+
 class PersonalisationRequest(BaseModel):
     count: int = 3
 

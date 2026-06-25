@@ -15,6 +15,7 @@ import {
   updateLeadPhone,
 } from "../api";
 import { getCurrentUser, subscribeAuth } from "../auth";
+import { consumePendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
 import {
   type SortColumn,
   type SortDirection,
@@ -39,9 +40,11 @@ import {
   type SidePanelCallbacks,
 } from "../components/sidePanel";
 import { CONTACT_STATUS_ORDER } from "../constants";
+import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { getDefaultContactStatus } from "../preferences";
 import { getLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
+import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
 
 export function initDashboard(): void {
   const companiesInput = document.querySelector<HTMLTextAreaElement>("#companies")!;
@@ -57,11 +60,14 @@ export function initDashboard(): void {
   const statNotFound = document.querySelector<HTMLSpanElement>("#stat-not_found")!;
   const industrySidebar = document.querySelector<HTMLElement>("#industry-sidebar")!;
   const sortableHeaders = document.querySelectorAll<HTMLTableCellElement>("#results-table th[data-sort]");
+  const statCards = document.querySelectorAll<HTMLDivElement>(".stats-grid .stat-card[data-status-filter]");
 
   let sortColumn: SortColumn = null;
   let sortDirection: SortDirection = "asc";
   let searchText = "";
   let isInitialLoad = true;
+  let statusFilter: Lead["status"] | null = null;
+  let contactStatusMinRank: number | null = null;
 
   // Animates a stat card's number from its current displayed value to the
   // new one — purely cosmetic, runs once per data refresh, cheap (a single
@@ -129,7 +135,11 @@ export function initDashboard(): void {
       renderEmptyState(resultsBody, "No leads yet — run a lookup above to get started.");
       return;
     }
-    const visible = sortLeadsStable(filterLeads(leads, searchText, getSelectedIndustries()), sortColumn, sortDirection);
+    const visible = sortLeadsStable(
+      filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank),
+      sortColumn,
+      sortDirection
+    );
     if (visible.length === 0) {
       renderEmptyState(resultsBody, "No leads match the current filters.");
       return;
@@ -141,7 +151,20 @@ export function initDashboard(): void {
       },
       onIndustryChange: handleIndustryChange,
       onContactStatusChange: handleContactStatusChange,
+      onGenerateEmail: (lead) => {
+        setPendingEmailWriterLead(lead.id);
+        openTab("email-writer", "AI Email Writer");
+      },
     });
+  }
+
+  function setStatusFilter(value: Lead["status"] | null): void {
+    statusFilter = value === null ? null : statusFilter === value ? null : value;
+    statCards.forEach((card) => {
+      const cardValue = (card.dataset.statusFilter || null) as Lead["status"] | null;
+      card.classList.toggle("stat-card-active", cardValue === statusFilter);
+    });
+    renderTable();
   }
 
   // Named so `onRowClick` above can re-assert it via `setSidePanelCallbacks`
@@ -213,6 +236,13 @@ export function initDashboard(): void {
     });
   });
 
+  statCards.forEach((card) => {
+    card.addEventListener("click", () => {
+      const value = (card.dataset.statusFilter || null) as Lead["status"] | null;
+      setStatusFilter(value);
+    });
+  });
+
   searchInput.addEventListener("input", () => {
     searchText = searchInput.value;
     renderTable();
@@ -272,6 +302,17 @@ export function initDashboard(): void {
     await refreshLeads();
     refreshBtn.classList.remove("is-loading");
     refreshBtn.disabled = false;
+  });
+
+  // External hand-off from Analytics' funnel rows. Checked whenever this
+  // tab actually becomes active, same pattern as the email-writer hand-off.
+  subscribeTabs(() => {
+    if (getActiveTabId() !== "dashboard") return;
+    const pendingRank = consumePendingDashboardContactStatusFilter();
+    if (pendingRank !== null) {
+      contactStatusMinRank = pendingRank;
+      renderTable();
+    }
   });
 
   renderTable();

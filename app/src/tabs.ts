@@ -1,8 +1,12 @@
 export type ViewName =
+  | "action-centre"
   | "dashboard"
+  | "call-queue"
+  | "opportunity-workspace"
   | "cold-call-lists"
   | "sales-intelligence"
   | "email-writer"
+  | "sequences"
   | "calendar"
   | "analytics"
   | "settings";
@@ -13,7 +17,7 @@ export interface Tab {
   view: ViewName;
 }
 
-const DEFAULT_TAB: Tab = { id: "dashboard", title: "Dashboard", view: "dashboard" };
+const DEFAULT_TAB: Tab = { id: "action-centre", title: "Today", view: "action-centre" };
 
 // There's no tab-strip UI anymore — sidebar nav links just switch the
 // current view directly — so this is really a single active view, kept as

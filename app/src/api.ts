@@ -32,6 +32,8 @@ export interface Lead {
   assigned_user_id: string | null;
   assigned_name: string | null;
   list_id: string | null;
+  opportunity_stage: OpportunityStage;
+  next_best_action: NextBestAction;
   phones: PhoneEntry[];
   emails: EmailEntry[];
   intelligence: LeadIntelligence | null;
@@ -103,6 +105,8 @@ export interface LeadList {
   lead_count: number;
 }
 
+export type OpportunityStage = "none" | "engaged" | "opportunity" | "proposal" | "won" | "lost";
+
 export interface LeadPatch {
   industry?: string;
   contactStatus?: string;
@@ -111,6 +115,12 @@ export interface LeadPatch {
   contactTitle?: string;
   website?: string;
   linkedin?: string;
+  opportunityStage?: OpportunityStage;
+}
+
+export interface NextBestAction {
+  action: string;
+  reason: string;
 }
 
 // Mirrors the backend's validation — for instant feedback before the round-trip; the backend stays authoritative.
@@ -326,6 +336,41 @@ export async function deleteCalendarEvent(id: string): Promise<void> {
   await invoke("delete_calendar_event", { id });
 }
 
+// --- Call logs — shared per-lead history, no owner restriction ---
+
+export type CallOutcome = "connected" | "voicemail" | "no_answer" | "wrong_number" | "other";
+
+export interface CallLog {
+  id: string;
+  lead_id: string;
+  calendar_event_id: string | null;
+  outcome: CallOutcome;
+  notes: string;
+  duration_seconds: number | null;
+  created_by: string;
+  created_at: string;
+}
+
+export async function listCallLogs(leadId: string): Promise<CallLog[]> {
+  return invoke<CallLog[]>("list_call_logs", { leadId });
+}
+
+export async function createCallLog(
+  leadId: string,
+  outcome: CallOutcome,
+  notes: string,
+  durationSeconds?: number,
+  calendarEventId?: string
+): Promise<CallLog> {
+  return invoke<CallLog>("create_call_log", {
+    leadId,
+    outcome,
+    notes,
+    durationSeconds,
+    calendarEventId,
+  });
+}
+
 // --- AI Email Writer: brand voice ---
 
 export interface BrandVoice {
@@ -455,6 +500,14 @@ export async function listEmailDrafts(leadId: string): Promise<EmailDraft[]> {
   return invoke<EmailDraft[]>("list_email_drafts", { leadId });
 }
 
+export interface PendingEmailDraft extends EmailDraft {
+  lead_company: string;
+}
+
+export async function listPendingEmailDrafts(): Promise<PendingEmailDraft[]> {
+  return invoke<PendingEmailDraft[]>("list_pending_email_drafts");
+}
+
 export async function deleteEmailDraft(id: string): Promise<void> {
   await invoke("delete_email_draft", { id });
 }
@@ -513,4 +566,91 @@ export async function disconnectEmailOAuthAccount(provider: EmailProvider): Prom
 /** Manual trigger only — actually sends the email via the connected account. */
 export async function sendEmailDraft(draftId: string, provider: EmailProvider): Promise<EmailDraft> {
   return invoke<EmailDraft>("send_email_draft", { draftId, provider });
+}
+
+// --- Sales Sequences — multi-channel automation (email + call/follow-up/reminder tasks) ---
+
+export type SequenceStatus = "draft" | "active" | "paused";
+export type SequenceStepType = "email" | "call_task" | "followup_task" | "reminder_task";
+export type SequenceEnrollmentStatus = "active" | "completed" | "stopped";
+
+export interface Sequence {
+  id: string;
+  name: string;
+  owner_user_id: string;
+  status: SequenceStatus;
+  created_at: string;
+  updated_at: string;
+  step_count: number;
+  enrollment_count: number;
+}
+
+export interface SequenceStep {
+  id: string;
+  sequence_id: string;
+  step_order: number;
+  delay_days: number;
+  step_type: SequenceStepType;
+  subject_template: string;
+  body_template: string;
+  created_at: string;
+}
+
+export interface SequenceEnrollment {
+  id: string;
+  sequence_id: string;
+  lead_id: string;
+  lead_company: string;
+  current_step: number;
+  status: SequenceEnrollmentStatus;
+  last_error: string | null;
+  enrolled_at: string;
+  next_run_at: string | null;
+  created_by: string;
+}
+
+export async function listSequences(): Promise<Sequence[]> {
+  return invoke<Sequence[]>("list_sequences");
+}
+
+export async function createSequence(name: string): Promise<Sequence> {
+  return invoke<Sequence>("create_sequence", { name });
+}
+
+export async function updateSequence(id: string, patch: { name?: string; status?: SequenceStatus }): Promise<Sequence> {
+  return invoke<Sequence>("update_sequence", { id, ...patch });
+}
+
+export async function deleteSequence(id: string): Promise<void> {
+  await invoke("delete_sequence", { id });
+}
+
+export async function listSequenceSteps(sequenceId: string): Promise<SequenceStep[]> {
+  return invoke<SequenceStep[]>("list_sequence_steps", { sequenceId });
+}
+
+export async function addSequenceStep(
+  sequenceId: string,
+  delayDays: number,
+  stepType: SequenceStepType,
+  subjectTemplate: string,
+  bodyTemplate: string
+): Promise<SequenceStep> {
+  return invoke<SequenceStep>("add_sequence_step", { sequenceId, delayDays, stepType, subjectTemplate, bodyTemplate });
+}
+
+export async function deleteSequenceStep(sequenceId: string, stepId: string): Promise<void> {
+  await invoke("delete_sequence_step", { sequenceId, stepId });
+}
+
+export async function listSequenceEnrollments(sequenceId: string): Promise<SequenceEnrollment[]> {
+  return invoke<SequenceEnrollment[]>("list_sequence_enrollments", { sequenceId });
+}
+
+export async function enrollLeadInSequence(sequenceId: string, leadId: string): Promise<SequenceEnrollment> {
+  return invoke<SequenceEnrollment>("enroll_lead_in_sequence", { sequenceId, leadId });
+}
+
+export async function stopSequenceEnrollment(sequenceId: string, enrollmentId: string): Promise<void> {
+  await invoke("stop_sequence_enrollment", { sequenceId, enrollmentId });
 }

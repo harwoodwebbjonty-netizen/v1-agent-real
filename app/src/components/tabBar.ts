@@ -1,10 +1,14 @@
 import { openTab, type ViewName } from "../tabs";
 
 const NAV_TITLES: Record<ViewName, string> = {
+  "action-centre": "Today",
   dashboard: "Dashboard",
+  "call-queue": "Call Queue",
+  "opportunity-workspace": "Opportunities",
   "cold-call-lists": "Cold Call Lists",
   "sales-intelligence": "AI Sales Intelligence",
   "email-writer": "AI Email Writer",
+  sequences: "Sequences",
   calendar: "Calendar",
   analytics: "Analytics",
   settings: "Settings",

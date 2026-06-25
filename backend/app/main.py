@@ -1,3 +1,6 @@
+import asyncio
+import logging
+
 from fastapi import Depends, FastAPI, Request
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -7,7 +10,19 @@ from app import db
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.dependencies import CurrentUser, get_current_user
-from app.routers import auth, brand_voice, calendar, email_oauth, email_templates, email_writer, lead_lists, leads, users
+from app.routers import (
+    auth,
+    brand_voice,
+    calendar,
+    call_logs,
+    email_oauth,
+    email_templates,
+    email_writer,
+    lead_lists,
+    leads,
+    sequences,
+    users,
+)
 from app.schemas import LookupRequest, LookupResult
 from app.schemas_chat import LeadChatRequest, LeadChatResponse
 from app.schemas_enrichment import EnrichLeadRequest, EnrichLeadResult
@@ -15,6 +30,10 @@ from app.services import usage_log
 from app.services.anthropic_service import lookup_company_phone
 from app.services.chat_service import chat_about_lead
 from app.services.enrichment_service import enrich_lead
+from app.services.sequences_service import process_due_enrollments
+
+logger = logging.getLogger("app.main")
+SEQUENCE_POLL_INTERVAL_SECONDS = 15 * 60
 
 app = FastAPI(title="Company Phone Lookup Backend")
 app.state.limiter = limiter
@@ -24,15 +43,32 @@ app.include_router(users.router)
 app.include_router(leads.router)
 app.include_router(lead_lists.router)
 app.include_router(calendar.router)
+app.include_router(call_logs.router)
 app.include_router(brand_voice.router)
 app.include_router(email_templates.router)
 app.include_router(email_writer.router)
 app.include_router(email_oauth.router)
+app.include_router(sequences.router)
+
+
+async def _sequence_scheduler_loop() -> None:
+    """Single in-process loop — see services/sequences_service.py's module
+    docstring for why this is correct for the current single-worker
+    deployment and what would need to change for multiple workers."""
+    while True:
+        try:
+            processed = await process_due_enrollments()
+            if processed:
+                logger.info("Sequence scheduler processed %d enrollment(s)", processed)
+        except Exception:  # noqa: BLE001 — the loop must never die from one bad cycle
+            logger.exception("Sequence scheduler cycle failed")
+        await asyncio.sleep(SEQUENCE_POLL_INTERVAL_SECONDS)
 
 
 @app.on_event("startup")
 def on_startup() -> None:
     db.init_db()
+    asyncio.create_task(_sequence_scheduler_loop())
 
 
 @app.exception_handler(RateLimitExceeded)

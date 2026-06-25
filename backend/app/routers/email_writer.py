@@ -13,6 +13,8 @@ from app.schemas_email_writer import (
     EmailDraftOut,
     EmailDraftsResponse,
     GenerateEmailRequest,
+    PendingEmailDraftOut,
+    PendingEmailDraftsResponse,
     PersonalisationRequest,
     PersonalisationResponse,
     RefineEmailRequest,
@@ -166,6 +168,14 @@ def list_drafts(lead_id: str, current_user: CurrentUser = Depends(get_current_us
         raise HTTPException(status_code=404, detail="Lead not found")
     _require_lead_access(lead, current_user)
     return EmailDraftsResponse(drafts=[_to_draft_out(r) for r in db.list_email_drafts(lead_id)])
+
+
+@router.get("/email-drafts/pending", response_model=PendingEmailDraftsResponse)
+def list_pending_drafts(current_user: CurrentUser = Depends(get_current_user)) -> PendingEmailDraftsResponse:
+    rows = db.list_pending_email_drafts(current_user.id)
+    return PendingEmailDraftsResponse(
+        drafts=[PendingEmailDraftOut(**_to_draft_out(r).model_dump(), lead_company=r["lead_company"]) for r in rows]
+    )
 
 
 @router.delete("/email-drafts/{draft_id}")

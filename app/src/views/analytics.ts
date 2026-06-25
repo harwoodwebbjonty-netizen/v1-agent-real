@@ -1,7 +1,10 @@
 import { Chart, registerables } from "chart.js";
 import type { Lead } from "../api";
+import { setIndustryFilter } from "../components/industryFilter";
 import { CONTACT_STATUS_ORDER } from "../constants";
+import { setPendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
 import { getLeads, subscribe } from "../state";
+import { openTab } from "../tabs";
 
 Chart.register(...registerables);
 
@@ -67,10 +70,19 @@ function renderIndustryChart(leads: Lead[]): void {
   industryChart?.destroy();
   industryChart = new Chart(canvas, {
     type: "bar",
-    data: { labels, datasets: [{ label: "Leads", data, backgroundColor: "#4f46e5" }] },
+    data: { labels, datasets: [{ label: "Leads", data, backgroundColor: "#2563eb" }] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
+      onHover: (event, elements) => {
+        (event.native?.target as HTMLElement).style.cursor = elements.length ? "pointer" : "default";
+      },
+      onClick: (_event, elements) => {
+        if (!elements.length) return;
+        const industry = labels[elements[0].index];
+        setIndustryFilter([industry]);
+        openTab("dashboard", "Dashboard");
+      },
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
     },
@@ -80,17 +92,24 @@ function renderIndustryChart(leads: Lead[]): void {
 function renderFunnel(leads: Lead[]): void {
   const counts = computeFunnel(leads);
   const max = counts[0] || 1;
-  const container = document.querySelector("#funnel-container")!;
+  const container = document.querySelector<HTMLDivElement>("#funnel-container")!;
   container.innerHTML = CONTACT_STATUS_ORDER.map((stage, i) => {
     const pct = max === 0 ? 0 : Math.round((counts[i] / max) * 100);
     return `
-      <div class="funnel-row">
+      <div class="funnel-row" data-rank="${i}" title="Show leads at or beyond ${stage}">
         <span class="funnel-label">${stage}</span>
         <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width: ${pct}%"></div></div>
         <span class="funnel-count">${counts[i]}</span>
       </div>
     `;
   }).join("");
+
+  container.querySelectorAll<HTMLDivElement>(".funnel-row").forEach((row) => {
+    row.addEventListener("click", () => {
+      setPendingDashboardContactStatusFilter(Number(row.dataset.rank));
+      openTab("dashboard", "Dashboard");
+    });
+  });
 }
 
 function renderTrendChart(leads: Lead[]): void {
@@ -105,8 +124,8 @@ function renderTrendChart(leads: Lead[]): void {
         {
           label: "New leads",
           data: counts,
-          borderColor: "#4f46e5",
-          backgroundColor: "rgba(79, 70, 229, 0.15)",
+          borderColor: "#2563eb",
+          backgroundColor: "rgba(37, 99, 235, 0.15)",
           fill: true,
           tension: 0.3,
         },

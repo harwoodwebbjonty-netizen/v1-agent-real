@@ -33,12 +33,39 @@ from app.schemas_sales_intelligence import (
 from app.services.anthropic_service import lookup_company_phone
 from app.services.auth_service import new_id, now_iso
 from app.services.email_scraper_service import scrape_emails
+from app.services.next_best_action import compute_next_best_action
 from app.services.sales_intelligence_service import (
     IntelligenceExtractionError,
     generate_sales_intelligence,
 )
 
 router = APIRouter(prefix="/leads", tags=["leads"])
+
+
+class ActivityContext:
+    """Bulk activity data needed for Next Best Action, fetched once per
+    request (3 grouped queries total) — never once per lead, so list views
+    stay cheap regardless of how many leads exist."""
+
+    def __init__(self) -> None:
+        self.today = now_iso()[:10]
+        self.call_log_dates = db.get_latest_call_log_dates()
+        self.email_dates = db.get_latest_sent_email_dates()
+        self.calendar_dates = db.get_latest_past_calendar_dates(self.today)
+        self.calls_today = db.get_lead_ids_with_call_scheduled(self.today)
+
+    def last_contact_date(self, lead_id: str) -> Optional[str]:
+        candidates = [
+            self.call_log_dates.get(lead_id),
+            self.email_dates.get(lead_id),
+            self.calendar_dates.get(lead_id),
+        ]
+        present = [c for c in candidates if c]
+        return max(present) if present else None
+
+
+def get_activity_context() -> ActivityContext:
+    return ActivityContext()
 
 _INTELLIGENCE_JSON_COLUMNS = (
     "pain_points",
@@ -81,7 +108,18 @@ def _user_name_map() -> dict[str, str]:
     return {u["id"]: u["name"] for u in db.list_users()}
 
 
-def _to_lead_out(row: sqlite3.Row, names: dict[str, str]) -> LeadOut:
+def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityContext) -> LeadOut:
+    intelligence = _to_intelligence_out(row["id"], db.get_latest_lead_intelligence(row["id"]))
+    next_best_action = compute_next_best_action(
+        status=row["status"],
+        contact_status=row["contact_status"],
+        opportunity_stage=row["opportunity_stage"],
+        lead_score=intelligence.lead_score if intelligence else None,
+        has_intelligence=intelligence is not None,
+        call_scheduled_today=row["id"] in activity.calls_today,
+        last_contact_date=activity.last_contact_date(row["id"]),
+        today=activity.today,
+    )
     return LeadOut(
         id=row["id"],
         timestamp=row["timestamp"],
@@ -102,9 +140,11 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str]) -> LeadOut:
         assigned_user_id=row["assigned_user_id"],
         assigned_name=names.get(row["assigned_user_id"]) if row["assigned_user_id"] else None,
         list_id=row["list_id"],
+        opportunity_stage=row["opportunity_stage"],
+        next_best_action=next_best_action,
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
         emails=[EmailOut(id=e["id"], email=e["email"], source=e["source"]) for e in db.list_emails(row["id"])],
-        intelligence=_to_intelligence_out(row["id"], db.get_latest_lead_intelligence(row["id"])),
+        intelligence=intelligence,
     )
 
 
@@ -121,15 +161,16 @@ def _require_lead_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
 
 
 @router.get("", response_model=LeadListResponse)
-def list_leads(current_user: CurrentUser = Depends(get_current_user)) -> LeadListResponse:
+def list_leads(current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadListResponse:
     names = _user_name_map()
-    return LeadListResponse(leads=[_to_lead_out(r, names) for r in db.list_leads()])
+    return LeadListResponse(leads=[_to_lead_out(r, names, activity) for r in db.list_leads()])
 
 
 @router.post("", response_model=LeadOut)
 @limiter.limit(get_settings().rate_limit)
 async def create_lead(
-    request: Request, body: CreateLeadRequest, current_user: CurrentUser = Depends(get_current_user)
+    request: Request, body: CreateLeadRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     # Default path (body.list_id is None): identical to before — lead lands
     # in the shared pool, owned by whoever ran the lookup.
@@ -170,21 +211,22 @@ async def create_lead(
         )
 
     row = db.get_lead(lead_id)
-    return _to_lead_out(row, _user_name_map())
+    return _to_lead_out(row, _user_name_map(), activity)
 
 
 @router.get("/{lead_id}", response_model=LeadOut)
-def get_lead(lead_id: str, current_user: CurrentUser = Depends(get_current_user)) -> LeadOut:
+def get_lead(lead_id: str, current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadOut:
     row = db.get_lead(lead_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Lead not found")
     _require_lead_access(row, current_user)
-    return _to_lead_out(row, _user_name_map())
+    return _to_lead_out(row, _user_name_map(), activity)
 
 
 @router.patch("/{lead_id}", response_model=LeadOut)
 def update_lead(
-    lead_id: str, body: UpdateLeadRequest, current_user: CurrentUser = Depends(get_current_user)
+    lead_id: str, body: UpdateLeadRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     row = db.get_lead(lead_id)
     if row is None:
@@ -195,12 +237,13 @@ def update_lead(
     db.update_lead_fields(lead_id, fields, now_iso())
 
     updated = db.get_lead(lead_id)
-    return _to_lead_out(updated, _user_name_map())
+    return _to_lead_out(updated, _user_name_map(), activity)
 
 
 @router.post("/{lead_id}/assign", response_model=LeadOut)
 def assign_lead(
-    lead_id: str, body: AssignLeadRequest, current_user: CurrentUser = Depends(get_current_user)
+    lead_id: str, body: AssignLeadRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     row = db.get_lead(lead_id)
     if row is None:
@@ -213,14 +256,15 @@ def assign_lead(
     db.assign_lead(lead_id, body.assigned_user_id, now_iso())
 
     updated = db.get_lead(lead_id)
-    return _to_lead_out(updated, _user_name_map())
+    return _to_lead_out(updated, _user_name_map(), activity)
 
 
 # --- Phone numbers (manual CRUD — independent of the AI phone-lookup pipeline above) ---
 
 @router.post("/{lead_id}/phones", response_model=LeadOut)
 def add_phone(
-    lead_id: str, body: AddPhoneRequest, current_user: CurrentUser = Depends(get_current_user)
+    lead_id: str, body: AddPhoneRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -230,12 +274,13 @@ def add_phone(
         db.add_phone(id=new_id(), lead_id=lead_id, phone_number=body.phone_number, source="manual", created_at=now_iso())
     except sqlite3.IntegrityError:
         raise _duplicate_error("phone number")
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 @router.patch("/{lead_id}/phones/{phone_id}", response_model=LeadOut)
 def update_phone(
-    lead_id: str, phone_id: str, body: UpdatePhoneRequest, current_user: CurrentUser = Depends(get_current_user)
+    lead_id: str, phone_id: str, body: UpdatePhoneRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -248,11 +293,11 @@ def update_phone(
         db.update_phone(phone_id, body.phone_number)
     except sqlite3.IntegrityError:
         raise _duplicate_error("phone number")
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 @router.delete("/{lead_id}/phones/{phone_id}", response_model=LeadOut)
-def delete_phone(lead_id: str, phone_id: str, current_user: CurrentUser = Depends(get_current_user)) -> LeadOut:
+def delete_phone(lead_id: str, phone_id: str, current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -261,14 +306,15 @@ def delete_phone(lead_id: str, phone_id: str, current_user: CurrentUser = Depend
     if phone is None or phone["lead_id"] != lead_id:
         raise HTTPException(status_code=404, detail="Phone number not found on this lead")
     db.delete_phone(phone_id)
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 # --- Email addresses (manual CRUD — fully independent of phones and of the email scraper) ---
 
 @router.post("/{lead_id}/emails", response_model=LeadOut)
 def add_email(
-    lead_id: str, body: AddEmailRequest, current_user: CurrentUser = Depends(get_current_user)
+    lead_id: str, body: AddEmailRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -278,12 +324,13 @@ def add_email(
         db.add_email(id=new_id(), lead_id=lead_id, email=body.email, source="manual", created_at=now_iso())
     except sqlite3.IntegrityError:
         raise _duplicate_error("email address")
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 @router.patch("/{lead_id}/emails/{email_id}", response_model=LeadOut)
 def update_email(
-    lead_id: str, email_id: str, body: UpdateEmailRequest, current_user: CurrentUser = Depends(get_current_user)
+    lead_id: str, email_id: str, body: UpdateEmailRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -296,11 +343,11 @@ def update_email(
         db.update_email(email_id, body.email)
     except sqlite3.IntegrityError:
         raise _duplicate_error("email address")
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 @router.delete("/{lead_id}/emails/{email_id}", response_model=LeadOut)
-def delete_email(lead_id: str, email_id: str, current_user: CurrentUser = Depends(get_current_user)) -> LeadOut:
+def delete_email(lead_id: str, email_id: str, current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
         raise HTTPException(status_code=404, detail="Lead not found")
@@ -309,7 +356,7 @@ def delete_email(lead_id: str, email_id: str, current_user: CurrentUser = Depend
     if email is None or email["lead_id"] != lead_id:
         raise HTTPException(status_code=404, detail="Email address not found on this lead")
     db.delete_email(email_id)
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 # --- Independent AI email scraper — manual trigger only, never automatic ---
@@ -317,7 +364,8 @@ def delete_email(lead_id: str, email_id: str, current_user: CurrentUser = Depend
 @router.post("/{lead_id}/scrape-email", response_model=LeadOut)
 @limiter.limit(get_settings().rate_limit)
 async def scrape_email_route(
-    request: Request, lead_id: str, current_user: CurrentUser = Depends(get_current_user)
+    request: Request, lead_id: str, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -329,7 +377,7 @@ async def scrape_email_route(
     for email in result.emails:
         db.add_email_ignore_duplicate(id=new_id(), lead_id=lead_id, email=email, source="scraped", created_at=created_at)
 
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 # --- AI Sales Intelligence — manual trigger only, full version history kept ---
@@ -337,7 +385,8 @@ async def scrape_email_route(
 @router.post("/{lead_id}/generate-intelligence", response_model=LeadOut)
 @limiter.limit(get_settings().rate_limit)
 async def generate_intelligence_route(
-    request: Request, lead_id: str, current_user: CurrentUser = Depends(get_current_user)
+    request: Request, lead_id: str, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
 ) -> LeadOut:
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -378,7 +427,7 @@ async def generate_intelligence_route(
     finally:
         db.release_intelligence_lock(lead_id)
 
-    return _to_lead_out(db.get_lead(lead_id), _user_name_map())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 @router.get("/{lead_id}/intelligence-history", response_model=LeadIntelligenceHistoryResponse)

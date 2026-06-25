@@ -35,7 +35,9 @@ import {
   type SidePanelCallbacks,
 } from "../components/sidePanel";
 import { CONTACT_STATUS_ORDER } from "../constants";
+import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
+import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
 
 const LIST_COLUMN_COUNT = 8; // 7 standard columns + the contacted-toggle column
@@ -221,6 +223,10 @@ export function initColdCallLists(): void {
         const next = lead.contact_status === CONTACT_STATUS_ORDER[0] ? "Contacted" : CONTACT_STATUS_ORDER[0];
         await updateLead(lead.id, { contactStatus: next });
         await refreshCurrentList();
+      },
+      onGenerateEmail: (lead) => {
+        setPendingEmailWriterLead(lead.id);
+        openTab("email-writer", "AI Email Writer");
       },
     });
   }

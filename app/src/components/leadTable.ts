@@ -24,10 +24,23 @@ export function sortLeadsStable(leads: Lead[], col: SortColumn, dir: SortDirecti
   return indexed.map((x) => x.lead);
 }
 
-/** Industry filter (OR within selection) AND search (substring across company/phone/notes/industry). */
-export function filterLeads(leads: Lead[], search: string, selectedIndustries: Set<string>): Lead[] {
+/** Industry filter (OR within selection) AND search (substring across company/phone/notes/industry),
+ * plus an optional exact status filter (dashboard stat cards) and an optional
+ * minimum contact-status rank (Analytics funnel — cumulative, same semantics
+ * as the funnel's own counts: a lead matches if it's at or beyond that stage). */
+export function filterLeads(
+  leads: Lead[],
+  search: string,
+  selectedIndustries: Set<string>,
+  statusFilter: Lead["status"] | null = null,
+  contactStatusMinRank: number | null = null
+): Lead[] {
   const q = search.trim().toLowerCase();
   return leads.filter((lead) => {
+    if (statusFilter && lead.status !== statusFilter) return false;
+    if (contactStatusMinRank !== null && CONTACT_STATUS_ORDER.indexOf(lead.contact_status) < contactStatusMinRank) {
+      return false;
+    }
     if (selectedIndustries.size > 0) {
       const industry = lead.industry || "Uncategorized";
       if (!selectedIndustries.has(industry)) return false;
@@ -48,6 +61,8 @@ export interface RowHandlers {
   onContactStatusChange: (lead: Lead, value: string) => void;
   /** Cold-call-list tables only: prepends a contacted/uncontacted toggle circle. */
   onToggleContacted?: (lead: Lead) => void;
+  /** Reduce-clicks: jump straight to drafting an email for this lead without opening the side panel first. */
+  onGenerateEmail?: (lead: Lead) => void;
 }
 
 const COLUMN_COUNT = 7;
@@ -89,12 +104,13 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
           ).join("")}
         </select>
       </td>
-      <td>
+      <td class="contact-cell">
         ${
           lead.emails.length > 0
             ? `<span class="status-badge unverified">✉ ${lead.emails.length}</span>`
             : `<span class="empty-hint">—</span>`
         }
+        ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
       </td>
     `;
     row.addEventListener("click", (event) => {
@@ -122,6 +138,12 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     toggleBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       handlers.onToggleContacted!(lead);
+    });
+
+    const generateEmailBtn = row.querySelector<HTMLButtonElement>(".generate-email-btn");
+    generateEmailBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handlers.onGenerateEmail!(lead);
     });
 
     tbody.appendChild(row);

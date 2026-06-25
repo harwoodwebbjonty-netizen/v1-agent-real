@@ -5,6 +5,8 @@ from pydantic import BaseModel
 from app.schemas_contacts import EmailOut, PhoneOut
 from app.schemas_sales_intelligence import LeadIntelligenceOut
 
+OpportunityStage = Literal["none", "engaged", "opportunity", "proposal", "won", "lost"]
+
 
 class CreateLeadRequest(BaseModel):
     company: str
@@ -19,6 +21,12 @@ class UpdateLeadRequest(BaseModel):
     contact_title: Optional[str] = None
     website: Optional[str] = None
     linkedin: Optional[str] = None
+    opportunity_stage: Optional[OpportunityStage] = None
+
+
+class NextBestActionOut(BaseModel):
+    action: str
+    reason: str
 
 
 class AssignLeadRequest(BaseModel):
@@ -45,6 +53,8 @@ class LeadOut(BaseModel):
     assigned_user_id: Optional[str]
     assigned_name: Optional[str]
     list_id: Optional[str]
+    opportunity_stage: OpportunityStage
+    next_best_action: NextBestActionOut
     phones: list[PhoneOut]
     emails: list[EmailOut]
     intelligence: Optional[LeadIntelligenceOut]

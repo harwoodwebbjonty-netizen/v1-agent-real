@@ -195,12 +195,88 @@ def _migration_001_baseline(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leads ADD COLUMN list_id TEXT")
 
 
+def _migration_002_call_logs(conn: sqlite3.Connection) -> None:
+    """Real call outcome tracking for the Call Queue. Shared per-lead
+    history like lead_intelligence_versions (no owner-based access
+    restriction) — created_by is attribution, not a visibility boundary."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS call_logs (
+            id TEXT PRIMARY KEY,
+            lead_id TEXT NOT NULL,
+            calendar_event_id TEXT,
+            outcome TEXT NOT NULL,
+            notes TEXT NOT NULL DEFAULT '',
+            duration_seconds INTEGER,
+            created_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_call_logs_lead_id ON call_logs(lead_id);
+        """
+    )
+
+
+def _migration_003_opportunity_stage(conn: sqlite3.Connection) -> None:
+    """Opportunity is a lifecycle stage on top of the existing lead, not a
+    separate disconnected entity — nothing about lead identity/APIs changes."""
+    lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "opportunity_stage" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN opportunity_stage TEXT NOT NULL DEFAULT 'none'")
+
+
+def _migration_004_sequences(conn: sqlite3.Connection) -> None:
+    """Multi-channel sales sequences (email + call/follow-up/reminder
+    tasks). Sending reuses the existing OAuth send path; non-email steps
+    create real calendar tasks rather than performing anything themselves."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS sequences (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'draft',
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS sequence_steps (
+            id TEXT PRIMARY KEY,
+            sequence_id TEXT NOT NULL,
+            step_order INTEGER NOT NULL,
+            delay_days INTEGER NOT NULL,
+            step_type TEXT NOT NULL,
+            subject_template TEXT NOT NULL DEFAULT '',
+            body_template TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_sequence_steps_sequence_id ON sequence_steps(sequence_id);
+
+        CREATE TABLE IF NOT EXISTS sequence_enrollments (
+            id TEXT PRIMARY KEY,
+            sequence_id TEXT NOT NULL,
+            lead_id TEXT NOT NULL,
+            current_step INTEGER NOT NULL DEFAULT 0,
+            status TEXT NOT NULL DEFAULT 'active',
+            last_error TEXT,
+            enrolled_at TEXT NOT NULL,
+            next_run_at TEXT,
+            created_by TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_sequence_enrollments_sequence_id ON sequence_enrollments(sequence_id);
+        CREATE INDEX IF NOT EXISTS idx_sequence_enrollments_lead_id ON sequence_enrollments(lead_id);
+        """
+    )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (1, _migration_001_baseline),
+    (2, _migration_002_call_logs),
+    (3, _migration_003_opportunity_stage),
+    (4, _migration_004_sequences),
 ]
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 4
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -697,6 +773,187 @@ def delete_calendar_event(event_id: str) -> None:
         conn.execute("DELETE FROM calendar_events WHERE id = ?", (event_id,))
 
 
+# --- call logs (shared per-lead history, like lead_intelligence_versions) ---
+
+def create_call_log(
+    id: str,
+    lead_id: str,
+    calendar_event_id: Optional[str],
+    outcome: str,
+    notes: str,
+    duration_seconds: Optional[int],
+    created_by: str,
+    created_at: str,
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO call_logs
+               (id, lead_id, calendar_event_id, outcome, notes, duration_seconds, created_by, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, lead_id, calendar_event_id, outcome, notes, duration_seconds, created_by, created_at),
+        )
+
+
+def list_call_logs_for_lead(lead_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM call_logs WHERE lead_id = ? ORDER BY created_at DESC",
+            (lead_id,),
+        ).fetchall()
+
+
+def get_latest_call_log_for_lead(lead_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM call_logs WHERE lead_id = ? ORDER BY created_at DESC LIMIT 1",
+            (lead_id,),
+        ).fetchone()
+
+
+# --- Bulk activity lookups for Next Best Action — 3 grouped queries total,
+# never one query per lead, so list views stay cheap regardless of lead count. ---
+
+def get_latest_call_log_dates() -> dict[str, str]:
+    with get_connection() as conn:
+        rows = conn.execute("SELECT lead_id, MAX(created_at) AS latest FROM call_logs GROUP BY lead_id").fetchall()
+        return {r["lead_id"]: r["latest"] for r in rows}
+
+
+def get_latest_sent_email_dates() -> dict[str, str]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT lead_id, MAX(sent_at) AS latest FROM email_drafts WHERE sent_at IS NOT NULL GROUP BY lead_id"
+        ).fetchall()
+        return {r["lead_id"]: r["latest"] for r in rows}
+
+
+def get_latest_past_calendar_dates(today: str) -> dict[str, str]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT lead_id, MAX(date) AS latest FROM calendar_events WHERE lead_id IS NOT NULL AND date <= ? GROUP BY lead_id",
+            (today,),
+        ).fetchall()
+        return {r["lead_id"]: r["latest"] for r in rows}
+
+
+def get_lead_ids_with_call_scheduled(date: str) -> set[str]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT DISTINCT lead_id FROM calendar_events WHERE type = 'call' AND date = ? AND lead_id IS NOT NULL",
+            (date,),
+        ).fetchall()
+        return {r["lead_id"] for r in rows}
+
+
+# --- sales sequences (multi-channel automation: email + call/follow-up/reminder tasks) ---
+
+def create_sequence(id: str, name: str, owner_user_id: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO sequences (id, name, owner_user_id, status, created_at, updated_at) VALUES (?, ?, ?, 'draft', ?, ?)",
+            (id, name, owner_user_id, created_at, created_at),
+        )
+
+
+def list_sequences(owner_user_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM sequences WHERE owner_user_id = ? ORDER BY created_at DESC", (owner_user_id,)
+        ).fetchall()
+
+
+def get_sequence(sequence_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM sequences WHERE id = ?", (sequence_id,)).fetchone()
+
+
+def update_sequence_fields(sequence_id: str, fields: dict, updated_at: str) -> None:
+    if not fields:
+        return
+    columns = ", ".join(f"{key} = ?" for key in fields)
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE sequences SET {columns}, updated_at = ? WHERE id = ?",
+            (*fields.values(), updated_at, sequence_id),
+        )
+
+
+def delete_sequence(sequence_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM sequence_enrollments WHERE sequence_id = ?", (sequence_id,))
+        conn.execute("DELETE FROM sequence_steps WHERE sequence_id = ?", (sequence_id,))
+        conn.execute("DELETE FROM sequences WHERE id = ?", (sequence_id,))
+
+
+def add_sequence_step(
+    id: str, sequence_id: str, step_order: int, delay_days: int, step_type: str,
+    subject_template: str, body_template: str, created_at: str,
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO sequence_steps
+               (id, sequence_id, step_order, delay_days, step_type, subject_template, body_template, created_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+            (id, sequence_id, step_order, delay_days, step_type, subject_template, body_template, created_at),
+        )
+
+
+def list_sequence_steps(sequence_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM sequence_steps WHERE sequence_id = ? ORDER BY step_order", (sequence_id,)
+        ).fetchall()
+
+
+def delete_sequence_step(step_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM sequence_steps WHERE id = ?", (step_id,))
+
+
+def enroll_lead_in_sequence(id: str, sequence_id: str, lead_id: str, created_by: str, enrolled_at: str, next_run_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO sequence_enrollments
+               (id, sequence_id, lead_id, current_step, status, enrolled_at, next_run_at, created_by)
+               VALUES (?, ?, ?, 0, 'active', ?, ?, ?)""",
+            (id, sequence_id, lead_id, enrolled_at, next_run_at, created_by),
+        )
+
+
+def list_sequence_enrollments(sequence_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            """SELECT se.*, l.company AS lead_company
+               FROM sequence_enrollments se
+               JOIN leads l ON l.id = se.lead_id
+               WHERE se.sequence_id = ?
+               ORDER BY se.enrolled_at DESC""",
+            (sequence_id,),
+        ).fetchall()
+
+
+def get_sequence_enrollment(enrollment_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM sequence_enrollments WHERE id = ?", (enrollment_id,)).fetchone()
+
+
+def update_enrollment(enrollment_id: str, fields: dict) -> None:
+    if not fields:
+        return
+    columns = ", ".join(f"{key} = ?" for key in fields)
+    with get_connection() as conn:
+        conn.execute(f"UPDATE sequence_enrollments SET {columns} WHERE id = ?", (*fields.values(), enrollment_id))
+
+
+def list_due_enrollments(now: str) -> list[sqlite3.Row]:
+    """Active enrollments whose next step is due — what the scheduler polls."""
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM sequence_enrollments WHERE status = 'active' AND next_run_at IS NOT NULL AND next_run_at <= ?",
+            (now,),
+        ).fetchall()
+
+
 # --- brand voice profiles (one row per user — "get your own, or sensible empty defaults") ---
 
 _BRAND_VOICE_COLUMNS = (
@@ -806,6 +1063,23 @@ def list_email_drafts(lead_id: str) -> list[sqlite3.Row]:
     with get_connection() as conn:
         return conn.execute(
             "SELECT * FROM email_drafts WHERE lead_id = ? ORDER BY created_at DESC, id DESC", (lead_id,)
+        ).fetchall()
+
+
+def list_pending_email_drafts(owner_user_id: str) -> list[sqlite3.Row]:
+    """This owner's started-but-unsent drafts across every lead — for the
+    Action Centre's "emails requiring action" section. Scoped to the
+    requesting user, same privacy boundary as every other draft endpoint.
+    Joins the lead's company name in directly since that's all the UI
+    needs to display the row."""
+    with get_connection() as conn:
+        return conn.execute(
+            """SELECT ed.*, l.company AS lead_company
+               FROM email_drafts ed
+               JOIN leads l ON l.id = ed.lead_id
+               WHERE ed.status = 'draft' AND ed.owner_user_id = ?
+               ORDER BY ed.updated_at DESC""",
+            (owner_user_id,),
         ).fetchall()
 
 

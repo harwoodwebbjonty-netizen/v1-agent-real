@@ -19,6 +19,14 @@ export function getSelectedIndustries(): Set<string> {
   return selected;
 }
 
+/** External setter — used by Analytics' industry chart click-through to
+ * filter the Dashboard down to one industry without duplicating this
+ * already-real filter mechanism. */
+export function setIndustryFilter(industries: string[]): void {
+  selected = new Set(industries);
+  notify();
+}
+
 export function subscribeIndustryFilter(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);

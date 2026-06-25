@@ -150,11 +150,13 @@ async fn update_lead(
     contact_title: Option<String>,
     website: Option<String>,
     linkedin: Option<String>,
+    opportunity_stage: Option<String>,
 ) -> Result<LeadRecord, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
     backend_client::update_lead(
         &base_url, &session.token, &id, industry, contact_status, lead_notes, contact_name, contact_title, website, linkedin,
+        opportunity_stage,
     )
     .await
 }
@@ -317,6 +319,38 @@ async fn delete_calendar_event(app_handle: tauri::AppHandle, id: String) -> Resu
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
     backend_client::delete_calendar_event(&base_url, &session.token, &id).await
+}
+
+// --- Call logs (shared per-lead history) ---
+
+#[tauri::command]
+async fn list_call_logs(app_handle: tauri::AppHandle, lead_id: String) -> Result<Vec<backend_client::CallLogRecord>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_call_logs(&base_url, &session.token, &lead_id).await
+}
+
+#[tauri::command]
+async fn create_call_log(
+    app_handle: tauri::AppHandle,
+    lead_id: String,
+    calendar_event_id: Option<String>,
+    outcome: String,
+    notes: String,
+    duration_seconds: Option<i64>,
+) -> Result<backend_client::CallLogRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_call_log(
+        &base_url,
+        &session.token,
+        &lead_id,
+        calendar_event_id.as_deref(),
+        &outcome,
+        &notes,
+        duration_seconds,
+    )
+    .await
 }
 
 // --- Cold call lists (private per-user lead lists; admins reach all of them) ---
@@ -517,6 +551,13 @@ async fn list_email_drafts(app_handle: tauri::AppHandle, lead_id: String) -> Res
 }
 
 #[tauri::command]
+async fn list_pending_email_drafts(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::PendingEmailDraft>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_pending_email_drafts(&base_url, &session.token).await
+}
+
+#[tauri::command]
 async fn delete_email_draft(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -588,6 +629,108 @@ async fn send_email_draft(
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
     backend_client::send_email_draft(&base_url, &session.token, &draft_id, &provider).await
+}
+
+// --- Sales Sequences ---
+
+#[tauri::command]
+async fn list_sequences(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::SequenceRecord>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_sequences(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn create_sequence(app_handle: tauri::AppHandle, name: String) -> Result<backend_client::SequenceRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_sequence(&base_url, &session.token, &name).await
+}
+
+#[tauri::command]
+async fn update_sequence(
+    app_handle: tauri::AppHandle,
+    id: String,
+    name: Option<String>,
+    status: Option<String>,
+) -> Result<backend_client::SequenceRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::update_sequence(&base_url, &session.token, &id, name.as_deref(), status.as_deref()).await
+}
+
+#[tauri::command]
+async fn delete_sequence(app_handle: tauri::AppHandle, id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_sequence(&base_url, &session.token, &id).await
+}
+
+#[tauri::command]
+async fn list_sequence_steps(
+    app_handle: tauri::AppHandle,
+    sequence_id: String,
+) -> Result<Vec<backend_client::SequenceStepRecord>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_sequence_steps(&base_url, &session.token, &sequence_id).await
+}
+
+#[tauri::command]
+#[allow(clippy::too_many_arguments)]
+async fn add_sequence_step(
+    app_handle: tauri::AppHandle,
+    sequence_id: String,
+    delay_days: i64,
+    step_type: String,
+    subject_template: String,
+    body_template: String,
+) -> Result<backend_client::SequenceStepRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::add_sequence_step(
+        &base_url, &session.token, &sequence_id, delay_days, &step_type, &subject_template, &body_template,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn delete_sequence_step(app_handle: tauri::AppHandle, sequence_id: String, step_id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_sequence_step(&base_url, &session.token, &sequence_id, &step_id).await
+}
+
+#[tauri::command]
+async fn list_sequence_enrollments(
+    app_handle: tauri::AppHandle,
+    sequence_id: String,
+) -> Result<Vec<backend_client::SequenceEnrollmentRecord>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_sequence_enrollments(&base_url, &session.token, &sequence_id).await
+}
+
+#[tauri::command]
+async fn enroll_lead_in_sequence(
+    app_handle: tauri::AppHandle,
+    sequence_id: String,
+    lead_id: String,
+) -> Result<backend_client::SequenceEnrollmentRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::enroll_lead_in_sequence(&base_url, &session.token, &sequence_id, &lead_id).await
+}
+
+#[tauri::command]
+async fn stop_sequence_enrollment(
+    app_handle: tauri::AppHandle,
+    sequence_id: String,
+    enrollment_id: String,
+) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::stop_sequence_enrollment(&base_url, &session.token, &sequence_id, &enrollment_id).await
 }
 
 /// One-time, admin-only: imports the legacy local CSV (pre-team-workspace
@@ -664,6 +807,8 @@ pub fn run() {
       create_calendar_event,
       update_calendar_event,
       delete_calendar_event,
+      list_call_logs,
+      create_call_log,
       create_lead_list,
       list_lead_lists,
       get_list_leads,
@@ -679,6 +824,7 @@ pub fn run() {
       refine_email_draft,
       update_email_draft,
       list_email_drafts,
+      list_pending_email_drafts,
       delete_email_draft,
       generate_email_personalisation,
       get_email_cta_suggestions,
@@ -687,6 +833,16 @@ pub fn run() {
       list_email_oauth_accounts,
       disconnect_email_oauth_account,
       send_email_draft,
+      list_sequences,
+      create_sequence,
+      update_sequence,
+      delete_sequence,
+      list_sequence_steps,
+      add_sequence_step,
+      delete_sequence_step,
+      list_sequence_enrollments,
+      enroll_lead_in_sequence,
+      stop_sequence_enrollment,
       export_log_csv,
       migrate_local_leads_to_team
     ])

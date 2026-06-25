@@ -106,7 +106,7 @@ def test_legacy_database_upgrades_preserving_all_data(isolated_db):
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        assert db.get_schema_version(conn) == 1
+        assert db.get_schema_version(conn) == db.CURRENT_SCHEMA_VERSION
         assert conn.execute("SELECT * FROM users WHERE id='user-1'").fetchone()["name"] == "Jonty"
         assert conn.execute("SELECT * FROM leads WHERE id='lead-1'").fetchone()["company"] == "Acme"
         assert conn.execute("SELECT * FROM calendar_events WHERE id='event-1'").fetchone()["title"] == "Call Acme"
@@ -200,6 +200,62 @@ def test_restore_round_trip(isolated_db):
 
     safety_copies = list(db_path.parent.glob("team-pre-restore-*.db"))
     assert len(safety_copies) == 1
+
+
+def test_call_logs_migration_and_crud(isolated_db):
+    db_path, _ = isolated_db
+    db.init_db()
+
+    db.create_user("user-1", "Jonty", "admin", "2026-01-01T00:00:00")
+    db.create_lead(
+        id="lead-1",
+        timestamp="2026-01-01T00:00:00",
+        company="Acme",
+        phone_number="555",
+        source_url="",
+        status="verified",
+        notes="",
+        owner_user_id="user-1",
+        created_at="2026-01-01T00:00:00",
+    )
+
+    db.create_call_log(
+        id="call-1",
+        lead_id="lead-1",
+        calendar_event_id=None,
+        outcome="connected",
+        notes="Spoke to the owner, interested.",
+        duration_seconds=180,
+        created_by="user-1",
+        created_at="2026-01-01T09:00:00",
+    )
+    db.create_call_log(
+        id="call-2",
+        lead_id="lead-1",
+        calendar_event_id=None,
+        outcome="voicemail",
+        notes="",
+        duration_seconds=None,
+        created_by="user-1",
+        created_at="2026-01-02T09:00:00",
+    )
+
+    logs = db.list_call_logs_for_lead("lead-1")
+    assert len(logs) == 2
+    # Most recent first.
+    assert logs[0]["id"] == "call-2"
+    assert logs[1]["outcome"] == "connected"
+    assert logs[1]["duration_seconds"] == 180
+
+    latest = db.get_latest_call_log_for_lead("lead-1")
+    assert latest["id"] == "call-2"
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        assert db.get_schema_version(conn) == db.CURRENT_SCHEMA_VERSION
+    finally:
+        conn.close()
 
 
 def test_corrupt_backup_rejected(isolated_db):

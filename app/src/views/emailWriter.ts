@@ -25,6 +25,7 @@ import {
 } from "../api";
 import { consumePendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeads, subscribe } from "../state";
+import { getActiveTabId, subscribeTabs } from "../tabs";
 import { escapeHtml } from "../utils";
 
 const VARIABLES: { key: string; label: string }[] = [
@@ -832,11 +833,26 @@ export function initEmailWriter(): void {
     await refreshTemplates();
   })();
 
-  // External hand-off from the side panel's "Write Email" button.
-  const pendingLeadId = consumePendingEmailWriterLead();
-  if (pendingLeadId) {
-    selectLeadForActiveSession(pendingLeadId);
-  } else {
+  // External hand-off from "Generate Email" buttons elsewhere (side panel,
+  // Call Queue, Action Centre, ...). Checked both at startup (in case this
+  // view happens to init after the handoff was set) and every time this
+  // tab actually becomes active — a hand-off set while the user is already
+  // elsewhere only takes effect once they switch here, which is the whole
+  // point of it being a hand-off rather than an immediate jump.
+  function checkPendingHandoff(): boolean {
+    const pendingLeadId = consumePendingEmailWriterLead();
+    if (pendingLeadId) {
+      selectLeadForActiveSession(pendingLeadId);
+      return true;
+    }
+    return false;
+  }
+
+  subscribeTabs(() => {
+    if (getActiveTabId() === "email-writer") checkPendingHandoff();
+  });
+
+  if (!checkPendingHandoff()) {
     renderAll();
   }
 }

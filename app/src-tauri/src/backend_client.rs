@@ -61,6 +61,12 @@ pub struct EmailRecord {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NextBestAction {
+    pub action: String,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeadRecord {
     pub id: String,
     pub timestamp: String,
@@ -81,6 +87,8 @@ pub struct LeadRecord {
     pub assigned_user_id: Option<String>,
     pub assigned_name: Option<String>,
     pub list_id: Option<String>,
+    pub opportunity_stage: String,
+    pub next_best_action: NextBestAction,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
     pub intelligence: Option<LeadIntelligence>,
@@ -132,6 +140,7 @@ struct UpdateLeadRequest {
     contact_title: Option<String>,
     website: Option<String>,
     linkedin: Option<String>,
+    opportunity_stage: Option<String>,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -146,13 +155,23 @@ pub async fn update_lead(
     contact_title: Option<String>,
     website: Option<String>,
     linkedin: Option<String>,
+    opportunity_stage: Option<String>,
 ) -> Result<LeadRecord, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/leads/{}", base_url, id);
     let response = client
         .patch(&url)
         .header("Authorization", format!("Bearer {}", token))
-        .json(&UpdateLeadRequest { industry, contact_status, lead_notes, contact_name, contact_title, website, linkedin })
+        .json(&UpdateLeadRequest {
+            industry,
+            contact_status,
+            lead_notes,
+            contact_name,
+            contact_title,
+            website,
+            linkedin,
+            opportunity_stage,
+        })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
@@ -664,6 +683,68 @@ pub async fn delete_calendar_event(base_url: &str, token: &str, id: &str) -> Res
     Ok(())
 }
 
+// --- Call logs (shared per-lead history, no owner restriction) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CallLogRecord {
+    pub id: String,
+    pub lead_id: String,
+    pub calendar_event_id: Option<String>,
+    pub outcome: String,
+    pub notes: String,
+    pub duration_seconds: Option<i64>,
+    pub created_by: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct CallLogsResponse {
+    call_logs: Vec<CallLogRecord>,
+}
+
+pub async fn list_call_logs(base_url: &str, token: &str, lead_id: &str) -> Result<Vec<CallLogRecord>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/call-logs/lead/{}", base_url, lead_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: CallLogsResponse = handle_response(response).await?;
+    Ok(parsed.call_logs)
+}
+
+#[derive(Serialize)]
+struct CreateCallLogRequest<'a> {
+    lead_id: &'a str,
+    calendar_event_id: Option<&'a str>,
+    outcome: &'a str,
+    notes: &'a str,
+    duration_seconds: Option<i64>,
+}
+
+pub async fn create_call_log(
+    base_url: &str,
+    token: &str,
+    lead_id: &str,
+    calendar_event_id: Option<&str>,
+    outcome: &str,
+    notes: &str,
+    duration_seconds: Option<i64>,
+) -> Result<CallLogRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/call-logs", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateCallLogRequest { lead_id, calendar_event_id, outcome, notes, duration_seconds })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
 // --- AI Email Writer: brand voice ---
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -983,6 +1064,44 @@ pub async fn list_email_drafts(base_url: &str, token: &str, lead_id: &str) -> Re
     Ok(parsed.drafts)
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct PendingEmailDraft {
+    pub id: String,
+    pub lead_id: String,
+    pub owner_user_id: String,
+    pub subject: String,
+    pub body: String,
+    pub tone: String,
+    pub length: String,
+    pub status: String,
+    pub sent_via: Option<String>,
+    pub sent_at: Option<String>,
+    pub estimated_open_rate: Option<f64>,
+    pub estimated_reply_rate: Option<f64>,
+    pub estimated_readability_score: Option<f64>,
+    pub created_at: String,
+    pub updated_at: String,
+    pub lead_company: String,
+}
+
+#[derive(Deserialize)]
+struct PendingEmailDraftsResponse {
+    drafts: Vec<PendingEmailDraft>,
+}
+
+pub async fn list_pending_email_drafts(base_url: &str, token: &str) -> Result<Vec<PendingEmailDraft>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/email-drafts/pending", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: PendingEmailDraftsResponse = handle_response(response).await?;
+    Ok(parsed.drafts)
+}
+
 pub async fn delete_email_draft(base_url: &str, token: &str, id: &str) -> Result<(), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/email-drafts/{}", base_url, id);
@@ -1158,4 +1277,241 @@ pub async fn send_email_draft(base_url: &str, token: &str, draft_id: &str, provi
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
+}
+
+// --- Sales Sequences (multi-channel automation: email + call/follow-up/reminder tasks) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequenceRecord {
+    pub id: String,
+    pub name: String,
+    pub owner_user_id: String,
+    pub status: String,
+    pub created_at: String,
+    pub updated_at: String,
+    pub step_count: i64,
+    pub enrollment_count: i64,
+}
+
+#[derive(Deserialize)]
+struct SequencesResponse {
+    sequences: Vec<SequenceRecord>,
+}
+
+pub async fn list_sequences(base_url: &str, token: &str) -> Result<Vec<SequenceRecord>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: SequencesResponse = handle_response(response).await?;
+    Ok(parsed.sequences)
+}
+
+#[derive(Serialize)]
+struct CreateSequenceRequest<'a> {
+    name: &'a str,
+}
+
+pub async fn create_sequence(base_url: &str, token: &str, name: &str) -> Result<SequenceRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateSequenceRequest { name })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+#[derive(Serialize)]
+struct UpdateSequenceRequest<'a> {
+    name: Option<&'a str>,
+    status: Option<&'a str>,
+}
+
+pub async fn update_sequence(
+    base_url: &str,
+    token: &str,
+    id: &str,
+    name: Option<&str>,
+    status: Option<&str>,
+) -> Result<SequenceRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}", base_url, id);
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&UpdateSequenceRequest { name, status })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn delete_sequence(base_url: &str, token: &str, id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}", base_url, id);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequenceStepRecord {
+    pub id: String,
+    pub sequence_id: String,
+    pub step_order: i64,
+    pub delay_days: i64,
+    pub step_type: String,
+    pub subject_template: String,
+    pub body_template: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct SequenceStepsResponse {
+    steps: Vec<SequenceStepRecord>,
+}
+
+pub async fn list_sequence_steps(base_url: &str, token: &str, sequence_id: &str) -> Result<Vec<SequenceStepRecord>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}/steps", base_url, sequence_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: SequenceStepsResponse = handle_response(response).await?;
+    Ok(parsed.steps)
+}
+
+#[derive(Serialize)]
+struct AddSequenceStepRequest<'a> {
+    delay_days: i64,
+    step_type: &'a str,
+    subject_template: &'a str,
+    body_template: &'a str,
+}
+
+pub async fn add_sequence_step(
+    base_url: &str,
+    token: &str,
+    sequence_id: &str,
+    delay_days: i64,
+    step_type: &str,
+    subject_template: &str,
+    body_template: &str,
+) -> Result<SequenceStepRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}/steps", base_url, sequence_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&AddSequenceStepRequest { delay_days, step_type, subject_template, body_template })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn delete_sequence_step(base_url: &str, token: &str, sequence_id: &str, step_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}/steps/{}", base_url, sequence_id, step_id);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SequenceEnrollmentRecord {
+    pub id: String,
+    pub sequence_id: String,
+    pub lead_id: String,
+    pub lead_company: String,
+    pub current_step: i64,
+    pub status: String,
+    pub last_error: Option<String>,
+    pub enrolled_at: String,
+    pub next_run_at: Option<String>,
+    pub created_by: String,
+}
+
+#[derive(Deserialize)]
+struct SequenceEnrollmentsResponse {
+    enrollments: Vec<SequenceEnrollmentRecord>,
+}
+
+pub async fn list_sequence_enrollments(
+    base_url: &str,
+    token: &str,
+    sequence_id: &str,
+) -> Result<Vec<SequenceEnrollmentRecord>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}/enrollments", base_url, sequence_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: SequenceEnrollmentsResponse = handle_response(response).await?;
+    Ok(parsed.enrollments)
+}
+
+#[derive(Serialize)]
+struct EnrollLeadRequest<'a> {
+    lead_id: &'a str,
+}
+
+pub async fn enroll_lead_in_sequence(
+    base_url: &str,
+    token: &str,
+    sequence_id: &str,
+    lead_id: &str,
+) -> Result<SequenceEnrollmentRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}/enrollments", base_url, sequence_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&EnrollLeadRequest { lead_id })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn stop_sequence_enrollment(
+    base_url: &str,
+    token: &str,
+    sequence_id: &str,
+    enrollment_id: &str,
+) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/sequences/{}/enrollments/{}/stop", base_url, sequence_id, enrollment_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
 }
