@@ -202,6 +202,26 @@ def test_restore_round_trip(isolated_db):
     assert len(safety_copies) == 1
 
 
+def test_presence_migration_and_heartbeat(isolated_db):
+    db_path, _ = isolated_db
+    db.init_db()
+
+    db.create_user("user-1", "Jonty", "admin", "2026-01-01T00:00:00")
+    user = db.get_user_by_id("user-1")
+    assert user["last_seen_at"] is None
+
+    db.update_user_last_seen("user-1", "2026-01-02T09:00:00")
+    user = db.get_user_by_id("user-1")
+    assert user["last_seen_at"] == "2026-01-02T09:00:00"
+
+    conn = sqlite3.connect(db_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        assert db.get_schema_version(conn) == db.CURRENT_SCHEMA_VERSION
+    finally:
+        conn.close()
+
+
 def test_call_logs_migration_and_crud(isolated_db):
     db_path, _ = isolated_db
     db.init_db()

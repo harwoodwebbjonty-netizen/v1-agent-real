@@ -2,6 +2,7 @@ import "./style.css";
 import { initAuth } from "./auth";
 import { initTabBar } from "./components/tabBar";
 import { initIdentitySwitcher } from "./identitySwitcher";
+import { initPresence } from "./presence";
 import { initTabRouter } from "./router";
 import { initSidebarToggle } from "./sidebarToggle";
 import { initTheme, toggleTheme } from "./theme";
@@ -34,6 +35,7 @@ initSettings();
 initTabBar();
 initTabRouter();
 initSidebarToggle();
+initPresence();
 
 document.querySelector<HTMLButtonElement>("#theme-toggle-btn")!.addEventListener("click", () => {
   toggleTheme();

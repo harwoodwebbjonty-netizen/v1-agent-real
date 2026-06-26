@@ -6,6 +6,7 @@ pub struct UserInfo {
     pub name: String,
     pub role: String,
     pub avatar: Option<String>,
+    pub last_seen_at: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -44,6 +45,22 @@ pub async fn identify(base_url: &str, name: &str) -> Result<(String, UserInfo), 
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     let parsed: LoginResponse = handle_response(response).await?;
     Ok((parsed.token, parsed.user))
+}
+
+/// Real presence ping — called periodically while the app is open, not a
+/// fabricated "online" flag. Failures are non-fatal (no network = no
+/// update to last_seen_at, nothing else in the app depends on this).
+pub async fn heartbeat(base_url: &str, token: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/auth/heartbeat", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
 }
 
 pub async fn logout(base_url: &str, token: &str) -> Result<(), String> {

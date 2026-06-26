@@ -47,3 +47,12 @@ def me(current_user: CurrentUser = Depends(get_current_user)) -> UserOut:
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user_out_from_row(user)
+
+
+@router.post("/heartbeat")
+def heartbeat(current_user: CurrentUser = Depends(get_current_user)) -> dict[str, str]:
+    """Called periodically while the app is open — real presence, not a
+    fabricated "online" flag. The frontend decides the "active" threshold
+    by comparing last_seen_at to now; this endpoint just records the ping."""
+    db.update_user_last_seen(current_user.id, now_iso())
+    return {"status": "ok"}

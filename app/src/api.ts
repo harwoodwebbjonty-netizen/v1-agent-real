@@ -132,6 +132,7 @@ export interface UserInfo {
   name: string;
   role: "admin" | "member";
   avatar: string | null;
+  last_seen_at: string | null;
 }
 
 // --- Auth ---
@@ -144,6 +145,11 @@ export async function identify(name: string): Promise<UserInfo> {
 
 export async function logout(): Promise<void> {
   await invoke("logout");
+}
+
+/** Real presence ping — called periodically while the app is open. */
+export async function sendHeartbeat(): Promise<void> {
+  await invoke("send_heartbeat");
 }
 
 export async function getCurrentSession(): Promise<UserInfo | null> {

@@ -34,6 +34,13 @@ async fn logout(app_handle: tauri::AppHandle) -> Result<(), String> {
 }
 
 #[tauri::command]
+async fn send_heartbeat(app_handle: tauri::AppHandle) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::heartbeat(&base_url, &session.token).await
+}
+
+#[tauri::command]
 fn get_current_session(app_handle: tauri::AppHandle) -> Option<UserInfo> {
     app_state::load_session(&app_handle).map(|s| s.user)
 }
@@ -779,6 +786,7 @@ pub fn run() {
     .invoke_handler(tauri::generate_handler![
       identify,
       logout,
+      send_heartbeat,
       get_current_session,
       list_team_members,
       create_team_member,

@@ -352,6 +352,31 @@ body {
   transform: translateX(-50%) translateY(0);
 }
 
+.active-users-bar {
+  position: fixed;
+  top: var(--space-3);
+  right: var(--space-4);
+  z-index: 150;
+  display: flex;
+  align-items: center;
+  padding: 4px 6px;
+  border-radius: 999px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow-card);
+}
+
+.active-user-avatar {
+  display: inline-flex;
+  margin-left: -6px;
+  border-radius: 50%;
+  border: 2px solid var(--surface);
+}
+
+.active-user-avatar:first-child {
+  margin-left: 0;
+}
+
 .update-banner {
   position: fixed;
   bottom: var(--space-5);

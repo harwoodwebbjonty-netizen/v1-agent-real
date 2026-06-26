@@ -268,6 +268,15 @@ def _migration_004_sequences(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_005_presence(conn: sqlite3.Connection) -> None:
+    """Real presence — updated by a heartbeat while the app is open, not a
+    fabricated "online" flag. Nullable: nobody has ever sent a heartbeat
+    until they're running a build new enough to send one."""
+    user_columns = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+    if "last_seen_at" not in user_columns:
+        conn.execute("ALTER TABLE users ADD COLUMN last_seen_at TEXT")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -275,8 +284,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (2, _migration_002_call_logs),
     (3, _migration_003_opportunity_stage),
     (4, _migration_004_sequences),
+    (5, _migration_005_presence),
 ]
-CURRENT_SCHEMA_VERSION = 4
+CURRENT_SCHEMA_VERSION = 5
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -463,6 +473,11 @@ def delete_user(user_id: str) -> None:
 def update_user_avatar(user_id: str, avatar: Optional[str]) -> None:
     with get_connection() as conn:
         conn.execute("UPDATE users SET avatar = ? WHERE id = ?", (avatar, user_id))
+
+
+def update_user_last_seen(user_id: str, last_seen_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET last_seen_at = ? WHERE id = ?", (last_seen_at, user_id))
 
 
 # --- sessions ---
