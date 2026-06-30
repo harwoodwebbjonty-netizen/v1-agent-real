@@ -2,6 +2,7 @@ import { getActiveTabId, getOpenTabs, subscribeTabs, type ViewName } from "./tab
 
 const ALL_VIEWS: ViewName[] = [
   "action-centre",
+  "ai-prospecting",
   "dashboard",
   "call-queue",
   "opportunity-workspace",

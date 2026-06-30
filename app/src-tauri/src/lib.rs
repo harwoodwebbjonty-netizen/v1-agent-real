@@ -740,6 +740,42 @@ async fn stop_sequence_enrollment(
     backend_client::stop_sequence_enrollment(&base_url, &session.token, &sequence_id, &enrollment_id).await
 }
 
+// --- AI Prospecting ---
+
+#[tauri::command]
+async fn get_prospecting_status(app_handle: tauri::AppHandle) -> Result<backend_client::ProspectingStatus, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_prospecting_status(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn start_prospecting_run(
+    app_handle: tauri::AppHandle,
+    criteria: backend_client::ProspectingCriteria,
+) -> Result<backend_client::StartProspectingResponse, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::start_prospecting_run(&base_url, &session.token, &criteria).await
+}
+
+#[tauri::command]
+async fn get_prospecting_run(
+    app_handle: tauri::AppHandle,
+    run_id: String,
+) -> Result<backend_client::ProspectingRunRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_prospecting_run(&base_url, &session.token, &run_id).await
+}
+
+#[tauri::command]
+async fn list_prospecting_runs(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::ProspectingRunRecord>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_prospecting_runs(&base_url, &session.token).await
+}
+
 /// One-time, admin-only: imports the legacy local CSV (pre-team-workspace
 /// data) into the shared backend. Only place in the app that still reads
 /// `csv_log.rs` at runtime.
@@ -851,6 +887,10 @@ pub fn run() {
       list_sequence_enrollments,
       enroll_lead_in_sequence,
       stop_sequence_enrollment,
+      get_prospecting_status,
+      start_prospecting_run,
+      get_prospecting_run,
+      list_prospecting_runs,
       export_log_csv,
       migrate_local_leads_to_team
     ])

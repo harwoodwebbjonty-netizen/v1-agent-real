@@ -142,6 +142,8 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         list_id=row["list_id"],
         opportunity_stage=row["opportunity_stage"],
         next_best_action=next_best_action,
+        company_number=row["company_number"],
+        ch_data=row["ch_data"],
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
         emails=[EmailOut(id=e["id"], email=e["email"], source=e["source"]) for e in db.list_emails(row["id"])],
         intelligence=intelligence,

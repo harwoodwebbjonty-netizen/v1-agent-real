@@ -55,6 +55,8 @@ class LeadOut(BaseModel):
     list_id: Optional[str]
     opportunity_stage: OpportunityStage
     next_best_action: NextBestActionOut
+    company_number: Optional[str] = None
+    ch_data: Optional[str] = None
     phones: list[PhoneOut]
     emails: list[EmailOut]
     intelligence: Optional[LeadIntelligenceOut]

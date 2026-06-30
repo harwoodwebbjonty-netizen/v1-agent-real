@@ -25,6 +25,11 @@ class Settings(BaseSettings):
     microsoft_oauth_client_secret: str = ""
     oauth_redirect_base_url: str = "http://localhost:8000"
 
+    # Companies House API — free official UK government API, register at
+    # https://developer.company-information.service.gov.uk
+    # Required for AI Prospecting; leave empty to disable the feature.
+    companies_house_api_key: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

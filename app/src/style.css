@@ -1873,6 +1873,42 @@ body.compact-rows td {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- AI Prospecting --- */
+
+.prospecting-run-panel {
+  border-left: 3px solid var(--accent-core);
+}
+
+.prospecting-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-top: var(--space-3);
+}
+
+.prospecting-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.prospecting-fields-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.prospecting-sic-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.prospecting-run-row {
+  cursor: default;
+}
+
 /* --- Today (Action Centre) --- */
 
 .action-section {

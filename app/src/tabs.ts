@@ -1,5 +1,6 @@
 export type ViewName =
   | "action-centre"
+  | "ai-prospecting"
   | "dashboard"
   | "call-queue"
   | "opportunity-workspace"

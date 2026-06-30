@@ -34,6 +34,8 @@ export interface Lead {
   list_id: string | null;
   opportunity_stage: OpportunityStage;
   next_best_action: NextBestAction;
+  company_number: string | null;
+  ch_data: string | null;
   phones: PhoneEntry[];
   emails: EmailEntry[];
   intelligence: LeadIntelligence | null;
@@ -659,4 +661,54 @@ export async function enrollLeadInSequence(sequenceId: string, leadId: string): 
 
 export async function stopSequenceEnrollment(sequenceId: string, enrollmentId: string): Promise<void> {
   await invoke("stop_sequence_enrollment", { sequenceId, enrollmentId });
+}
+
+// --- AI Prospecting (Companies House automated lead sourcing) ---
+
+export interface ProspectingCriteria {
+  sic_codes: string[];
+  location: string;
+  company_type: string;
+  incorporated_from: string;
+  incorporated_to: string;
+  max_results: number;
+  min_ch_score: number;
+  run_ai_enrichment: boolean;
+}
+
+export interface ProspectingStatus {
+  configured: boolean;
+}
+
+export interface ProspectingRun {
+  id: string;
+  status: "running" | "complete" | "error";
+  criteria: string;
+  found: number;
+  created: number;
+  skipped: number;
+  error: string | null;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface StartProspectingResponse {
+  run_id: string;
+  message: string;
+}
+
+export async function getProspectingStatus(): Promise<ProspectingStatus> {
+  return invoke<ProspectingStatus>("get_prospecting_status");
+}
+
+export async function startProspectingRun(criteria: ProspectingCriteria): Promise<StartProspectingResponse> {
+  return invoke<StartProspectingResponse>("start_prospecting_run", { criteria });
+}
+
+export async function getProspectingRun(runId: string): Promise<ProspectingRun> {
+  return invoke<ProspectingRun>("get_prospecting_run", { runId });
+}
+
+export async function listProspectingRuns(): Promise<ProspectingRun[]> {
+  return invoke<ProspectingRun[]>("list_prospecting_runs");
 }

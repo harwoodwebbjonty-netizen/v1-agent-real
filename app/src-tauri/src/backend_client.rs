@@ -89,6 +89,8 @@ pub struct LeadRecord {
     pub list_id: Option<String>,
     pub opportunity_stage: String,
     pub next_best_action: NextBestAction,
+    pub company_number: Option<String>,
+    pub ch_data: Option<String>,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
     pub intelligence: Option<LeadIntelligence>,
@@ -1514,4 +1516,95 @@ pub async fn stop_sequence_enrollment(
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     let _: serde_json::Value = handle_response(response).await?;
     Ok(())
+}
+
+// --- AI Prospecting (Companies House lead sourcing) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProspectingStatus {
+    pub configured: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProspectingCriteria {
+    pub sic_codes: Vec<String>,
+    pub location: String,
+    pub company_type: String,
+    pub incorporated_from: String,
+    pub incorporated_to: String,
+    pub max_results: i64,
+    pub min_ch_score: i64,
+    pub run_ai_enrichment: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProspectingRunRecord {
+    pub id: String,
+    pub status: String,
+    pub criteria: String,
+    pub found: i64,
+    pub created: i64,
+    pub skipped: i64,
+    pub error: Option<String>,
+    pub started_at: String,
+    pub completed_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StartProspectingResponse {
+    pub run_id: String,
+    pub message: String,
+}
+
+pub async fn get_prospecting_status(base_url: &str, token: &str) -> Result<ProspectingStatus, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ai-prospecting/status", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn start_prospecting_run(
+    base_url: &str,
+    token: &str,
+    criteria: &ProspectingCriteria,
+) -> Result<StartProspectingResponse, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ai-prospecting/run", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(criteria)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn get_prospecting_run(base_url: &str, token: &str, run_id: &str) -> Result<ProspectingRunRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ai-prospecting/runs/{}", base_url, run_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn list_prospecting_runs(base_url: &str, token: &str) -> Result<Vec<ProspectingRunRecord>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ai-prospecting/runs", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
 }

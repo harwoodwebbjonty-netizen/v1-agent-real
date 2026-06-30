@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.dependencies import CurrentUser, get_current_user
 from app.routers import (
+    ai_prospecting,
     auth,
     brand_voice,
     calendar,
@@ -49,6 +50,7 @@ app.include_router(email_templates.router)
 app.include_router(email_writer.router)
 app.include_router(email_oauth.router)
 app.include_router(sequences.router)
+app.include_router(ai_prospecting.router)
 
 
 async def _sequence_scheduler_loop() -> None:

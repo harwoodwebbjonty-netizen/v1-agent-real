@@ -277,6 +277,32 @@ def _migration_005_presence(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN last_seen_at TEXT")
 
 
+def _migration_006_ai_prospecting(conn: sqlite3.Connection) -> None:
+    """Companies House company number on leads (for dedup + profile link)
+    and a table tracking AI Prospecting run status/results."""
+    lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "company_number" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN company_number TEXT")
+    if "ch_data" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN ch_data TEXT")
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS prospecting_runs (
+            id TEXT PRIMARY KEY,
+            owner_user_id TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'running',
+            criteria TEXT NOT NULL DEFAULT '{}',
+            found INTEGER NOT NULL DEFAULT 0,
+            created INTEGER NOT NULL DEFAULT 0,
+            skipped INTEGER NOT NULL DEFAULT 0,
+            error TEXT,
+            started_at TEXT NOT NULL,
+            completed_at TEXT
+        );
+        """
+    )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -285,8 +311,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (3, _migration_003_opportunity_stage),
     (4, _migration_004_sequences),
     (5, _migration_005_presence),
+    (6, _migration_006_ai_prospecting),
 ]
-CURRENT_SCHEMA_VERSION = 5
+CURRENT_SCHEMA_VERSION = 6
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -478,6 +505,44 @@ def update_user_avatar(user_id: str, avatar: Optional[str]) -> None:
 def update_user_last_seen(user_id: str, last_seen_at: str) -> None:
     with get_connection() as conn:
         conn.execute("UPDATE users SET last_seen_at = ? WHERE id = ?", (last_seen_at, user_id))
+
+
+# --- AI Prospecting (Companies House integration) ---
+
+def get_lead_by_company_number(company_number: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM leads WHERE company_number = ?", (company_number,)).fetchone()
+
+
+def create_prospecting_run(id: str, owner_user_id: str, criteria: str, started_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO prospecting_runs
+               (id, owner_user_id, status, criteria, found, created, skipped, started_at)
+               VALUES (?, ?, 'running', ?, 0, 0, 0, ?)""",
+            (id, owner_user_id, criteria, started_at),
+        )
+
+
+def get_prospecting_run(run_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM prospecting_runs WHERE id = ?", (run_id,)).fetchone()
+
+
+def list_prospecting_runs(owner_user_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM prospecting_runs WHERE owner_user_id = ? ORDER BY started_at DESC LIMIT 20",
+            (owner_user_id,),
+        ).fetchall()
+
+
+def update_prospecting_run(run_id: str, fields: dict) -> None:
+    if not fields:
+        return
+    columns = ", ".join(f"{key} = ?" for key in fields)
+    with get_connection() as conn:
+        conn.execute(f"UPDATE prospecting_runs SET {columns} WHERE id = ?", (*fields.values(), run_id))
 
 
 # --- sessions ---
