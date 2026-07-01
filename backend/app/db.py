@@ -303,6 +303,16 @@ def _migration_006_ai_prospecting(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_007_prospecting_named_lists(conn: sqlite3.Connection) -> None:
+    """Add name + list_id to prospecting_runs so each run can create a named
+    Cold Call List and all its leads are grouped under it."""
+    run_columns = {row["name"] for row in conn.execute("PRAGMA table_info(prospecting_runs)")}
+    if "name" not in run_columns:
+        conn.execute("ALTER TABLE prospecting_runs ADD COLUMN name TEXT NOT NULL DEFAULT ''")
+    if "list_id" not in run_columns:
+        conn.execute("ALTER TABLE prospecting_runs ADD COLUMN list_id TEXT")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -312,8 +322,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (4, _migration_004_sequences),
     (5, _migration_005_presence),
     (6, _migration_006_ai_prospecting),
+    (7, _migration_007_prospecting_named_lists),
 ]
-CURRENT_SCHEMA_VERSION = 6
+CURRENT_SCHEMA_VERSION = 7
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -514,13 +525,16 @@ def get_lead_by_company_number(company_number: str) -> Optional[sqlite3.Row]:
         return conn.execute("SELECT * FROM leads WHERE company_number = ?", (company_number,)).fetchone()
 
 
-def create_prospecting_run(id: str, owner_user_id: str, criteria: str, started_at: str) -> None:
+def create_prospecting_run(
+    id: str, owner_user_id: str, criteria: str, started_at: str,
+    name: str = "", list_id: Optional[str] = None,
+) -> None:
     with get_connection() as conn:
         conn.execute(
             """INSERT INTO prospecting_runs
-               (id, owner_user_id, status, criteria, found, created, skipped, started_at)
-               VALUES (?, ?, 'running', ?, 0, 0, 0, ?)""",
-            (id, owner_user_id, criteria, started_at),
+               (id, owner_user_id, status, criteria, found, created, skipped, started_at, name, list_id)
+               VALUES (?, ?, 'running', ?, 0, 0, 0, ?, ?, ?)""",
+            (id, owner_user_id, criteria, started_at, name, list_id),
         )
 
 

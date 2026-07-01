@@ -6,6 +6,7 @@ free pre-filter score, keeping per-lead AI cost minimal."""
 
 import json
 import logging
+from typing import Optional
 
 from app import db
 from app.core.config import get_settings
@@ -25,7 +26,9 @@ from app.services.companies_house_service import (
 logger = logging.getLogger("app.ai_prospecting")
 
 
-async def run_prospecting(run_id: str, owner_user_id: str, criteria: ProspectingCriteria) -> None:
+async def run_prospecting(
+    run_id: str, owner_user_id: str, criteria: ProspectingCriteria, list_id: Optional[str] = None
+) -> None:
     """Entry point called by the background task. Updates prospecting_runs table
     in real time so the frontend can poll for live progress."""
     settings = get_settings()
@@ -104,6 +107,7 @@ async def run_prospecting(run_id: str, owner_user_id: str, criteria: Prospecting
                 notes=f"Via AI Prospecting | CH score: {ch_score}/100 | {address_str}",
                 owner_user_id=owner_user_id,
                 created_at=created_at,
+                list_id=list_id,
             )
 
             # Patch extra CH fields onto the lead

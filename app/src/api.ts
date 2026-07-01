@@ -666,6 +666,7 @@ export async function stopSequenceEnrollment(sequenceId: string, enrollmentId: s
 // --- AI Prospecting (Companies House automated lead sourcing) ---
 
 export interface ProspectingCriteria {
+  name: string;
   sic_codes: string[];
   location: string;
   company_type: string;
@@ -682,6 +683,7 @@ export interface ProspectingStatus {
 
 export interface ProspectingRun {
   id: string;
+  name: string;
   status: "running" | "complete" | "error";
   criteria: string;
   found: number;
@@ -690,6 +692,7 @@ export interface ProspectingRun {
   error: string | null;
   started_at: string;
   completed_at: string | null;
+  list_id: string | null;
 }
 
 export interface StartProspectingResponse {

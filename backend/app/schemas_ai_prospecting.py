@@ -4,6 +4,7 @@ from pydantic import BaseModel
 
 
 class ProspectingCriteria(BaseModel):
+    name: str = ""
     sic_codes: list[str] = []
     location: str = ""
     company_type: str = "ltd"
@@ -21,6 +22,7 @@ class StartProspectingResponse(BaseModel):
 
 class ProspectingRunOut(BaseModel):
     id: str
+    name: str
     status: str
     criteria: str
     found: int
@@ -29,3 +31,4 @@ class ProspectingRunOut(BaseModel):
     error: Optional[str]
     started_at: str
     completed_at: Optional[str]
+    list_id: Optional[str] = None

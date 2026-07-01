@@ -1,5 +1,6 @@
 import asyncio
 import json
+from typing import Optional
 
 from fastapi import APIRouter, Depends
 
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/ai-prospecting", tags=["ai-prospecting"])
 def _to_run_out(row) -> ProspectingRunOut:
     return ProspectingRunOut(
         id=row["id"],
+        name=row["name"] or "",
         status=row["status"],
         criteria=row["criteria"],
         found=row["found"],
@@ -28,6 +30,7 @@ def _to_run_out(row) -> ProspectingRunOut:
         error=row["error"],
         started_at=row["started_at"],
         completed_at=row["completed_at"],
+        list_id=row["list_id"],
     )
 
 
@@ -60,8 +63,19 @@ async def start_run(
     """Starts a prospecting run as a background task. Poll /runs/{run_id}
     for live progress (found / created / skipped counts)."""
     run_id = new_id()
-    db.create_prospecting_run(run_id, current_user.id, json.dumps(criteria.model_dump()), now_iso())
-    asyncio.create_task(run_prospecting(run_id, current_user.id, criteria))
+    now = now_iso()
+
+    # Create a named Cold Call List so leads land in it automatically
+    list_id: Optional[str] = None
+    if criteria.name.strip():
+        list_id = new_id()
+        db.create_lead_list(list_id, criteria.name.strip(), current_user.id, now)
+
+    db.create_prospecting_run(
+        run_id, current_user.id, json.dumps(criteria.model_dump()), now,
+        name=criteria.name.strip(), list_id=list_id,
+    )
+    asyncio.create_task(run_prospecting(run_id, current_user.id, criteria, list_id))
     return StartProspectingResponse(
         run_id=run_id,
         message="Prospecting run started — poll /ai-prospecting/runs/{run_id} for progress.",

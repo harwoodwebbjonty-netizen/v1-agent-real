@@ -1527,6 +1527,7 @@ pub struct ProspectingStatus {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProspectingCriteria {
+    pub name: String,
     pub sic_codes: Vec<String>,
     pub location: String,
     pub company_type: String,
@@ -1540,6 +1541,7 @@ pub struct ProspectingCriteria {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProspectingRunRecord {
     pub id: String,
+    pub name: String,
     pub status: String,
     pub criteria: String,
     pub found: i64,
@@ -1548,6 +1550,7 @@ pub struct ProspectingRunRecord {
     pub error: Option<String>,
     pub started_at: String,
     pub completed_at: Option<String>,
+    pub list_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -29,6 +29,28 @@ function formatRunTime(run: ProspectingRun): string {
   return "running…";
 }
 
+function fillFormFromCriteria(container: HTMLDivElement, criteria: ProspectingCriteria): void {
+  const nameEl = container.querySelector<HTMLInputElement>("#run-name-input");
+  const sicEl = container.querySelector<HTMLInputElement>("#sic-input");
+  const locationEl = container.querySelector<HTMLInputElement>("#location-input");
+  const incFromEl = container.querySelector<HTMLInputElement>("#inc-from-input");
+  const incToEl = container.querySelector<HTMLInputElement>("#inc-to-input");
+  const maxResultsEl = container.querySelector<HTMLInputElement>("#max-results-input");
+  const minScoreEl = container.querySelector<HTMLInputElement>("#min-score-input");
+  const aiToggleEl = container.querySelector<HTMLInputElement>("#ai-enrichment-toggle");
+
+  if (nameEl) nameEl.value = criteria.name || "";
+  if (sicEl) sicEl.value = (criteria.sic_codes || []).join(",");
+  if (locationEl) locationEl.value = criteria.location || "";
+  if (incFromEl) incFromEl.value = criteria.incorporated_from || "";
+  if (incToEl) incToEl.value = criteria.incorporated_to || "";
+  if (maxResultsEl) maxResultsEl.value = String(criteria.max_results || 50);
+  if (minScoreEl) minScoreEl.value = String(criteria.min_ch_score || 0);
+  if (aiToggleEl) aiToggleEl.checked = criteria.run_ai_enrichment || false;
+
+  container.querySelector("#run-name-input")?.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
 export function initAiProspecting(): void {
   const container = document.querySelector<HTMLDivElement>("#view-ai-prospecting")!;
 
@@ -69,9 +91,14 @@ export function initAiProspecting(): void {
               </section>`
             : `<section class="card prospecting-run-panel">
                 <h3 class="action-section-title">Run AI Prospecting</h3>
-                <p class="card-subtitle">Set your criteria below, then click Run. The system will find matching companies on Companies House, check they're not already in your CRM, build their profile, score them — and add them as leads ready to call.</p>
+                <p class="card-subtitle">Give this run a name, set your criteria, then click Run. Discovered leads are added to Cold Call Lists under that name so you can find them instantly.</p>
 
                 <div class="prospecting-form">
+                  <div class="prospecting-field">
+                    <label class="stat-label">Run name <span style="color:var(--danger)">*</span></label>
+                    <input type="text" id="run-name-input" class="search-input" placeholder="e.g. Manchester Construction Q3 2026" style="width:100%;max-width:480px" />
+                  </div>
+
                   <div class="prospecting-field">
                     <label class="stat-label">Sector / SIC codes</label>
                     <div class="prospecting-sic-presets">
@@ -136,13 +163,17 @@ export function initAiProspecting(): void {
               : `<div class="action-section-body">
                   ${runs
                     .map(
-                      (run) => `
+                      (run) => {
+                        const parsedCriteria = (() => { try { return JSON.parse(run.criteria); } catch { return null; } })();
+                        return `
                   <div class="action-row prospecting-run-row" data-run-id="${escapeHtml(run.id)}">
                     <span class="status-badge ${run.status === "complete" ? "verified" : run.status === "error" ? "not_found" : "unverified"}">${escapeHtml(run.status)}</span>
-                    <span class="action-row-title">Found <strong>${run.found}</strong> · Added <strong>${run.created}</strong> · Skipped <strong>${run.skipped}</strong></span>
+                    <span class="action-row-title">${run.name ? `<strong>${escapeHtml(run.name)}</strong> · ` : ""}Found <strong>${run.found}</strong> · Added <strong>${run.created}</strong> · Skipped <strong>${run.skipped}</strong></span>
                     <span class="empty-hint">${formatRunTime(run)}</span>
                     ${run.error ? `<span class="empty-hint" style="color:var(--danger);max-width:300px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escapeHtml(run.error)}">${escapeHtml(run.error)}</span>` : ""}
-                  </div>`
+                    ${parsedCriteria ? `<button type="button" class="btn btn-ghost btn-sm rerun-btn" data-criteria="${escapeHtml(JSON.stringify(parsedCriteria))}">Re-run</button>` : ""}
+                  </div>`;
+                      }
                     )
                     .join("")}
                 </div>`
@@ -172,9 +203,28 @@ export function initAiProspecting(): void {
       input.value = "";
     });
 
+    // Re-run buttons on past runs
+    container.querySelectorAll<HTMLButtonElement>(".rerun-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        try {
+          const criteria: ProspectingCriteria = JSON.parse(btn.dataset.criteria ?? "{}");
+          fillFormFromCriteria(container, criteria);
+        } catch { /* ignore */ }
+      });
+    });
+
     container.querySelector<HTMLButtonElement>("#run-prospecting-btn")?.addEventListener("click", async () => {
       const btn = container.querySelector<HTMLButtonElement>("#run-prospecting-btn")!;
       const statusMsg = container.querySelector<HTMLSpanElement>("#run-status-msg")!;
+
+      const name = container.querySelector<HTMLInputElement>("#run-name-input")?.value.trim() ?? "";
+      if (!name) {
+        statusMsg.textContent = "Please enter a name for this run.";
+        statusMsg.style.color = "var(--danger)";
+        container.querySelector<HTMLInputElement>("#run-name-input")?.focus();
+        return;
+      }
+      statusMsg.style.color = "";
 
       const sicRaw = (container.querySelector<HTMLInputElement>("#sic-input")?.value ?? "")
         .split(",")
@@ -182,6 +232,7 @@ export function initAiProspecting(): void {
         .filter(Boolean);
 
       const criteria: ProspectingCriteria = {
+        name,
         sic_codes: sicRaw,
         location: container.querySelector<HTMLInputElement>("#location-input")?.value.trim() ?? "",
         company_type: "ltd",
