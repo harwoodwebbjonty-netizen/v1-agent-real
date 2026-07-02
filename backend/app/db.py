@@ -621,6 +621,16 @@ def delete_session(token: str) -> None:
 
 # --- leads ---
 
+def _find_existing_lead_in_conn(conn: sqlite3.Connection, company_number: Optional[str], company_name: str) -> Optional[sqlite3.Row]:
+    if company_number:
+        row = conn.execute("SELECT * FROM leads WHERE company_number = ?", (company_number,)).fetchone()
+        if row:
+            return row
+    return conn.execute(
+        "SELECT * FROM leads WHERE LOWER(TRIM(company)) = LOWER(TRIM(?))", (company_name,)
+    ).fetchone()
+
+
 def create_lead(
     id: str,
     timestamp: str,
@@ -633,8 +643,24 @@ def create_lead(
     created_at: str,
     list_id: Optional[str] = None,
     company_number: Optional[str] = None,
-) -> None:
+) -> str:
+    """Creates a new lead or merges into an existing one. Returns the lead id."""
     with get_connection() as conn:
+        existing = _find_existing_lead_in_conn(conn, company_number, company)
+        if existing:
+            updates = {k: v for k, v in {
+                "phone_number": phone_number,
+                "source_url": source_url,
+                "notes": notes,
+                "company_number": company_number,
+            }.items() if v and not existing[k]}
+            if updates:
+                cols = ", ".join(f"{k} = ?" for k in updates)
+                conn.execute(
+                    f"UPDATE leads SET {cols}, updated_at = ? WHERE id = ?",
+                    (*updates.values(), created_at, existing["id"]),
+                )
+            return existing["id"]
         conn.execute(
             """INSERT INTO leads
                (id, timestamp, company, phone_number, source_url, status, notes,
@@ -642,6 +668,7 @@ def create_lead(
                VALUES (?, ?, ?, ?, ?, ?, ?, '', 'New', '', ?, NULL, ?, ?, ?, ?)""",
             (id, timestamp, company, phone_number, source_url, status, notes, owner_user_id, list_id, company_number, created_at, created_at),
         )
+        return id
 
 
 def list_leads(list_id: Optional[str] = None) -> list[sqlite3.Row]:

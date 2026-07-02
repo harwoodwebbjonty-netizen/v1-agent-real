@@ -1831,6 +1831,16 @@ body.compact-rows td {
   height: 260px;
 }
 
+.chart-wrap-sm {
+  height: 220px;
+}
+
+.charts-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+}
+
 .funnel-row {
   display: flex;
   align-items: center;

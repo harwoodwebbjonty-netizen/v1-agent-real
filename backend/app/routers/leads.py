@@ -199,10 +199,9 @@ async def create_lead(
     # only place that persists its result, the service itself stays pure.
     result = await lookup_company_phone(body.company)
 
-    lead_id = new_id()
     created_at = now_iso()
-    db.create_lead(
-        id=lead_id,
+    actual_lead_id = db.create_lead(
+        id=new_id(),
         timestamp=created_at,
         company=result.company,
         phone_number=result.phone_number,
@@ -214,15 +213,12 @@ async def create_lead(
         list_id=body.list_id,
     )
 
-    # The only touch point added to this flow: mirror the AI-found number
-    # into the new multi-value table too, so it shows up alongside anything
-    # added manually later. Skipped when there's no real number to mirror.
     if result.status != "not_found" and result.phone_number:
         db.add_phone_ignore_duplicate(
-            id=new_id(), lead_id=lead_id, phone_number=result.phone_number, source="scraped", created_at=created_at
+            id=new_id(), lead_id=actual_lead_id, phone_number=result.phone_number, source="scraped", created_at=created_at
         )
 
-    row = db.get_lead(lead_id)
+    row = db.get_lead(actual_lead_id)
     return _to_lead_out(row, _user_name_map(), activity)
 
 

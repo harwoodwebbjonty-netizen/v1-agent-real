@@ -10,6 +10,7 @@ Chart.register(...registerables);
 
 let industryChart: Chart | null = null;
 let trendChart: Chart | null = null;
+let statusChart: Chart | null = null;
 
 function computeKpis(leads: Lead[]) {
   const total = leads.length;
@@ -21,11 +22,31 @@ function computeKpis(leads: Lead[]) {
   return { total, contacted, replyRate, conversionRate };
 }
 
+function computeCoverage(leads: Lead[]) {
+  if (!leads.length) return { phone: 0, companyNumber: 0, enriched: 0 };
+  const n = leads.length;
+  return {
+    phone: leads.filter((l) => l.phone_number).length / n,
+    companyNumber: leads.filter((l) => l.company_number).length / n,
+    enriched: leads.filter((l) => l.ch_data).length / n,
+  };
+}
+
 function computeIndustryCounts(leads: Lead[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const lead of leads) {
     const industry = lead.industry || "Uncategorized";
     counts[industry] = (counts[industry] || 0) + 1;
+  }
+  return counts;
+}
+
+function computeStatusDistribution(leads: Lead[]): Record<string, number> {
+  const counts: Record<string, number> = {};
+  for (const s of CONTACT_STATUS_ORDER) counts[s] = 0;
+  for (const lead of leads) {
+    const s = lead.contact_status || CONTACT_STATUS_ORDER[0];
+    counts[s] = (counts[s] || 0) + 1;
   }
   return counts;
 }
@@ -37,17 +58,15 @@ function computeFunnel(leads: Lead[]): number[] {
   );
 }
 
-function weekKey(dateStr: string): string {
+function monthKey(dateStr: string): string {
   const d = new Date(dateStr);
-  const oneJan = new Date(d.getFullYear(), 0, 1);
-  const week = Math.ceil(((d.getTime() - oneJan.getTime()) / 86400000 + oneJan.getDay() + 1) / 7);
-  return `${d.getFullYear()}-W${String(week).padStart(2, "0")}`;
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
 }
 
-function computeWeeklyTrend(leads: Lead[]): { labels: string[]; counts: number[] } {
+function computeMonthlyTrend(leads: Lead[]): { labels: string[]; counts: number[] } {
   const counts: Record<string, number> = {};
   for (const lead of leads) {
-    const key = weekKey(lead.timestamp);
+    const key = monthKey(lead.timestamp);
     counts[key] = (counts[key] || 0) + 1;
   }
   const labels = Object.keys(counts).sort();
@@ -60,6 +79,13 @@ function renderKpis(leads: Lead[]): void {
   document.querySelector("#kpi-contacted")!.textContent = String(contacted);
   document.querySelector("#kpi-reply-rate")!.textContent = `${Math.round(replyRate * 100)}%`;
   document.querySelector("#kpi-conversion-rate")!.textContent = `${Math.round(conversionRate * 100)}%`;
+}
+
+function renderCoverageStats(leads: Lead[]): void {
+  const { phone, companyNumber, enriched } = computeCoverage(leads);
+  document.querySelector("#cov-phone")!.textContent = `${Math.round(phone * 100)}%`;
+  document.querySelector("#cov-company-number")!.textContent = `${Math.round(companyNumber * 100)}%`;
+  document.querySelector("#cov-enriched")!.textContent = `${Math.round(enriched * 100)}%`;
 }
 
 function renderIndustryChart(leads: Lead[]): void {
@@ -89,6 +115,35 @@ function renderIndustryChart(leads: Lead[]): void {
   });
 }
 
+function renderStatusChart(leads: Lead[]): void {
+  const counts = computeStatusDistribution(leads);
+  const labels = Object.keys(counts);
+  const data = labels.map((l) => counts[l]);
+  const colors = ["#94a3b8", "#3b82f6", "#f59e0b", "#10b981"];
+  const canvas = document.querySelector<HTMLCanvasElement>("#status-chart")!;
+  statusChart?.destroy();
+  statusChart = new Chart(canvas, {
+    type: "doughnut",
+    data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2 }] },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      onHover: (event, elements) => {
+        (event.native?.target as HTMLElement).style.cursor = elements.length ? "pointer" : "default";
+      },
+      onClick: (_event, elements) => {
+        if (!elements.length) return;
+        const rank = CONTACT_STATUS_ORDER.indexOf(labels[elements[0].index]);
+        if (rank >= 0) {
+          setPendingDashboardContactStatusFilter(rank);
+          openTab("dashboard", "Dashboard");
+        }
+      },
+      plugins: { legend: { position: "bottom" } },
+    },
+  });
+}
+
 function renderFunnel(leads: Lead[]): void {
   const counts = computeFunnel(leads);
   const max = counts[0] || 1;
@@ -113,21 +168,19 @@ function renderFunnel(leads: Lead[]): void {
 }
 
 function renderTrendChart(leads: Lead[]): void {
-  const { labels, counts } = computeWeeklyTrend(leads);
+  const { labels, counts } = computeMonthlyTrend(leads);
   const canvas = document.querySelector<HTMLCanvasElement>("#trend-chart")!;
   trendChart?.destroy();
   trendChart = new Chart(canvas, {
-    type: "line",
+    type: "bar",
     data: {
       labels,
       datasets: [
         {
           label: "New leads",
           data: counts,
-          borderColor: "#2563eb",
-          backgroundColor: "rgba(37, 99, 235, 0.15)",
-          fill: true,
-          tension: 0.3,
+          backgroundColor: "rgba(37, 99, 235, 0.7)",
+          borderRadius: 4,
         },
       ],
     },
@@ -154,7 +207,9 @@ function renderAnalytics(): void {
   contentEl.classList.remove("hidden");
 
   renderKpis(leads);
+  renderCoverageStats(leads);
   renderIndustryChart(leads);
+  renderStatusChart(leads);
   renderFunnel(leads);
   renderTrendChart(leads);
 }
@@ -186,18 +241,40 @@ export function initAnalytics(): void {
           </div>
         </section>
 
+        <section class="stats-grid">
+          <div class="stat-card">
+            <span class="stat-label">Has Phone</span>
+            <span id="cov-phone" class="stat-value">0%</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">Has CH Number</span>
+            <span id="cov-company-number" class="stat-value">0%</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label">CH Enriched</span>
+            <span id="cov-enriched" class="stat-value">0%</span>
+          </div>
+        </section>
+
         <section class="card">
           <h2 class="card-title">Leads by Industry</h2>
           <div class="chart-wrap"><canvas id="industry-chart"></canvas></div>
         </section>
 
-        <section class="card">
-          <h2 class="card-title">Funnel</h2>
-          <div id="funnel-container"></div>
-        </section>
+        <div class="charts-row">
+          <section class="card">
+            <h2 class="card-title">Contact Status</h2>
+            <div class="chart-wrap chart-wrap-sm"><canvas id="status-chart"></canvas></div>
+          </section>
+
+          <section class="card">
+            <h2 class="card-title">Funnel</h2>
+            <div id="funnel-container"></div>
+          </section>
+        </div>
 
         <section class="card">
-          <h2 class="card-title">Weekly New Leads</h2>
+          <h2 class="card-title">Monthly New Leads</h2>
           <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
         </section>
       </div>
