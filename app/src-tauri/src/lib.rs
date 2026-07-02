@@ -393,13 +393,11 @@ async fn import_leads_csv(app_handle: tauri::AppHandle, list_id: String, csv_pat
     backend_client::import_leads_to_list(&base_url, &session.token, &list_id, rows).await
 }
 
-/// Reads the user-picked CSV and imports leads into the main dashboard pool (no list).
+/// Reads the user-picked CSV and returns company names for the AI lookup pipeline.
+/// Falls back to the first column if no recognised company header is found.
 #[tauri::command]
-async fn import_leads_to_dashboard(app_handle: tauri::AppHandle, csv_path: String) -> Result<usize, String> {
-    let session = require_session(&app_handle)?;
-    let base_url = app_state::resolve_base_url(&app_handle);
-    let rows = csv_log::parse_uploaded_csv(&csv_path)?;
-    backend_client::import_leads_to_dashboard(&base_url, &session.token, rows).await
+async fn import_leads_to_dashboard(csv_path: String) -> Result<Vec<String>, String> {
+    csv_log::read_company_names_from_csv(&csv_path)
 }
 
 #[tauri::command]
