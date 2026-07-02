@@ -279,8 +279,8 @@ export async function importLeadsCsv(listId: string, csvPath: string): Promise<n
   return invoke<number>("import_leads_csv", { listId, csvPath });
 }
 
-export async function importLeadsToDashboard(csvPath: string): Promise<string[]> {
-  return invoke<string[]>("import_leads_to_dashboard", { csvPath });
+export async function importLeadsToDashboard(csvPath: string): Promise<number> {
+  return invoke<number>("import_leads_to_dashboard", { csvPath });
 }
 
 // --- AI Sales Intelligence — manual trigger only, full version history kept ---

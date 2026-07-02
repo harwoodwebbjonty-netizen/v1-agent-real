@@ -428,6 +428,24 @@ pub async fn import_leads_to_list(
     Ok(parsed.imported)
 }
 
+pub async fn import_leads_to_dashboard(
+    base_url: &str,
+    token: &str,
+    leads: Vec<serde_json::Value>,
+) -> Result<usize, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/import-csv", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&ImportLeadsRequest { leads })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: ImportLeadsResponse = handle_response(response).await?;
+    Ok(parsed.imported)
+}
+
 // --- AI Sales Intelligence — manual trigger only, full version history kept ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

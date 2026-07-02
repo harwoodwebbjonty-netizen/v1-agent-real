@@ -303,13 +303,9 @@ export function initDashboard(): void {
     importCsvBtn.disabled = true;
     importCsvBtn.textContent = "Importing...";
     try {
-      const names = await importLeadsToDashboard(path);
-      if (names.length === 0) {
-        statusMessage.textContent = "No company names found in CSV.";
-        return;
-      }
-      statusMessage.textContent = `Found ${names.length} companies — looking up now...`;
-      await runLookups(names);
+      const imported = await importLeadsToDashboard(path);
+      statusMessage.textContent = `Imported ${imported} lead(s).`;
+      await refreshLeads();
     } catch (err) {
       statusMessage.textContent = `Import failed: ${err}`;
     } finally {

@@ -305,34 +305,3 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
     Ok(rows)
 }
 
-/// Reads a user-supplied CSV and returns just the company names for bulk
-/// enrichment via the AI lookup pipeline. Falls back to the first column if
-/// no recognised company header is found.
-pub fn read_company_names_from_csv(path: &str) -> Result<Vec<String>, String> {
-    let mut reader = csv::Reader::from_path(path)
-        .map_err(|e| format!("Could not read CSV file {:?}: {}", path, e))?;
-
-    let headers = reader
-        .headers()
-        .map_err(|e| format!("Could not read CSV headers: {}", e))?
-        .clone();
-
-    let company_col = headers
-        .iter()
-        .position(|h| {
-            let h = h.trim().to_ascii_lowercase();
-            matches!(h.as_str(), "company" | "company_name" | "name" | "business_name" | "organisation" | "organization")
-        })
-        .unwrap_or(0);
-
-    let mut names = Vec::new();
-    for result in reader.records() {
-        let record = result.map_err(|e| format!("Could not parse CSV row: {}", e))?;
-        let name = record.get(company_col).unwrap_or_default().trim().to_string();
-        if !name.is_empty() {
-            names.push(name);
-        }
-    }
-    Ok(names)
-}
-
