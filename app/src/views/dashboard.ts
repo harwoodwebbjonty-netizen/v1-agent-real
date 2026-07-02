@@ -5,6 +5,7 @@ import {
   addLeadPhone,
   assignLead,
   chEnrichAll,
+  dedupLeads,
   deleteLeadEmail,
   deleteLeadPhone,
   exportLogCsv,
@@ -349,6 +350,7 @@ export function initDashboard(): void {
   refreshBtn.addEventListener("click", async () => {
     refreshBtn.disabled = true;
     refreshBtn.classList.add("is-loading");
+    try { await dedupLeads(); } catch { /* non-critical */ }
     await refreshLeads();
     refreshBtn.classList.remove("is-loading");
     refreshBtn.disabled = false;

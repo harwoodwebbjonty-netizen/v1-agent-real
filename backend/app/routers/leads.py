@@ -35,6 +35,7 @@ from app.schemas_sales_intelligence import (
 from app.services.anthropic_service import lookup_company_phone
 from app.services.auth_service import new_id, now_iso
 from app.services.companies_house_service import (
+    _SIC_DESCRIPTIONS,
     build_ch_data_json,
     extract_sic_industry,
     get_company_charges,
@@ -514,6 +515,69 @@ async def ch_enrich_all(current_user: CurrentUser = Depends(get_current_user)) -
         except Exception:
             continue
     return {"enriched": enriched}
+
+
+@router.post("/dedup")
+def dedup_leads(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """Merges duplicate leads in the shared pool (list_id IS NULL).
+    Winner = oldest created_at. All phones, emails, notes, call logs, etc. are
+    absorbed into the winner; the duplicate is deleted. Also normalises any
+    raw SIC codes stored in industry to human-readable names."""
+    leads = db.list_leads()  # shared pool only
+    now = now_iso()
+    merged = 0
+
+    # Fix existing raw SIC codes → readable names
+    for lead in leads:
+        industry = (lead["industry"] or "").strip()
+        if industry and industry.isdigit():
+            name = _SIC_DESCRIPTIONS.get(industry[:2], "")
+            if name:
+                db.update_lead_fields(lead["id"], {"industry": name}, now)
+
+    # Re-fetch after fix so duplicate checks use updated data
+    leads = db.list_leads()
+
+    # Group by company_number first
+    by_cn: dict[str, list] = {}
+    no_cn = []
+    for lead in leads:
+        cn = (lead["company_number"] or "").strip()
+        if cn:
+            by_cn.setdefault(cn, []).append(lead)
+        else:
+            no_cn.append(lead)
+
+    for cn, group in by_cn.items():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda r: r["created_at"])
+        winner = group[0]
+        for loser in group[1:]:
+            db.merge_lead_into(winner["id"], loser["id"], now)
+            merged += 1
+
+    # Group remainder by normalised name
+    by_name: dict[str, list] = {}
+    for lead in no_cn:
+        # Skip leads that were already merged into a company_number winner above
+        if db.get_lead(lead["id"]) is None:
+            continue
+        key = lead["company"].strip().lower()
+        by_name.setdefault(key, []).append(lead)
+
+    for name, group in by_name.items():
+        if len(group) < 2:
+            continue
+        group.sort(key=lambda r: r["created_at"])
+        winner = group[0]
+        for loser in group[1:]:
+            if db.get_lead(loser["id"]) is None:
+                continue
+            db.merge_lead_into(winner["id"], loser["id"], now)
+            merged += 1
+
+    return {"merged": merged}
 
 
 @router.post("/migrate", response_model=MigrateResponse)

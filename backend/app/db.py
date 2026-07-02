@@ -671,6 +671,60 @@ def create_lead(
         return id
 
 
+_CONTACT_STATUS_RANK: dict[str, int] = {"New": 0, "Contacted": 1, "Replied": 2, "Converted": 3}
+
+
+def merge_lead_into(winner_id: str, loser_id: str, now: str) -> None:
+    """Absorbs loser into winner: fills blank scalar fields, re-parents all child
+    records, then deletes the loser. Runs in a single transaction."""
+    with get_connection() as conn:
+        winner = conn.execute("SELECT * FROM leads WHERE id = ?", (winner_id,)).fetchone()
+        loser = conn.execute("SELECT * FROM leads WHERE id = ?", (loser_id,)).fetchone()
+        if not winner or not loser:
+            return
+
+        # Scalar fields: only overwrite blanks on winner
+        scalar_fields = [
+            "phone_number", "source_url", "notes", "lead_notes",
+            "company_number", "ch_data", "industry",
+            "website", "linkedin", "contact_name", "contact_title",
+            "assigned_user_id",
+        ]
+        updates: dict[str, object] = {}
+        for field in scalar_fields:
+            if not winner[field] and loser[field]:
+                updates[field] = loser[field]
+
+        # Take higher contact_status rank
+        winner_rank = _CONTACT_STATUS_RANK.get(winner["contact_status"] or "New", 0)
+        loser_rank = _CONTACT_STATUS_RANK.get(loser["contact_status"] or "New", 0)
+        if loser_rank > winner_rank:
+            updates["contact_status"] = loser["contact_status"]
+
+        # Take non-'none' opportunity stage if winner has none
+        if (winner["opportunity_stage"] or "none") == "none" and (loser["opportunity_stage"] or "none") != "none":
+            updates["opportunity_stage"] = loser["opportunity_stage"]
+
+        if updates:
+            cols = ", ".join(f"{k} = ?" for k in updates)
+            conn.execute(
+                f"UPDATE leads SET {cols}, updated_at = ? WHERE id = ?",
+                (*updates.values(), now, winner_id),
+            )
+
+        # Re-parent child records (IGNORE handles unique constraint conflicts)
+        conn.execute("UPDATE OR IGNORE lead_phones SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
+        conn.execute("DELETE FROM lead_phones WHERE lead_id = ?", (loser_id,))
+        conn.execute("UPDATE OR IGNORE lead_emails SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
+        conn.execute("DELETE FROM lead_emails WHERE lead_id = ?", (loser_id,))
+        for table in ("lead_intelligence_versions", "call_logs", "email_drafts", "sequence_enrollments"):
+            conn.execute(f"UPDATE {table} SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
+        conn.execute("UPDATE calendar_events SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
+        conn.execute("UPDATE activity_events SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
+        conn.execute("DELETE FROM lead_intelligence_locks WHERE lead_id = ?", (loser_id,))
+        conn.execute("DELETE FROM leads WHERE id = ?", (loser_id,))
+
+
 def list_leads(list_id: Optional[str] = None) -> list[sqlite3.Row]:
     with get_connection() as conn:
         if list_id is None:

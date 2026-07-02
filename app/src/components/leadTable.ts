@@ -1,6 +1,7 @@
 import type { Lead } from "../api";
 import { CONTACT_STATUS_ORDER } from "../constants";
 import { copyToClipboard } from "../contact";
+import { normalizeSicIndustry } from "../sic";
 import { escapeHtml } from "../utils";
 
 export type SortColumn = "company" | "phone_number" | "status" | "industry" | "contact_status" | null;
@@ -104,7 +105,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
       <td>${lead.source_url ? `<a href="${escapeHtml(lead.source_url)}" target="_blank">${escapeHtml(lead.source_url)}</a>` : ""}</td>
       <td><span class="status-badge ${lead.status}">${lead.status.replace("_", " ")}</span></td>
       <td class="editable-cell">
-        <input type="text" class="inline-edit industry-input" value="${escapeHtml(lead.industry)}" placeholder="Uncategorized" />
+        <input type="text" class="inline-edit industry-input" value="${escapeHtml(normalizeSicIndustry(lead.industry))}" placeholder="Uncategorized" />
       </td>
       <td class="editable-cell">
         <select class="inline-edit contact-status-select">

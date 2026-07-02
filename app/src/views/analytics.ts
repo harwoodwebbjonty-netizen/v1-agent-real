@@ -3,6 +3,7 @@ import type { Lead } from "../api";
 import { setIndustryFilter } from "../components/industryFilter";
 import { CONTACT_STATUS_ORDER } from "../constants";
 import { setPendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
+import { normalizeSicIndustry } from "../sic";
 import { getLeads, subscribe } from "../state";
 import { openTab } from "../tabs";
 
@@ -35,7 +36,7 @@ function computeCoverage(leads: Lead[]) {
 function computeIndustryCounts(leads: Lead[]): Record<string, number> {
   const counts: Record<string, number> = {};
   for (const lead of leads) {
-    const industry = lead.industry || "Uncategorized";
+    const industry = normalizeSicIndustry(lead.industry) || "Uncategorized";
     counts[industry] = (counts[industry] || 0) + 1;
   }
   return counts;

@@ -287,6 +287,10 @@ export async function chEnrichAll(): Promise<number> {
   return invoke<number>("ch_enrich_all");
 }
 
+export async function dedupLeads(): Promise<number> {
+  return invoke<number>("dedup_leads");
+}
+
 // --- AI Sales Intelligence — manual trigger only, full version history kept ---
 
 /** Manual trigger only — also used for "Refresh" (same backend action). Never runs automatically. */

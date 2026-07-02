@@ -400,6 +400,13 @@ async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<usize, String> {
     backend_client::ch_enrich_all(&base_url, &session.token).await
 }
 
+#[tauri::command]
+async fn dedup_leads(app_handle: tauri::AppHandle) -> Result<usize, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::dedup_leads(&base_url, &session.token).await
+}
+
 /// Reads the user-picked CSV and bulk-imports leads into the main dashboard pool.
 /// Falls back to the first column if no recognised company header is found.
 #[tauri::command]
@@ -943,6 +950,7 @@ pub fn run() {
       import_leads_csv,
       import_leads_to_dashboard,
       ch_enrich_all,
+      dedup_leads,
       get_brand_voice,
       update_brand_voice,
       create_email_template,
