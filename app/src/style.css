@@ -2620,20 +2620,12 @@ body.compact-rows td {
 /* Event rows */
 .activity-event-row {
   display: flex;
-  gap: var(--space-3);
   padding: var(--space-3) 0;
   border-bottom: 1px solid var(--border);
 }
 
 .activity-event-row:last-child {
   border-bottom: none;
-}
-
-.activity-event-icon {
-  font-size: 15px;
-  flex-shrink: 0;
-  margin-top: 2px;
-  line-height: 1.4;
 }
 
 .activity-event-body {
@@ -2643,16 +2635,17 @@ body.compact-rows td {
 
 .activity-event-header {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   gap: var(--space-2);
   flex-wrap: wrap;
-  margin-bottom: 3px;
 }
 
 .activity-event-desc {
   font-size: var(--text-sm);
   color: var(--text-muted);
   line-height: 1.4;
+  flex: 1;
+  min-width: 0;
 }
 
 .activity-event-time {

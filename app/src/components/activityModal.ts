@@ -2,22 +2,6 @@ import type { ActivityEvent, Lead } from "../api";
 import { listLeadActivity, triggerLeadRefresh } from "../api";
 import { escapeHtml } from "../utils";
 
-const EVENT_ICONS: Record<string, string> = {
-  NEW_CHARGE: "🔗",
-  CHARGE_SATISFIED: "✅",
-  CHARGE_UPDATED: "✏️",
-  DIRECTOR_APPOINTMENT: "👤",
-  DIRECTOR_RESIGNATION: "👤",
-  PSC_CHANGE: "🏢",
-  RISK_INCREASE: "⚠️",
-  FINANCIAL_CHANGE: "📊",
-  COMPANY_EVENT: "📋",
-};
-
-function eventIcon(type: string): string {
-  return EVENT_ICONS[type] ?? "📌";
-}
-
 function eventLabel(type: string): string {
   return type.replace(/_/g, " ");
 }
@@ -35,20 +19,18 @@ function formatDetected(iso: string): string {
 }
 
 function renderEventRow(event: ActivityEvent): string {
-  const icon = eventIcon(event.event_type);
   const label = eventLabel(event.event_type);
   const badgeClass = `event-badge event-badge-${event.event_type}`;
   const timeStr = formatDetected(event.detected_at);
-  const occurredStr = event.occurred_at ? ` · occurred ${event.occurred_at}` : "";
+  const occurredStr = event.occurred_at ? ` · ${event.occurred_at}` : "";
   return `
     <div class="activity-event-row">
-      <span class="activity-event-icon">${icon}</span>
       <div class="activity-event-body">
         <div class="activity-event-header">
           <span class="${badgeClass}">${escapeHtml(label)}</span>
+          <span class="activity-event-desc">${escapeHtml(event.description)}</span>
           <span class="activity-event-time">${escapeHtml(timeStr)}${escapeHtml(occurredStr)}</span>
         </div>
-        <div class="activity-event-desc">${escapeHtml(event.description)}</div>
       </div>
     </div>
   `;

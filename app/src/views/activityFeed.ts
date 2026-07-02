@@ -13,17 +13,6 @@ const EVENT_TYPES = [
   "COMPANY_EVENT",
 ];
 
-const EVENT_ICONS: Record<string, string> = {
-  NEW_CHARGE: "🔗",
-  CHARGE_SATISFIED: "✅",
-  CHARGE_UPDATED: "✏️",
-  DIRECTOR_APPOINTMENT: "👤",
-  DIRECTOR_RESIGNATION: "👤",
-  PSC_CHANGE: "🏢",
-  RISK_INCREASE: "⚠️",
-  FINANCIAL_CHANGE: "📊",
-  COMPANY_EVENT: "📋",
-};
 
 const TIME_RANGES: { label: string; hours: number | null }[] = [
   { label: "24h", hours: 24 },
@@ -71,19 +60,17 @@ function sinceFromHours(hours: number | null): string | undefined {
 }
 
 function renderEventRow(event: ActivityEvent): string {
-  const icon = EVENT_ICONS[event.event_type] ?? "📌";
   const label = event.event_type.replace(/_/g, " ");
   const badgeClass = `event-badge event-badge-${event.event_type}`;
   return `
     <div class="activity-feed-row">
-      <span class="activity-event-icon">${icon}</span>
       <div class="activity-event-body">
         <div class="activity-event-header">
           <span class="activity-feed-company">${escapeHtml(event.company_name)}</span>
           <span class="${badgeClass}">${escapeHtml(label)}</span>
+          <span class="activity-event-desc">${escapeHtml(event.description)}</span>
           <span class="activity-event-time">${escapeHtml(formatTime(event.detected_at))}</span>
         </div>
-        <div class="activity-event-desc">${escapeHtml(event.description)}</div>
       </div>
     </div>
   `;
@@ -91,10 +78,9 @@ function renderEventRow(event: ActivityEvent): string {
 
 function renderFilters(): string {
   const typeOptions = EVENT_TYPES.map((t) => {
-    const icon = EVENT_ICONS[t] ?? "📌";
     const label = t.replace(/_/g, " ");
     const active = state.selectedTypes.has(t);
-    return `<button class="p-filter-chip ${active ? "active" : ""}" data-type="${t}" type="button">${icon} ${label}</button>`;
+    return `<button class="p-filter-chip ${active ? "active" : ""}" data-type="${t}" type="button">${label}</button>`;
   }).join("");
 
   const rangeButtons = TIME_RANGES.map(({ label, hours }) => {
