@@ -1,4 +1,4 @@
-import { save } from "@tauri-apps/plugin-dialog";
+import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   type Lead,
   addLeadEmail,
@@ -9,6 +9,7 @@ import {
   exportLogCsv,
   generateLeadIntelligence,
   getBatchActivitySummaries,
+  importLeadsToDashboard,
   lookupCompanyPhone,
   scrapeLeadEmail,
   updateLead,
@@ -51,6 +52,7 @@ import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
 export function initDashboard(): void {
   const companiesInput = document.querySelector<HTMLTextAreaElement>("#companies")!;
   const lookupBtn = document.querySelector<HTMLButtonElement>("#lookup-btn")!;
+  const importCsvBtn = document.querySelector<HTMLButtonElement>("#import-csv-btn")!;
   const exportBtn = document.querySelector<HTMLButtonElement>("#export-btn")!;
   const refreshBtn = document.querySelector<HTMLButtonElement>("#refresh-btn")!;
   const searchInput = document.querySelector<HTMLInputElement>("#search-input")!;
@@ -288,6 +290,27 @@ export function initDashboard(): void {
       .filter((line) => line.length > 0);
     if (companies.length > 0) {
       void runLookups(companies);
+    }
+  });
+
+  importCsvBtn.addEventListener("click", async () => {
+    const path = await open({
+      multiple: false,
+      filters: [{ name: "CSV", extensions: ["csv"] }],
+    });
+    if (typeof path !== "string") return;
+
+    importCsvBtn.disabled = true;
+    importCsvBtn.textContent = "Importing...";
+    try {
+      const imported = await importLeadsToDashboard(path);
+      statusMessage.textContent = `Imported ${imported} lead(s).`;
+      await refreshLeads();
+    } catch (err) {
+      statusMessage.textContent = `Import failed: ${err}`;
+    } finally {
+      importCsvBtn.disabled = false;
+      importCsvBtn.textContent = "Import CSV";
     }
   });
 

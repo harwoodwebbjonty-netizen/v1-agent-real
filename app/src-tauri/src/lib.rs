@@ -393,6 +393,15 @@ async fn import_leads_csv(app_handle: tauri::AppHandle, list_id: String, csv_pat
     backend_client::import_leads_to_list(&base_url, &session.token, &list_id, rows).await
 }
 
+/// Reads the user-picked CSV and imports leads into the main dashboard pool (no list).
+#[tauri::command]
+async fn import_leads_to_dashboard(app_handle: tauri::AppHandle, csv_path: String) -> Result<usize, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    let rows = csv_log::parse_uploaded_csv(&csv_path)?;
+    backend_client::import_leads_to_dashboard(&base_url, &session.token, rows).await
+}
+
 #[tauri::command]
 async fn export_log_csv(app_handle: tauri::AppHandle, dest_path: String) -> Result<(), String> {
     let session = require_session(&app_handle)?;
@@ -924,6 +933,7 @@ pub fn run() {
       list_lead_lists,
       get_list_leads,
       import_leads_csv,
+      import_leads_to_dashboard,
       get_brand_voice,
       update_brand_voice,
       create_email_template,

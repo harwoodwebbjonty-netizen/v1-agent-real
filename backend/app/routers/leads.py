@@ -19,6 +19,8 @@ from app.schemas_contacts import (
 from app.schemas_leads import (
     AssignLeadRequest,
     CreateLeadRequest,
+    ImportLeadsRequest,
+    ImportLeadsResponse,
     LeadListResponse,
     LeadOut,
     MigrateRequest,
@@ -443,6 +445,29 @@ def get_intelligence_history(
     return LeadIntelligenceHistoryResponse(
         versions=[_to_intelligence_version_out(r) for r in db.list_lead_intelligence_versions(lead_id)]
     )
+
+
+@router.post("/import-csv", response_model=ImportLeadsResponse)
+def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depends(get_current_user)) -> ImportLeadsResponse:
+    imported = 0
+    created_at = now_iso()
+    for entry in body.leads:
+        company = entry.get("company")
+        if not company:
+            continue
+        db.create_lead(
+            id=new_id(),
+            timestamp=entry.get("timestamp") or created_at,
+            company=company,
+            phone_number=entry.get("phone_number", ""),
+            source_url=entry.get("source_url", ""),
+            status=entry.get("status", "unverified"),
+            notes=entry.get("notes", ""),
+            owner_user_id=current_user.id,
+            created_at=created_at,
+        )
+        imported += 1
+    return ImportLeadsResponse(imported=imported)
 
 
 @router.post("/migrate", response_model=MigrateResponse)
