@@ -4,6 +4,7 @@ import {
   addLeadEmail,
   addLeadPhone,
   assignLead,
+  chEnrichAll,
   deleteLeadEmail,
   deleteLeadPhone,
   exportLogCsv,
@@ -53,6 +54,7 @@ export function initDashboard(): void {
   const companiesInput = document.querySelector<HTMLTextAreaElement>("#companies")!;
   const lookupBtn = document.querySelector<HTMLButtonElement>("#lookup-btn")!;
   const importCsvBtn = document.querySelector<HTMLButtonElement>("#import-csv-btn")!;
+  const enrichBtn = document.querySelector<HTMLButtonElement>("#enrich-btn")!;
   const exportBtn = document.querySelector<HTMLButtonElement>("#export-btn")!;
   const refreshBtn = document.querySelector<HTMLButtonElement>("#refresh-btn")!;
   const searchInput = document.querySelector<HTMLInputElement>("#search-input")!;
@@ -311,6 +313,21 @@ export function initDashboard(): void {
     } finally {
       importCsvBtn.disabled = false;
       importCsvBtn.textContent = "Import CSV";
+    }
+  });
+
+  enrichBtn.addEventListener("click", async () => {
+    enrichBtn.disabled = true;
+    enrichBtn.textContent = "Enriching...";
+    try {
+      const enriched = await chEnrichAll();
+      await refreshLeads();
+      alert(`Enriched ${enriched} lead(s) with Companies House data (industry, company number, accounts, directors).`);
+    } catch (err) {
+      alert(`Enrichment failed: ${err}`);
+    } finally {
+      enrichBtn.disabled = false;
+      enrichBtn.textContent = "Enrich from CH";
     }
   });
 

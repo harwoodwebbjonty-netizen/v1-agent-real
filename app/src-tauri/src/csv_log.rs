@@ -302,15 +302,29 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
         pos
     };
 
+    // Company name: exact aliases first, then first column fallback
     let company_col = find_col(&[
         "company", "company_name", "company name", "name", "business_name",
         "business name", "organisation", "organization", "employer", "account name",
     ]).unwrap_or(0);
 
-    let phone_col = find_col(&[
-        "phone_number", "phone", "phone number", "telephone", "tel",
-        "mobile", "mobile number", "contact number", "number",
-    ]);
+    // Company number: substring match on "company number", "reg", "crn" etc.
+    let company_number_col = headers.iter().enumerate().position(|(_, h)| {
+        let h = if h.trim().starts_with('\u{feff}') { h.trim().trim_start_matches('\u{feff}') } else { h.trim() };
+        let h = h.to_ascii_lowercase();
+        h.contains("company number") || h.contains("company_number") || h.contains("company no")
+            || h == "crn" || h == "reg no" || h == "reg number"
+            || h.contains("registration number") || h.contains("registration no")
+            || h == "ch number" || h == "ch no"
+    });
+
+    // Phone: any header that contains "phone" or "mobile", or equals "tel"
+    let phone_col = headers.iter().position(|h| {
+        let h = h.trim().to_ascii_lowercase();
+        h.contains("phone") || h.contains("mobile") || h == "tel"
+            || h.starts_with("tel ") || h.ends_with(" tel")
+    });
+
     let source_col = find_col(&["source_url", "website", "url", "site", "web"]);
     let notes_col = find_col(&["notes", "note", "comments", "comment"]);
 
@@ -330,14 +344,17 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
             "phone_number": get(&record, phone_col),
             "source_url": get(&record, source_col),
             "notes": get(&record, notes_col),
+            "company_number": get(&record, company_number_col),
         }));
     }
 
     if rows.is_empty() {
         return Err(format!(
-            "No rows found. Detected delimiter: '{}', headers: [{}]. Check your CSV has data rows.",
+            "No rows found. Delimiter: '{}', headers detected: [{}]. Phone column: {}, Company# column: {}.",
             delimiter as char,
-            headers.iter().collect::<Vec<_>>().join(", ")
+            headers.iter().collect::<Vec<_>>().join(" | "),
+            phone_col.map(|i| headers.get(i).unwrap_or("?").to_string()).unwrap_or("NOT FOUND".to_string()),
+            company_number_col.map(|i| headers.get(i).unwrap_or("?").to_string()).unwrap_or("NOT FOUND".to_string()),
         ));
     }
 

@@ -632,14 +632,15 @@ def create_lead(
     owner_user_id: str,
     created_at: str,
     list_id: Optional[str] = None,
+    company_number: Optional[str] = None,
 ) -> None:
     with get_connection() as conn:
         conn.execute(
             """INSERT INTO leads
                (id, timestamp, company, phone_number, source_url, status, notes,
-                industry, contact_status, lead_notes, owner_user_id, assigned_user_id, list_id, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, '', 'New', '', ?, NULL, ?, ?, ?)""",
-            (id, timestamp, company, phone_number, source_url, status, notes, owner_user_id, list_id, created_at, created_at),
+                industry, contact_status, lead_notes, owner_user_id, assigned_user_id, list_id, company_number, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, '', 'New', '', ?, NULL, ?, ?, ?, ?)""",
+            (id, timestamp, company, phone_number, source_url, status, notes, owner_user_id, list_id, company_number, created_at, created_at),
         )
 
 

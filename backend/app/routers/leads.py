@@ -34,6 +34,14 @@ from app.schemas_sales_intelligence import (
 )
 from app.services.anthropic_service import lookup_company_phone
 from app.services.auth_service import new_id, now_iso
+from app.services.companies_house_service import (
+    build_ch_data_json,
+    extract_sic_industry,
+    get_company_charges,
+    get_company_officers,
+    get_company_profile,
+    search_company_by_name,
+)
 from app.services.email_scraper_service import scrape_emails
 from app.services.next_best_action import compute_next_best_action
 from app.services.sales_intelligence_service import (
@@ -465,9 +473,45 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
             notes=entry.get("notes", ""),
             owner_user_id=current_user.id,
             created_at=created_at,
+            company_number=entry.get("company_number") or None,
         )
         imported += 1
     return ImportLeadsResponse(imported=imported)
+
+
+@router.post("/ch-enrich-all")
+async def ch_enrich_all(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """Searches Companies House by name for every lead that has no company_number yet,
+    then fetches profile + charges + officers and writes industry/ch_data/company_number."""
+    settings = get_settings()
+    if not settings.companies_house_api_key:
+        raise HTTPException(status_code=400, detail="Companies House API key not configured")
+
+    leads = db.list_leads()
+    enriched = 0
+    for lead in leads:
+        if lead["company_number"]:
+            continue
+        try:
+            result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
+            if not result:
+                continue
+            company_number = result.get("company_number", "")
+            if not company_number:
+                continue
+            profile = await get_company_profile(settings.companies_house_api_key, company_number) or {}
+            charges = await get_company_charges(settings.companies_house_api_key, company_number)
+            officers = await get_company_officers(settings.companies_house_api_key, company_number)
+            ch_data = build_ch_data_json(profile, charges, officers)
+            industry = extract_sic_industry(profile)
+            fields: dict = {"company_number": company_number, "ch_data": ch_data}
+            if industry and not lead["industry"]:
+                fields["industry"] = industry
+            db.update_lead_fields(lead["id"], fields, now_iso())
+            enriched += 1
+        except Exception:
+            continue
+    return {"enriched": enriched}
 
 
 @router.post("/migrate", response_model=MigrateResponse)

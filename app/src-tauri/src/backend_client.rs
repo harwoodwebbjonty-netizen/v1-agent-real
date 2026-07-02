@@ -428,6 +428,19 @@ pub async fn import_leads_to_list(
     Ok(parsed.imported)
 }
 
+pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<usize, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/ch-enrich-all", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let parsed: serde_json::Value = handle_response(response).await?;
+    Ok(parsed["enriched"].as_u64().unwrap_or(0) as usize)
+}
+
 pub async fn import_leads_to_dashboard(
     base_url: &str,
     token: &str,

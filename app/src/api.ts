@@ -283,6 +283,10 @@ export async function importLeadsToDashboard(csvPath: string): Promise<number> {
   return invoke<number>("import_leads_to_dashboard", { csvPath });
 }
 
+export async function chEnrichAll(): Promise<number> {
+  return invoke<number>("ch_enrich_all");
+}
+
 // --- AI Sales Intelligence — manual trigger only, full version history kept ---
 
 /** Manual trigger only — also used for "Refresh" (same backend action). Never runs automatically. */

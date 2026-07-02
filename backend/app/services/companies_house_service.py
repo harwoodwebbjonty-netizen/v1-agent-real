@@ -49,6 +49,19 @@ async def search_companies(
         return data.get("items", [])
 
 
+async def search_company_by_name(api_key: str, name: str) -> Optional[dict]:
+    """Text search by company name — returns the top active result or None."""
+    async with _client(api_key) as client:
+        r = await client.get("/search/companies", params={"q": name, "items_per_page": 3})
+        if r.status_code != 200:
+            return None
+        for item in r.json().get("items", []):
+            if item.get("company_status") == "active":
+                return item
+        items = r.json().get("items", [])
+        return items[0] if items else None
+
+
 async def get_company_profile(api_key: str, company_number: str) -> Optional[dict]:
     async with _client(api_key) as client:
         r = await client.get(f"/company/{company_number}")
