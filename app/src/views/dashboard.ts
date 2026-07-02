@@ -304,10 +304,10 @@ export function initDashboard(): void {
     importCsvBtn.textContent = "Importing...";
     try {
       const imported = await importLeadsToDashboard(path);
-      statusMessage.textContent = `Imported ${imported} lead(s).`;
       await refreshLeads();
+      alert(`Imported ${imported} lead(s) successfully.`);
     } catch (err) {
-      statusMessage.textContent = `Import failed: ${err}`;
+      alert(`Import failed: ${err}`);
     } finally {
       importCsvBtn.disabled = false;
       importCsvBtn.textContent = "Import CSV";

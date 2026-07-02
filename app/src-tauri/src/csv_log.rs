@@ -258,13 +258,28 @@ pub fn read_all(app_handle: &tauri::AppHandle) -> Result<Vec<LeadRecord>, String
 // `read_all`, used exactly once by the `migrate_local_leads_to_team` command
 // to import legacy local data into the shared workspace.
 
+/// Auto-detects whether a CSV file uses comma or semicolon as delimiter by
+/// checking which produces more columns in the header row.
+fn detect_delimiter(path: &str) -> u8 {
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    let first_line = content.lines().next().unwrap_or("");
+    let commas = first_line.chars().filter(|&c| c == ',').count();
+    let semis = first_line.chars().filter(|&c| c == ';').count();
+    if semis > commas { b';' } else { b',' }
+}
+
 /// Parses an arbitrary user-supplied CSV (unknown column layout, picked via
 /// the cold-call-list "Upload CSV" dialog) into JSON objects matching the
 /// backend's `ImportLeadsRequest` shape. Unlike `read_records` above, which
 /// only understands this app's own fixed internal log format, this is
 /// header-driven and tolerant of missing optional columns.
+/// Auto-detects comma vs semicolon delimiter and falls back to first column
+/// for the company name if no recognised header is found.
 pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> {
-    let mut reader = csv::Reader::from_path(path)
+    let delimiter = detect_delimiter(path);
+    let mut reader = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .from_path(path)
         .map_err(|e| format!("Could not read CSV file {:?}: {}", path, e))?;
 
     let headers = reader
@@ -272,17 +287,32 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
         .map_err(|e| format!("Could not read CSV headers: {}", e))?
         .clone();
 
+    // Strip UTF-8 BOM from first header if present
+    let first_header = headers.get(0).unwrap_or("").trim_start_matches('\u{feff}');
+
     let find_col = |names: &[&str]| -> Option<usize> {
-        headers
-            .iter()
-            .position(|h| names.iter().any(|n| h.trim().eq_ignore_ascii_case(n)))
+        let mut pos = None;
+        for (i, h) in headers.iter().enumerate() {
+            let h_clean = if i == 0 { first_header } else { h.trim() };
+            if names.iter().any(|n| h_clean.eq_ignore_ascii_case(n)) {
+                pos = Some(i);
+                break;
+            }
+        }
+        pos
     };
 
-    let company_col = find_col(&["company", "company_name", "name", "business_name", "organisation", "organization"])
-        .unwrap_or(0);
-    let phone_col = find_col(&["phone_number", "phone", "phone number"]);
-    let source_col = find_col(&["source_url", "website", "url", "site"]);
-    let notes_col = find_col(&["notes"]);
+    let company_col = find_col(&[
+        "company", "company_name", "company name", "name", "business_name",
+        "business name", "organisation", "organization", "employer", "account name",
+    ]).unwrap_or(0);
+
+    let phone_col = find_col(&[
+        "phone_number", "phone", "phone number", "telephone", "tel",
+        "mobile", "mobile number", "contact number", "number",
+    ]);
+    let source_col = find_col(&["source_url", "website", "url", "site", "web"]);
+    let notes_col = find_col(&["notes", "note", "comments", "comment"]);
 
     let get = |record: &csv::StringRecord, idx: Option<usize>| -> String {
         idx.and_then(|i| record.get(i)).unwrap_or_default().trim().to_string()
@@ -302,6 +332,15 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
             "notes": get(&record, notes_col),
         }));
     }
+
+    if rows.is_empty() {
+        return Err(format!(
+            "No rows found. Detected delimiter: '{}', headers: [{}]. Check your CSV has data rows.",
+            delimiter as char,
+            headers.iter().collect::<Vec<_>>().join(", ")
+        ));
+    }
+
     Ok(rows)
 }
 
