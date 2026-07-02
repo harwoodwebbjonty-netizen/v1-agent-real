@@ -1907,6 +1907,249 @@ body.compact-rows td {
 
 .prospecting-run-row {
   cursor: default;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+/* ---- AI Prospecting enhanced components ---- */
+
+/* Range slider */
+.p-slider-wrap {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+.p-slider {
+  -webkit-appearance: none;
+  flex: 1;
+  min-width: 120px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--border);
+  outline: none;
+  cursor: pointer;
+}
+.p-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--accent-core);
+  cursor: pointer;
+  border: 2px solid var(--surface);
+  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+}
+.p-slider::-moz-range-thumb {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--accent-core);
+  cursor: pointer;
+  border: 2px solid var(--surface);
+}
+.p-slider-num {
+  width: 58px;
+  text-align: center;
+}
+
+/* Multi-select */
+.p-multiselect {
+  position: relative;
+}
+.p-multiselect-trigger {
+  display: flex;
+  align-items: flex-start;
+  min-height: 38px;
+  padding: var(--space-1) var(--space-2);
+  background: var(--input-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  cursor: text;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.p-multiselect-trigger:focus-within {
+  border-color: var(--accent-core);
+  box-shadow: 0 0 0 3px var(--accent-glow);
+}
+.p-multiselect-search {
+  border: none;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--text-sm);
+  color: var(--text);
+  flex: 1;
+  min-width: 100px;
+  padding: 4px var(--space-1);
+}
+.p-multiselect-search::placeholder { color: var(--text-muted); }
+
+.p-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px var(--space-2);
+  background: var(--accent-glow);
+  color: var(--accent-core);
+  border: 1px solid rgba(37, 99, 235, 0.2);
+  border-radius: 4px;
+  font-size: var(--text-xs);
+  font-weight: 500;
+  white-space: nowrap;
+  max-width: 200px;
+}
+.p-chip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.p-chip-x {
+  cursor: pointer;
+  opacity: 0.6;
+  font-size: 11px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+.p-chip-x:hover { opacity: 1; }
+
+.p-multiselect-dropdown {
+  position: absolute;
+  top: calc(100% + 3px);
+  left: 0;
+  right: 0;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-card-hover);
+  z-index: 200;
+  max-height: 240px;
+  overflow-y: auto;
+}
+.p-ms-group {
+  padding: var(--space-1) var(--space-3);
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  background: var(--bg);
+  position: sticky;
+  top: 0;
+  z-index: 1;
+}
+.p-ms-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: 7px var(--space-3);
+  cursor: pointer;
+  font-size: var(--text-sm);
+  transition: background 0.1s;
+}
+.p-ms-option:hover { background: var(--panel); }
+.p-ms-option.selected { background: var(--accent-glow); color: var(--accent-core); }
+.p-ms-option input[type="checkbox"] { pointer-events: none; accent-color: var(--accent-core); flex-shrink: 0; }
+.p-ms-empty {
+  padding: var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Tooltip */
+.p-tip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+.p-tip-icon {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--text-muted);
+  font-size: 9px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  margin-left: 5px;
+  flex-shrink: 0;
+  cursor: help;
+}
+.p-tip-content {
+  display: none;
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: 0;
+  background: var(--text);
+  color: var(--surface);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  font-size: var(--text-xs);
+  white-space: normal;
+  width: 230px;
+  z-index: 300;
+  line-height: 1.6;
+  pointer-events: none;
+}
+.p-tip:hover .p-tip-content { display: block; }
+
+/* Date presets */
+.p-date-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin-bottom: var(--space-2);
+}
+
+/* Active filters strip */
+.p-filters-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+  min-height: 28px;
+}
+.p-filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  color: var(--text);
+  white-space: nowrap;
+}
+.p-filter-chip-x {
+  cursor: pointer;
+  opacity: 0.5;
+  font-size: 11px;
+}
+.p-filter-chip-x:hover { opacity: 1; }
+
+/* Section divider inside prospecting form */
+.p-section-label {
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  margin-top: var(--space-1);
+}
+
+/* Run summary in recent runs */
+.p-run-filters {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 320px;
 }
 
 /* --- Today (Action Centre) --- */

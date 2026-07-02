@@ -1529,6 +1529,7 @@ pub struct ProspectingStatus {
 pub struct ProspectingCriteria {
     pub name: String,
     pub sic_codes: Vec<String>,
+    pub locations: Vec<String>,
     pub location: String,
     pub company_type: String,
     pub incorporated_from: String,
@@ -1536,6 +1537,14 @@ pub struct ProspectingCriteria {
     pub max_results: i64,
     pub min_ch_score: i64,
     pub run_ai_enrichment: bool,
+    pub charge_types: Vec<String>,
+    pub active_charges_only: bool,
+    pub include_satisfied: bool,
+    pub new_charges_only: bool,
+    pub charge_registered_from: String,
+    pub charge_registered_to: String,
+    pub min_charges: i64,
+    pub max_charges: i64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

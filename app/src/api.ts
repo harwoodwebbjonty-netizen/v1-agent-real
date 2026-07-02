@@ -668,6 +668,7 @@ export async function stopSequenceEnrollment(sequenceId: string, enrollmentId: s
 export interface ProspectingCriteria {
   name: string;
   sic_codes: string[];
+  locations: string[];
   location: string;
   company_type: string;
   incorporated_from: string;
@@ -675,6 +676,14 @@ export interface ProspectingCriteria {
   max_results: number;
   min_ch_score: number;
   run_ai_enrichment: boolean;
+  charge_types: string[];
+  active_charges_only: boolean;
+  include_satisfied: boolean;
+  new_charges_only: boolean;
+  charge_registered_from: string;
+  charge_registered_to: string;
+  min_charges: number;
+  max_charges: number;
 }
 
 export interface ProspectingStatus {
