@@ -268,93 +268,128 @@ fn detect_delimiter(path: &str) -> u8 {
     if semis > commas { b';' } else { b',' }
 }
 
-/// Parses an arbitrary user-supplied CSV (unknown column layout, picked via
-/// the cold-call-list "Upload CSV" dialog) into JSON objects matching the
-/// backend's `ImportLeadsRequest` shape. Unlike `read_records` above, which
-/// only understands this app's own fixed internal log format, this is
-/// header-driven and tolerant of missing optional columns.
-/// Auto-detects comma vs semicolon delimiter and falls back to first column
-/// for the company name if no recognised header is found.
+/// Returns true if the first row looks like real company data rather than column headers.
+/// Detects the Companies House / no-header export pattern.
+fn first_row_is_data(path: &str, delimiter: u8) -> bool {
+    let Ok(mut reader) = csv::ReaderBuilder::new()
+        .delimiter(delimiter)
+        .has_headers(false)
+        .from_path(path) else { return false };
+    let Ok(mut records) = Ok::<_, ()>(reader.records()) else { return false };
+    if let Some(Ok(record)) = records.next() {
+        let col0 = record.get(0).unwrap_or("").trim().to_uppercase();
+        let col1 = record.get(1).unwrap_or("").trim();
+        // Looks like a company row if col0 ends with a company suffix
+        // or col1 looks like a UK Companies House number (digits or SC/NI/OC/LP prefix)
+        let is_company_name = col0.ends_with("LIMITED") || col0.ends_with("LTD")
+            || col0.ends_with("LLP") || col0.ends_with("PLC") || col0.ends_with("LTD.");
+        let is_ch_number = col1.chars().all(|c| c.is_ascii_digit() || c == ' ')
+            || col1.starts_with("SC") || col1.starts_with("NI")
+            || col1.starts_with("OC") || col1.starts_with("LP")
+            || col1.starts_with("SO");
+        return is_company_name || is_ch_number;
+    }
+    false
+}
+
+/// Parses an arbitrary user-supplied CSV into JSON objects for the backend.
+/// Handles both headered CSVs (named columns) and headerless exports
+/// (e.g. Companies House bulk data: col 0=name, col 1=CH number, col 6=phone).
 pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> {
     let delimiter = detect_delimiter(path);
+    let headerless = first_row_is_data(path, delimiter);
+
     let mut reader = csv::ReaderBuilder::new()
         .delimiter(delimiter)
+        .has_headers(!headerless)
         .from_path(path)
-        .map_err(|e| format!("Could not read CSV file {:?}: {}", path, e))?;
-
-    let headers = reader
-        .headers()
-        .map_err(|e| format!("Could not read CSV headers: {}", e))?
-        .clone();
-
-    // Strip UTF-8 BOM from first header if present
-    let first_header = headers.get(0).unwrap_or("").trim_start_matches('\u{feff}');
-
-    let find_col = |names: &[&str]| -> Option<usize> {
-        let mut pos = None;
-        for (i, h) in headers.iter().enumerate() {
-            let h_clean = if i == 0 { first_header } else { h.trim() };
-            if names.iter().any(|n| h_clean.eq_ignore_ascii_case(n)) {
-                pos = Some(i);
-                break;
-            }
-        }
-        pos
-    };
-
-    // Company name: exact aliases first, then first column fallback
-    let company_col = find_col(&[
-        "company", "company_name", "company name", "name", "business_name",
-        "business name", "organisation", "organization", "employer", "account name",
-    ]).unwrap_or(0);
-
-    // Company number: substring match on "company number", "reg", "crn" etc.
-    let company_number_col = headers.iter().enumerate().position(|(_, h)| {
-        let h = if h.trim().starts_with('\u{feff}') { h.trim().trim_start_matches('\u{feff}') } else { h.trim() };
-        let h = h.to_ascii_lowercase();
-        h.contains("company number") || h.contains("company_number") || h.contains("company no")
-            || h == "crn" || h == "reg no" || h == "reg number"
-            || h.contains("registration number") || h.contains("registration no")
-            || h == "ch number" || h == "ch no"
-    });
-
-    // Phone: any header that contains "phone" or "mobile", or equals "tel"
-    let phone_col = headers.iter().position(|h| {
-        let h = h.trim().to_ascii_lowercase();
-        h.contains("phone") || h.contains("mobile") || h == "tel"
-            || h.starts_with("tel ") || h.ends_with(" tel")
-    });
-
-    let source_col = find_col(&["source_url", "website", "url", "site", "web"]);
-    let notes_col = find_col(&["notes", "note", "comments", "comment"]);
+        .map_err(|e| format!("Could not read CSV file: {}", e))?;
 
     let get = |record: &csv::StringRecord, idx: Option<usize>| -> String {
         idx.and_then(|i| record.get(i)).unwrap_or_default().trim().to_string()
     };
 
     let mut rows = Vec::new();
-    for result in reader.records() {
-        let record = result.map_err(|e| format!("Could not parse CSV row: {}", e))?;
-        let company = get(&record, Some(company_col));
-        if company.is_empty() {
-            continue;
+
+    if headerless {
+        // Positional layout: col 0=company, col 1=company_number, col 4=email (ignored), col 6=phone
+        for result in reader.records() {
+            let record = result.map_err(|e| format!("Could not parse CSV row: {}", e))?;
+            let company = get(&record, Some(0));
+            if company.is_empty() { continue; }
+            // Phone: last non-empty column that looks like a phone (col 6 in CH exports,
+            // but scan from the end to be safe)
+            let phone = (0..record.len()).rev()
+                .find(|&i| {
+                    let v = record.get(i).unwrap_or("").trim();
+                    !v.is_empty() && i != 1 && v.chars().any(|c| c.is_ascii_digit())
+                        && !v.contains('@')
+                })
+                .and_then(|i| record.get(i))
+                .unwrap_or("")
+                .trim()
+                .to_string();
+            rows.push(serde_json::json!({
+                "company": company,
+                "company_number": get(&record, Some(1)),
+                "phone_number": phone,
+                "source_url": "",
+                "notes": "",
+            }));
         }
-        rows.push(serde_json::json!({
-            "company": company,
-            "phone_number": get(&record, phone_col),
-            "source_url": get(&record, source_col),
-            "notes": get(&record, notes_col),
-            "company_number": get(&record, company_number_col),
-        }));
+    } else {
+        let headers = reader.headers()
+            .map_err(|e| format!("Could not read CSV headers: {}", e))?
+            .clone();
+        let first_header = headers.get(0).unwrap_or("").trim_start_matches('\u{feff}');
+
+        let find_col = |names: &[&str]| -> Option<usize> {
+            headers.iter().enumerate().find_map(|(i, h)| {
+                let h_clean = if i == 0 { first_header } else { h.trim() };
+                if names.iter().any(|n| h_clean.eq_ignore_ascii_case(n)) { Some(i) } else { None }
+            })
+        };
+
+        let company_col = find_col(&[
+            "company", "company_name", "company name", "name", "business_name",
+            "business name", "organisation", "organization", "employer", "account name",
+        ]).unwrap_or(0);
+
+        let company_number_col = headers.iter().position(|h| {
+            let h = h.trim().trim_start_matches('\u{feff}').to_ascii_lowercase();
+            h.contains("company number") || h.contains("company_number") || h.contains("company no")
+                || h == "crn" || h == "reg no" || h == "reg number"
+                || h.contains("registration number") || h == "ch number" || h == "ch no"
+        });
+
+        let phone_col = headers.iter().position(|h| {
+            let h = h.trim().to_ascii_lowercase();
+            h.contains("phone") || h.contains("mobile") || h == "tel"
+                || h.starts_with("tel ") || h.ends_with(" tel")
+        });
+
+        let source_col = find_col(&["source_url", "website", "url", "site", "web"]);
+        let notes_col = find_col(&["notes", "note", "comments", "comment"]);
+
+        for result in reader.records() {
+            let record = result.map_err(|e| format!("Could not parse CSV row: {}", e))?;
+            let company = get(&record, Some(company_col));
+            if company.is_empty() { continue; }
+            rows.push(serde_json::json!({
+                "company": company,
+                "phone_number": get(&record, phone_col),
+                "source_url": get(&record, source_col),
+                "notes": get(&record, notes_col),
+                "company_number": get(&record, company_number_col),
+            }));
+        }
     }
 
     if rows.is_empty() {
         return Err(format!(
-            "No rows found. Delimiter: '{}', headers detected: [{}]. Phone column: {}, Company# column: {}.",
+            "No rows found in CSV (delimiter: '{}', headerless: {}). Check the file has data rows.",
             delimiter as char,
-            headers.iter().collect::<Vec<_>>().join(" | "),
-            phone_col.map(|i| headers.get(i).unwrap_or("?").to_string()).unwrap_or("NOT FOUND".to_string()),
-            company_number_col.map(|i| headers.get(i).unwrap_or("?").to_string()).unwrap_or("NOT FOUND".to_string()),
+            headerless,
         ));
     }
 

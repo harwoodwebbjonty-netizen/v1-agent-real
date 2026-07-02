@@ -490,13 +490,19 @@ async def ch_enrich_all(current_user: CurrentUser = Depends(get_current_user)) -
     leads = db.list_leads()
     enriched = 0
     for lead in leads:
-        if lead["company_number"]:
+        # Skip if already fully enriched
+        if lead["ch_data"]:
             continue
         try:
-            result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
-            if not result:
-                continue
-            company_number = result.get("company_number", "")
+            company_number = lead["company_number"] or ""
+            # If we don't have a company number yet, search by name
+            if not company_number:
+                if not settings.companies_house_api_key:
+                    continue
+                result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
+                if not result:
+                    continue
+                company_number = result.get("company_number", "")
             if not company_number:
                 continue
             profile = await get_company_profile(settings.companies_house_api_key, company_number) or {}
