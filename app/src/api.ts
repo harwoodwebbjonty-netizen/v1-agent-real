@@ -36,6 +36,9 @@ export interface Lead {
   next_best_action: NextBestAction;
   company_number: string | null;
   ch_data: string | null;
+  refresh_tier: string | null;
+  next_dg_refresh_at: string | null;
+  last_dg_refreshed_at: string | null;
   phones: PhoneEntry[];
   emails: EmailEntry[];
   intelligence: LeadIntelligence | null;
@@ -723,4 +726,58 @@ export async function getProspectingRun(runId: string): Promise<ProspectingRun> 
 
 export async function listProspectingRuns(): Promise<ProspectingRun[]> {
   return invoke<ProspectingRun[]>("list_prospecting_runs");
+}
+
+// --- Activity Feed (DataGardener) ---
+
+export interface ActivityEvent {
+  id: string;
+  company_number: string;
+  company_name: string;
+  lead_id: string | null;
+  event_type: string;
+  description: string;
+  event_data: string | null;
+  occurred_at: string;
+  detected_at: string;
+}
+
+export interface ActivitySummary {
+  count: number;
+  latest_detected_at: string | null;
+  has_recent_24h: boolean;
+}
+
+export async function listLeadActivity(leadId: string): Promise<ActivityEvent[]> {
+  return invoke<ActivityEvent[]>("list_lead_activity", { leadId });
+}
+
+export async function getLeadActivitySummary(leadId: string): Promise<ActivitySummary> {
+  return invoke<ActivitySummary>("get_lead_activity_summary", { leadId });
+}
+
+export async function triggerLeadRefresh(leadId: string): Promise<void> {
+  await invoke("trigger_lead_refresh", { leadId });
+}
+
+export async function getGlobalActivityFeed(filters: {
+  eventTypes?: string;
+  since?: string;
+  companyName?: string;
+} = {}): Promise<ActivityEvent[]> {
+  return invoke<ActivityEvent[]>("get_global_activity_feed", {
+    eventTypes: filters.eventTypes ?? null,
+    since: filters.since ?? null,
+    companyName: filters.companyName ?? null,
+  });
+}
+
+export async function getBatchActivitySummaries(
+  leadIds: string[]
+): Promise<Record<string, ActivitySummary>> {
+  return invoke<Record<string, ActivitySummary>>("get_batch_activity_summaries", { leadIds });
+}
+
+export async function getActivityStatus(): Promise<{ configured: boolean }> {
+  return invoke<{ configured: boolean }>("get_activity_status");
 }

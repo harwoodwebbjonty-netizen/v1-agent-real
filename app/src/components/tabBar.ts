@@ -2,6 +2,7 @@ import { openTab, type ViewName } from "../tabs";
 
 const NAV_TITLES: Record<ViewName, string> = {
   "action-centre": "Today",
+  "activity-feed": "Activity Feed",
   "ai-prospecting": "AI Prospecting",
   dashboard: "Dashboard",
   "call-queue": "Call Queue",

@@ -11,6 +11,7 @@ from app.core.config import get_settings
 from app.core.rate_limit import limiter
 from app.dependencies import CurrentUser, get_current_user
 from app.routers import (
+    activity,
     ai_prospecting,
     auth,
     brand_voice,
@@ -28,6 +29,7 @@ from app.schemas import LookupRequest, LookupResult
 from app.schemas_chat import LeadChatRequest, LeadChatResponse
 from app.schemas_enrichment import EnrichLeadRequest, EnrichLeadResult
 from app.services import usage_log
+from app.services.activity_refresh_service import process_due_refreshes
 from app.services.anthropic_service import lookup_company_phone
 from app.services.chat_service import chat_about_lead
 from app.services.enrichment_service import enrich_lead
@@ -35,6 +37,7 @@ from app.services.sequences_service import process_due_enrollments
 
 logger = logging.getLogger("app.main")
 SEQUENCE_POLL_INTERVAL_SECONDS = 15 * 60
+ACTIVITY_REFRESH_POLL_SECONDS = 30 * 60
 
 app = FastAPI(title="Company Phone Lookup Backend")
 app.state.limiter = limiter
@@ -51,6 +54,7 @@ app.include_router(email_writer.router)
 app.include_router(email_oauth.router)
 app.include_router(sequences.router)
 app.include_router(ai_prospecting.router)
+app.include_router(activity.router)
 
 
 async def _sequence_scheduler_loop() -> None:
@@ -67,10 +71,25 @@ async def _sequence_scheduler_loop() -> None:
         await asyncio.sleep(SEQUENCE_POLL_INTERVAL_SECONDS)
 
 
+async def _activity_refresh_loop() -> None:
+    """Tiered background refresh for DataGardener company snapshots.
+    A-tier leads (hot/engaged) refresh every 6h; B-tier every 2d; C-tier every 7d.
+    The scheduler only runs when DATAGARDENER_API_KEY is configured."""
+    while True:
+        try:
+            detected = await process_due_refreshes()
+            if detected:
+                logger.info("Activity refresh detected %d new event(s)", detected)
+        except Exception:  # noqa: BLE001
+            logger.exception("Activity refresh cycle failed")
+        await asyncio.sleep(ACTIVITY_REFRESH_POLL_SECONDS)
+
+
 @app.on_event("startup")
 def on_startup() -> None:
     db.init_db()
     asyncio.create_task(_sequence_scheduler_loop())
+    asyncio.create_task(_activity_refresh_loop())
 
 
 @app.exception_handler(RateLimitExceeded)

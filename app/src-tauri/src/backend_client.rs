@@ -1620,3 +1620,142 @@ pub async fn list_prospecting_runs(base_url: &str, token: &str) -> Result<Vec<Pr
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
 }
+
+// --- Activity Feed (DataGardener) ---
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivityEvent {
+    pub id: String,
+    pub company_number: String,
+    pub company_name: String,
+    pub lead_id: Option<String>,
+    pub event_type: String,
+    pub description: String,
+    pub event_data: Option<String>,
+    pub occurred_at: String,
+    pub detected_at: String,
+}
+
+#[derive(Serialize, Deserialize, Clone)]
+pub struct ActivitySummary {
+    pub count: i64,
+    pub latest_detected_at: Option<String>,
+    pub has_recent_24h: bool,
+}
+
+#[derive(Deserialize)]
+struct ActivityEventsWrapper {
+    events: Vec<ActivityEvent>,
+}
+
+#[derive(Deserialize)]
+struct BatchSummaryWrapper {
+    summaries: std::collections::HashMap<String, ActivitySummary>,
+}
+
+pub async fn list_lead_activity(base_url: &str, token: &str, lead_id: &str) -> Result<Vec<ActivityEvent>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/activity/lead/{}", base_url, lead_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: ActivityEventsWrapper = handle_response(response).await?;
+    Ok(wrapper.events)
+}
+
+pub async fn get_lead_activity_summary(base_url: &str, token: &str, lead_id: &str) -> Result<ActivitySummary, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/activity/lead/{}/summary", base_url, lead_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn trigger_lead_refresh(base_url: &str, token: &str, lead_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/activity/lead/{}/refresh", base_url, lead_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Length", "0")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    if !response.status().is_success() {
+        let status = response.status();
+        let body = response.text().await.unwrap_or_default();
+        return Err(format!("Backend returned {}: {}", status, body));
+    }
+    Ok(())
+}
+
+pub async fn get_global_activity_feed(
+    base_url: &str,
+    token: &str,
+    event_types: Option<&str>,
+    since: Option<&str>,
+    company_name: Option<&str>,
+) -> Result<Vec<ActivityEvent>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/activity/feed", base_url);
+    let mut params: Vec<(&str, &str)> = vec![];
+    if let Some(et) = event_types {
+        params.push(("event_types", et));
+    }
+    if let Some(s) = since {
+        params.push(("since", s));
+    }
+    if let Some(cn) = company_name {
+        params.push(("company_name", cn));
+    }
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: ActivityEventsWrapper = handle_response(response).await?;
+    Ok(wrapper.events)
+}
+
+pub async fn get_batch_activity_summaries(
+    base_url: &str,
+    token: &str,
+    lead_ids: &[String],
+) -> Result<std::collections::HashMap<String, ActivitySummary>, String> {
+    if lead_ids.is_empty() {
+        return Ok(std::collections::HashMap::new());
+    }
+    let client = reqwest::Client::new();
+    let ids_param = lead_ids.join(",");
+    let url = format!("{}/activity/batch-summary", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .query(&[("lead_ids", ids_param.as_str())])
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: BatchSummaryWrapper = handle_response(response).await?;
+    Ok(wrapper.summaries)
+}
+
+pub async fn get_activity_status(base_url: &str, token: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/activity/status", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}

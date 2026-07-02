@@ -313,6 +313,45 @@ def _migration_007_prospecting_named_lists(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE prospecting_runs ADD COLUMN list_id TEXT")
 
 
+def _migration_008_activity_feed(conn: sqlite3.Connection) -> None:
+    """DataGardener-powered activity feed. Append-only snapshots + structured
+    change events for each lead's Companies House company number. Three new
+    columns on leads control the tiered background refresh schedule."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS company_snapshots (
+            id TEXT PRIMARY KEY,
+            company_number TEXT NOT NULL,
+            snapshot_json TEXT NOT NULL,
+            fetched_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_snapshots_company ON company_snapshots(company_number);
+
+        CREATE TABLE IF NOT EXISTS activity_events (
+            id TEXT PRIMARY KEY,
+            company_number TEXT NOT NULL,
+            company_name TEXT NOT NULL,
+            lead_id TEXT,
+            event_type TEXT NOT NULL,
+            description TEXT NOT NULL,
+            event_data TEXT,
+            occurred_at TEXT NOT NULL,
+            detected_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_activity_company ON activity_events(company_number);
+        CREATE INDEX IF NOT EXISTS idx_activity_lead ON activity_events(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_activity_detected ON activity_events(detected_at);
+        """
+    )
+    lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "refresh_tier" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN refresh_tier TEXT DEFAULT 'C'")
+    if "next_dg_refresh_at" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN next_dg_refresh_at TEXT")
+    if "last_dg_refreshed_at" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN last_dg_refreshed_at TEXT")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -323,8 +362,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (5, _migration_005_presence),
     (6, _migration_006_ai_prospecting),
     (7, _migration_007_prospecting_named_lists),
+    (8, _migration_008_activity_feed),
 ]
-CURRENT_SCHEMA_VERSION = 7
+CURRENT_SCHEMA_VERSION = 8
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1260,4 +1300,134 @@ def delete_email_oauth_account(user_id: str, provider: str) -> None:
     with get_connection() as conn:
         conn.execute(
             "DELETE FROM email_oauth_accounts WHERE user_id = ? AND provider = ?", (user_id, provider)
+        )
+
+
+# --- DataGardener activity feed (append-only snapshots + structured change events) ---
+
+def get_latest_snapshot(company_number: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM company_snapshots WHERE company_number = ? ORDER BY fetched_at DESC LIMIT 1",
+            (company_number,),
+        ).fetchone()
+
+
+def save_snapshot(id: str, company_number: str, snapshot_json: str, fetched_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO company_snapshots (id, company_number, snapshot_json, fetched_at) VALUES (?, ?, ?, ?)",
+            (id, company_number, snapshot_json, fetched_at),
+        )
+
+
+def save_activity_events(events: list[dict]) -> None:
+    """Bulk insert; silently skip exact id duplicates."""
+    if not events:
+        return
+    with get_connection() as conn:
+        conn.executemany(
+            """INSERT OR IGNORE INTO activity_events
+               (id, company_number, company_name, lead_id, event_type, description, event_data, occurred_at, detected_at)
+               VALUES (:id, :company_number, :company_name, :lead_id, :event_type, :description, :event_data, :occurred_at, :detected_at)""",
+            events,
+        )
+
+
+def list_lead_activity(lead_id: str, limit: int = 50) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM activity_events WHERE lead_id = ? ORDER BY detected_at DESC LIMIT ?",
+            (lead_id, limit),
+        ).fetchall()
+
+
+def list_global_activity(
+    event_types: Optional[list[str]] = None,
+    since: Optional[str] = None,
+    company_name: Optional[str] = None,
+    limit: int = 100,
+) -> list[sqlite3.Row]:
+    clauses: list[str] = []
+    params: list = []
+    if event_types:
+        placeholders = ", ".join("?" for _ in event_types)
+        clauses.append(f"event_type IN ({placeholders})")
+        params.extend(event_types)
+    if since:
+        clauses.append("detected_at >= ?")
+        params.append(since)
+    if company_name:
+        clauses.append("company_name LIKE ?")
+        params.append(f"%{company_name}%")
+    where = ("WHERE " + " AND ".join(clauses)) if clauses else ""
+    with get_connection() as conn:
+        return conn.execute(
+            f"SELECT * FROM activity_events {where} ORDER BY detected_at DESC LIMIT ?",
+            (*params, limit),
+        ).fetchall()
+
+
+def get_lead_activity_summary(lead_id: str) -> dict:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS cnt, MAX(detected_at) AS latest FROM activity_events WHERE lead_id = ?",
+            (lead_id,),
+        ).fetchone()
+    if not row or not row["cnt"]:
+        return {"count": 0, "latest_detected_at": None, "has_recent_24h": False}
+    from datetime import datetime, timedelta, timezone
+    latest = row["latest"]
+    has_recent = False
+    if latest:
+        try:
+            cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
+            has_recent = latest >= cutoff
+        except Exception:
+            pass
+    return {"count": row["cnt"], "latest_detected_at": latest, "has_recent_24h": has_recent}
+
+
+def get_batch_activity_summaries(lead_ids: list[str]) -> dict[str, dict]:
+    if not lead_ids:
+        return {}
+    placeholders = ", ".join("?" for _ in lead_ids)
+    with get_connection() as conn:
+        rows = conn.execute(
+            f"SELECT lead_id, COUNT(*) AS cnt, MAX(detected_at) AS latest FROM activity_events "
+            f"WHERE lead_id IN ({placeholders}) GROUP BY lead_id",
+            lead_ids,
+        ).fetchall()
+    from datetime import datetime, timedelta, timezone
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat(timespec="seconds")
+    result: dict[str, dict] = {}
+    for row in rows:
+        latest = row["latest"]
+        result[row["lead_id"]] = {
+            "count": row["cnt"],
+            "latest_detected_at": latest,
+            "has_recent_24h": bool(latest and latest >= cutoff),
+        }
+    return result
+
+
+def list_due_dg_refreshes(now_iso: str, limit: int = 20) -> list[sqlite3.Row]:
+    """Leads with a Companies House number that are due (or not yet scheduled)
+    for a DataGardener refresh."""
+    with get_connection() as conn:
+        return conn.execute(
+            """SELECT * FROM leads
+               WHERE company_number IS NOT NULL
+               AND (next_dg_refresh_at IS NULL OR next_dg_refresh_at <= ?)
+               ORDER BY next_dg_refresh_at ASC NULLS FIRST
+               LIMIT ?""",
+            (now_iso, limit),
+        ).fetchall()
+
+
+def update_lead_dg_refresh(lead_id: str, tier: str, next_refresh_at: str, last_refreshed_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE leads SET refresh_tier = ?, next_dg_refresh_at = ?, last_dg_refreshed_at = ? WHERE id = ?",
+            (tier, next_refresh_at, last_refreshed_at, lead_id),
         )

@@ -63,6 +63,8 @@ export interface RowHandlers {
   onToggleContacted?: (lead: Lead) => void;
   /** Reduce-clicks: jump straight to drafting an email for this lead without opening the side panel first. */
   onGenerateEmail?: (lead: Lead) => void;
+  /** Dashboard only: opens the activity modal for this lead. Renders a pulsing dot column on the left. */
+  onActivityClick?: (lead: Lead) => void;
 }
 
 const COLUMN_COUNT = 7;
@@ -74,6 +76,13 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     row.dataset.leadId = lead.id;
     row.className = "lead-row";
     row.innerHTML = `
+      ${
+        handlers.onActivityClick
+          ? `<td class="activity-col">
+               <span class="activity-dot pulse-none" data-lead-id="${lead.id}" title="View recent company activity"></span>
+             </td>`
+          : ""
+      }
       ${
         handlers.onToggleContacted
           ? `<td class="contacted-cell">
@@ -144,6 +153,12 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     generateEmailBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       handlers.onGenerateEmail!(lead);
+    });
+
+    const activityDot = row.querySelector<HTMLElement>(".activity-dot");
+    activityDot?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handlers.onActivityClick!(lead);
     });
 
     tbody.appendChild(row);

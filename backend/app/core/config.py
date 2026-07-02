@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     # Required for AI Prospecting; leave empty to disable the feature.
     companies_house_api_key: str = ""
 
+    # DataGardener API — powers the Recent Activity Feed (charge changes,
+    # director/PSC events, risk alerts). Leave empty to disable the feature
+    # — all activity dots stay grey and no background refreshes run.
+    datagardener_api_key: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

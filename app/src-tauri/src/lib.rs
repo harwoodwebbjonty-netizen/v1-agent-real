@@ -776,6 +776,73 @@ async fn list_prospecting_runs(app_handle: tauri::AppHandle) -> Result<Vec<backe
     backend_client::list_prospecting_runs(&base_url, &session.token).await
 }
 
+// --- Activity Feed (DataGardener) ---
+
+#[tauri::command]
+async fn list_lead_activity(
+    app_handle: tauri::AppHandle,
+    lead_id: String,
+) -> Result<Vec<backend_client::ActivityEvent>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_lead_activity(&base_url, &session.token, &lead_id).await
+}
+
+#[tauri::command]
+async fn get_lead_activity_summary(
+    app_handle: tauri::AppHandle,
+    lead_id: String,
+) -> Result<backend_client::ActivitySummary, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_lead_activity_summary(&base_url, &session.token, &lead_id).await
+}
+
+#[tauri::command]
+async fn trigger_lead_refresh(
+    app_handle: tauri::AppHandle,
+    lead_id: String,
+) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::trigger_lead_refresh(&base_url, &session.token, &lead_id).await
+}
+
+#[tauri::command]
+async fn get_global_activity_feed(
+    app_handle: tauri::AppHandle,
+    event_types: Option<String>,
+    since: Option<String>,
+    company_name: Option<String>,
+) -> Result<Vec<backend_client::ActivityEvent>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_global_activity_feed(
+        &base_url,
+        &session.token,
+        event_types.as_deref(),
+        since.as_deref(),
+        company_name.as_deref(),
+    ).await
+}
+
+#[tauri::command]
+async fn get_batch_activity_summaries(
+    app_handle: tauri::AppHandle,
+    lead_ids: Vec<String>,
+) -> Result<std::collections::HashMap<String, backend_client::ActivitySummary>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_batch_activity_summaries(&base_url, &session.token, &lead_ids).await
+}
+
+#[tauri::command]
+async fn get_activity_status(app_handle: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_activity_status(&base_url, &session.token).await
+}
+
 /// One-time, admin-only: imports the legacy local CSV (pre-team-workspace
 /// data) into the shared backend. Only place in the app that still reads
 /// `csv_log.rs` at runtime.
@@ -891,6 +958,12 @@ pub fn run() {
       start_prospecting_run,
       get_prospecting_run,
       list_prospecting_runs,
+      list_lead_activity,
+      get_lead_activity_summary,
+      trigger_lead_refresh,
+      get_global_activity_feed,
+      get_batch_activity_summaries,
+      get_activity_status,
       export_log_csv,
       migrate_local_leads_to_team
     ])

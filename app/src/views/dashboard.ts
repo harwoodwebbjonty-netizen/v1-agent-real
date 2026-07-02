@@ -8,12 +8,14 @@ import {
   deleteLeadPhone,
   exportLogCsv,
   generateLeadIntelligence,
+  getBatchActivitySummaries,
   lookupCompanyPhone,
   scrapeLeadEmail,
   updateLead,
   updateLeadEmail,
   updateLeadPhone,
 } from "../api";
+import { openActivityModal, updatePulseDots } from "../components/activityModal";
 import { getCurrentUser, subscribeAuth } from "../auth";
 import { consumePendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
 import {
@@ -155,7 +157,15 @@ export function initDashboard(): void {
         setPendingEmailWriterLead(lead.id);
         openTab("email-writer", "AI Email Writer");
       },
+      onActivityClick: (lead) => openActivityModal(lead),
     });
+
+    // Batch-load activity summaries after rows are in the DOM — dots start grey,
+    // then upgrade their pulse class once data arrives.
+    const leadIds = visible.map((l) => l.id);
+    void getBatchActivitySummaries(leadIds)
+      .then((summaries) => updatePulseDots(resultsBody, summaries))
+      .catch(() => { /* non-critical — dots stay grey */ });
   }
 
   function setStatusFilter(value: Lead["status"] | null): void {
