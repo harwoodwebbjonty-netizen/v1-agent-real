@@ -880,7 +880,15 @@ table {
   width: 100%;
   border-collapse: collapse;
   font-size: var(--text-sm);
+  table-layout: auto;
 }
+
+/* Minimum column widths so data is never truncated by browser squeeze */
+th[data-sort="company"] { min-width: 180px; }
+th[data-sort="phone_number"] { min-width: 160px; }
+th[data-sort="status"] { min-width: 105px; }
+th[data-sort="industry"] { min-width: 150px; }
+th[data-sort="contact_status"] { min-width: 155px; }
 
 th,
 td {
@@ -1492,6 +1500,10 @@ select.inline-edit {
 select.inline-edit:hover {
   border-color: var(--accent-core);
 }
+
+/* Ensure selects and text inputs have a sensible minimum so they never read as 3-char stubs */
+.inline-edit { min-width: 80px; }
+select.inline-edit { min-width: 110px; }
 
 /* Contact-status signal chips, styled purely via CSS (:has() reads the live selected option — zero JS/logic change) */
 .contact-status-select {

@@ -88,8 +88,31 @@ async def _activity_refresh_loop() -> None:
 @app.on_event("startup")
 def on_startup() -> None:
     db.init_db()
+    _backfill_industry_unclassified()
     asyncio.create_task(_sequence_scheduler_loop())
     asyncio.create_task(_activity_refresh_loop())
+
+
+def _backfill_industry_unclassified() -> None:
+    """One-time migration: set industry='Unclassified' for fully-enriched leads with no SIC codes."""
+    import json
+    from app.services.auth_service import now_iso
+    now = now_iso()
+    updated = 0
+    with db.get_connection() as conn:
+        rows = conn.execute(
+            "SELECT id, ch_data FROM leads WHERE (industry IS NULL OR industry = '') AND ch_data IS NOT NULL"
+        ).fetchall()
+        for row in rows:
+            try:
+                cd = json.loads(row[1])
+                if "charges" in cd and not cd.get("not_found") and not cd.get("partial") and not cd.get("sic_codes"):
+                    conn.execute("UPDATE leads SET industry = ? WHERE id = ?", ("Unclassified", row[0]))
+                    updated += 1
+            except Exception:
+                pass
+    if updated:
+        logging.getLogger("app").info("Backfilled industry=Unclassified for %d leads", updated)
 
 
 @app.exception_handler(RateLimitExceeded)

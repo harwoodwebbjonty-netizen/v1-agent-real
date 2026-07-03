@@ -550,7 +550,7 @@ async def _run_enrichment_batch(api_key: str, user_id: str, is_admin: bool, limi
             charges, charges_total = await get_company_charges(api_key, company_number)
             officers = await get_company_officers(api_key, company_number)
             ch_data = build_ch_data_json(profile, charges, officers, charges_total)
-            industry = extract_sic_industry(profile)
+            industry = extract_sic_industry(profile) or ("Unclassified" if not profile.get("sic_codes") else "")
             fields: dict = {"company_number": company_number, "ch_data": ch_data}
             if industry:
                 fields["industry"] = industry
@@ -613,6 +613,25 @@ async def ch_enrich_auto(current_user: CurrentUser = Depends(get_current_user)) 
 def ch_enrich_stop(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     _enrich_status["running"] = False
     return _enrich_status
+
+
+@router.post("/backfill-industry")
+def backfill_industry(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """One-time fix: set industry='Unclassified' for fully-enriched leads that have no SIC codes on CH."""
+    rows = db.list_all_leads_for_user(current_user.id, current_user.role == "admin")
+    updated = 0
+    now = now_iso()
+    for row in rows:
+        if row["industry"]:
+            continue
+        try:
+            stored = json.loads(row["ch_data"] or "{}")
+            if "charges" in stored and not stored.get("not_found") and not stored.get("partial") and not stored.get("sic_codes"):
+                db.update_lead_fields(row["id"], {"industry": "Unclassified"}, now)
+                updated += 1
+        except Exception:
+            pass
+    return {"updated": updated}
 
 
 @router.post("/dedup")
