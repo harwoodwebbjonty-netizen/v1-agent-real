@@ -244,7 +244,7 @@ export function initOpportunityWorkspace(): void {
 
     container.querySelector<HTMLButtonElement>("#ow-email-btn")!.addEventListener("click", () => {
       setPendingEmailWriterLead(lead.id);
-      openTab("email-writer", "AI Email Writer");
+      openTab("outreach", "Outreach");
     });
 
     container.querySelector<HTMLButtonElement>("#ow-followup-btn")!.addEventListener("click", async (ev) => {

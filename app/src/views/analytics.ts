@@ -108,7 +108,7 @@ function renderIndustryChart(leads: Lead[]): void {
         if (!elements.length) return;
         const industry = labels[elements[0].index];
         setIndustryFilter([industry]);
-        openTab("dashboard", "Dashboard");
+        openTab("dashboard", "Leads");
       },
       plugins: { legend: { display: false } },
       scales: { y: { beginAtZero: true, ticks: { precision: 0 } } },
@@ -137,7 +137,7 @@ function renderStatusChart(leads: Lead[]): void {
         const rank = CONTACT_STATUS_ORDER.indexOf(labels[elements[0].index]);
         if (rank >= 0) {
           setPendingDashboardContactStatusFilter(rank);
-          openTab("dashboard", "Dashboard");
+          openTab("dashboard", "Leads");
         }
       },
       plugins: { legend: { position: "bottom" } },
@@ -163,7 +163,7 @@ function renderFunnel(leads: Lead[]): void {
   container.querySelectorAll<HTMLDivElement>(".funnel-row").forEach((row) => {
     row.addEventListener("click", () => {
       setPendingDashboardContactStatusFilter(Number(row.dataset.rank));
-      openTab("dashboard", "Dashboard");
+      openTab("dashboard", "Leads");
     });
   });
 }

@@ -31,6 +31,7 @@ import {
   sortLeadsStable,
 } from "../components/leadTable";
 import {
+  getHasChargesFilter,
   getSelectedIndustries,
   initFiltersToggle,
   renderIndustrySidebar,
@@ -143,7 +144,7 @@ export function initDashboard(): void {
       return;
     }
     const visible = sortLeadsStable(
-      filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank),
+      filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank, getHasChargesFilter()),
       sortColumn,
       sortDirection
     );
@@ -160,7 +161,7 @@ export function initDashboard(): void {
       onContactStatusChange: handleContactStatusChange,
       onGenerateEmail: (lead) => {
         setPendingEmailWriterLead(lead.id);
-        openTab("email-writer", "AI Email Writer");
+        openTab("outreach", "Outreach");
       },
       onActivityClick: (lead) => openActivityModal(lead),
     });

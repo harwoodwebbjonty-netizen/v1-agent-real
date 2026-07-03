@@ -466,7 +466,7 @@ export function initSidePanel(callbacks: SidePanelCallbacks): void {
     if (!currentLead) return;
     setPendingEmailWriterLead(currentLead.id);
     closeSidePanel();
-    openTab("email-writer", "AI Email Writer");
+    openTab("outreach", "Outreach");
   });
   document.querySelector("#side-panel-save-notes-btn")!.addEventListener("click", async () => {
     if (!currentLead) return;

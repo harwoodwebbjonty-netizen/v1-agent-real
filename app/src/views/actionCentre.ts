@@ -22,7 +22,6 @@ import {
   type SidePanelCallbacks,
 } from "../components/sidePanel";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
-import { setPendingOpportunityWorkspaceLead } from "../opportunityWorkspaceHandoff";
 import { getLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
 import { openTab } from "../tabs";
@@ -191,7 +190,7 @@ export function initActionCentre(): void {
         <div class="action-row" data-lead-id="${escapeHtml(lead.id)}">
           <span class="action-row-title">${escapeHtml(lead.company)}</span>
           <span class="empty-hint">${escapeHtml(event.time || "")}</span>
-          <button type="button" class="btn btn-ghost btn-sm action-row-open-queue">Open in Call Queue</button>
+          <button type="button" class="btn btn-ghost btn-sm action-row-details-btn">View</button>
         </div>`
           )
           .join("")
@@ -247,7 +246,7 @@ export function initActionCentre(): void {
         <div class="action-row" data-lead-id="${escapeHtml(lead.id)}">
           <span class="action-row-title">${escapeHtml(lead.company)}</span>
           <span class="status-badge cal-type-task">${escapeHtml(lead.opportunity_stage)}</span>
-          <button type="button" class="btn btn-ghost btn-sm action-row-opportunity-btn">Open Workspace</button>
+          <button type="button" class="btn btn-ghost btn-sm action-row-details-btn">View</button>
         </div>`
           )
           .join("")
@@ -267,16 +266,6 @@ export function initActionCentre(): void {
           .join("")
       : emptyRow("Nobody marked as Replied right now.");
 
-    container.querySelectorAll<HTMLButtonElement>(".action-row-open-queue").forEach((btn) => {
-      btn.addEventListener("click", () => openTab("call-queue", "Call Queue"));
-    });
-    container.querySelectorAll<HTMLButtonElement>(".action-row-opportunity-btn").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const leadId = btn.closest<HTMLElement>(".action-row")!.dataset.leadId!;
-        setPendingOpportunityWorkspaceLead(leadId);
-        openTab("opportunity-workspace", "Opportunities");
-      });
-    });
     container.querySelectorAll<HTMLButtonElement>(".action-row-details-btn").forEach((btn) => {
       btn.addEventListener("click", () => openLead(btn.closest<HTMLElement>(".action-row")!.dataset.leadId!));
     });
@@ -284,7 +273,7 @@ export function initActionCentre(): void {
       btn.addEventListener("click", () => {
         const leadId = btn.closest<HTMLElement>(".action-row")!.dataset.leadId!;
         setPendingEmailWriterLead(leadId);
-        openTab("email-writer", "AI Email Writer");
+        openTab("outreach", "Outreach");
       });
     });
   }

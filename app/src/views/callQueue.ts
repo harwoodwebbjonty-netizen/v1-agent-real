@@ -256,7 +256,7 @@ export function initCallQueue(): void {
       btn.addEventListener("click", () => {
         const card = btn.closest<HTMLElement>(".call-queue-card")!;
         setPendingEmailWriterLead(card.dataset.leadId!);
-        openTab("email-writer", "AI Email Writer");
+        openTab("outreach", "Outreach");
       });
     });
 

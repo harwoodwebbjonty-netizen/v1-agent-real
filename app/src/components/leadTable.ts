@@ -26,15 +26,15 @@ export function sortLeadsStable(leads: Lead[], col: SortColumn, dir: SortDirecti
 }
 
 /** Industry filter (OR within selection) AND search (substring across company/phone/notes/industry),
- * plus an optional exact status filter (dashboard stat cards) and an optional
- * minimum contact-status rank (Analytics funnel — cumulative, same semantics
- * as the funnel's own counts: a lead matches if it's at or beyond that stage). */
+ * plus an optional exact status filter (dashboard stat cards), an optional
+ * minimum contact-status rank (Analytics funnel), and an optional CH charges filter. */
 export function filterLeads(
   leads: Lead[],
   search: string,
   selectedIndustries: Set<string>,
   statusFilter: Lead["status"] | null = null,
-  contactStatusMinRank: number | null = null
+  contactStatusMinRank: number | null = null,
+  hasChargesFilter = false
 ): Lead[] {
   const q = search.trim().toLowerCase();
   return leads.filter((lead) => {
@@ -45,6 +45,14 @@ export function filterLeads(
     if (selectedIndustries.size > 0) {
       const industry = lead.industry || "Uncategorized";
       if (!selectedIndustries.has(industry)) return false;
+    }
+    if (hasChargesFilter) {
+      try {
+        const chData = JSON.parse(lead.ch_data || "{}");
+        if ((chData.charges_total ?? 0) === 0) return false;
+      } catch {
+        return false;
+      }
     }
     if (q.length === 0) return true;
     return (
@@ -62,6 +70,8 @@ export interface RowHandlers {
   onContactStatusChange: (lead: Lead, value: string) => void;
   /** Cold-call-list tables only: prepends a contacted/uncontacted toggle circle. */
   onToggleContacted?: (lead: Lead) => void;
+  /** Cold-call-list tables only: a dedicated "Called" checkbox distinct from contact status. */
+  onToggleCalled?: (lead: Lead) => void;
   /** Reduce-clicks: jump straight to drafting an email for this lead without opening the side panel first. */
   onGenerateEmail?: (lead: Lead) => void;
   /** Dashboard only: opens the activity modal for this lead. Renders a pulsing dot column on the left. */
@@ -75,12 +85,19 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
   for (const lead of leads) {
     const row = document.createElement("tr");
     row.dataset.leadId = lead.id;
-    row.className = "lead-row";
+    row.className = `lead-row${lead.called_at ? " lead-row-called" : ""}`;
     row.innerHTML = `
       ${
         handlers.onActivityClick
           ? `<td class="activity-col">
                <span class="activity-dot pulse-none" data-lead-id="${lead.id}" title="View recent company activity"></span>
+             </td>`
+          : ""
+      }
+      ${
+        handlers.onToggleCalled
+          ? `<td class="called-cell">
+               <input type="checkbox" class="called-cb" ${lead.called_at ? "checked" : ""} title="Mark as called" />
              </td>`
           : ""
       }
@@ -142,6 +159,12 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     copyBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       void copyToClipboard(lead.phone_number);
+    });
+
+    const calledCb = row.querySelector<HTMLInputElement>(".called-cb");
+    calledCb?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handlers.onToggleCalled!(lead);
     });
 
     const toggleBtn = row.querySelector<HTMLButtonElement>(".contacted-toggle");

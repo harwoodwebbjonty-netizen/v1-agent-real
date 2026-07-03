@@ -352,6 +352,15 @@ def _migration_008_activity_feed(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leads ADD COLUMN last_dg_refreshed_at TEXT")
 
 
+def _migration_009_called_at(conn: sqlite3.Connection) -> None:
+    """Per-list-lead 'called' tracking. Scoped correctly because each lead
+    belongs to exactly one list via list_id — so a nullable timestamp on the
+    lead row is per-person per-lead without needing a separate join table."""
+    lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "called_at" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN called_at TEXT")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -363,8 +372,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (6, _migration_006_ai_prospecting),
     (7, _migration_007_prospecting_named_lists),
     (8, _migration_008_activity_feed),
+    (9, _migration_009_called_at),
 ]
-CURRENT_SCHEMA_VERSION = 8
+CURRENT_SCHEMA_VERSION = 9
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -863,6 +873,17 @@ def get_lead_list(list_id: str) -> Optional[sqlite3.Row]:
 def count_leads_in_list(list_id: str) -> int:
     with get_connection() as conn:
         return conn.execute("SELECT COUNT(*) FROM leads WHERE list_id = ?", (list_id,)).fetchone()[0]
+
+
+def toggle_lead_called(lead_id: str, list_id: str, now: str) -> Optional[str]:
+    """Flips called_at between null (uncalled) and now (called). Returns the new value."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT called_at, list_id FROM leads WHERE id = ?", (lead_id,)).fetchone()
+        if not row or row["list_id"] != list_id:
+            return None
+        new_val: Optional[str] = None if row["called_at"] else now
+        conn.execute("UPDATE leads SET called_at = ? WHERE id = ?", (new_val, lead_id))
+        return new_val
 
 
 # --- AI sales intelligence (append-only version history — never updated, never deleted) ---

@@ -394,6 +394,13 @@ async fn import_leads_csv(app_handle: tauri::AppHandle, list_id: String, csv_pat
 }
 
 #[tauri::command]
+async fn toggle_list_lead_called(app_handle: tauri::AppHandle, list_id: String, lead_id: String) -> Result<Option<String>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::toggle_list_lead_called(&base_url, &session.token, &list_id, &lead_id).await
+}
+
+#[tauri::command]
 async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<usize, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -949,6 +956,7 @@ pub fn run() {
       get_list_leads,
       import_leads_csv,
       import_leads_to_dashboard,
+      toggle_list_lead_called,
       ch_enrich_all,
       dedup_leads,
       get_brand_voice,

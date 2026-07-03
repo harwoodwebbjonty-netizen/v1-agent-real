@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app import db
 from app.dependencies import CurrentUser, get_current_user
-from app.routers.leads import _to_lead_out, _user_name_map
+from app.routers.leads import _to_lead_out, _user_name_map, get_activity_context
 from app.schemas_leads import (
     CreateLeadListRequest,
     ImportLeadsRequest,
@@ -55,7 +55,8 @@ def get_list_leads(list_id: str, current_user: CurrentUser = Depends(get_current
         raise HTTPException(status_code=404, detail="List not found")
     _require_list_access(lead_list, current_user)
     names = _user_name_map()
-    return LeadListResponse(leads=[_to_lead_out(r, names) for r in db.list_leads(list_id=list_id)])
+    activity = get_activity_context()
+    return LeadListResponse(leads=[_to_lead_out(r, names, activity) for r in db.list_leads(list_id=list_id)])
 
 
 @router.post("/{list_id}/import-csv", response_model=ImportLeadsResponse)
@@ -87,3 +88,15 @@ def import_leads_csv(
         )
         imported += 1
     return ImportLeadsResponse(imported=imported)
+
+
+@router.patch("/{list_id}/leads/{lead_id}/toggle-called")
+def toggle_lead_called(
+    list_id: str, lead_id: str, current_user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    lead_list = db.get_lead_list(list_id)
+    if lead_list is None:
+        raise HTTPException(status_code=404, detail="List not found")
+    _require_list_access(lead_list, current_user)
+    new_called_at = db.toggle_lead_called(lead_id, list_id, now_iso())
+    return {"called_at": new_called_at}

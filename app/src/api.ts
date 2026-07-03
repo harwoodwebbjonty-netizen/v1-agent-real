@@ -36,6 +36,7 @@ export interface Lead {
   next_best_action: NextBestAction;
   company_number: string | null;
   ch_data: string | null;
+  called_at: string | null;
   refresh_tier: string | null;
   next_dg_refresh_at: string | null;
   last_dg_refreshed_at: string | null;
@@ -277,6 +278,10 @@ export async function getListLeads(listId: string): Promise<Lead[]> {
 
 export async function importLeadsCsv(listId: string, csvPath: string): Promise<number> {
   return invoke<number>("import_leads_csv", { listId, csvPath });
+}
+
+export async function toggleListLeadCalled(listId: string, leadId: string): Promise<string | null> {
+  return invoke<string | null>("toggle_list_lead_called", { listId, leadId });
 }
 
 export async function importLeadsToDashboard(csvPath: string): Promise<number> {

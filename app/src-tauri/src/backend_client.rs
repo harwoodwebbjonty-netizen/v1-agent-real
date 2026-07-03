@@ -91,6 +91,7 @@ pub struct LeadRecord {
     pub next_best_action: NextBestAction,
     pub company_number: Option<String>,
     pub ch_data: Option<String>,
+    pub called_at: Option<String>,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
     pub intelligence: Option<LeadIntelligence>,
@@ -426,6 +427,19 @@ pub async fn import_leads_to_list(
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     let parsed: ImportLeadsResponse = handle_response(response).await?;
     Ok(parsed.imported)
+}
+
+pub async fn toggle_list_lead_called(base_url: &str, token: &str, list_id: &str, lead_id: &str) -> Result<Option<String>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/lead-lists/{}/leads/{}/toggle-called", base_url, list_id, lead_id);
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let parsed: serde_json::Value = handle_response(response).await?;
+    Ok(parsed["called_at"].as_str().map(String::from))
 }
 
 pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<usize, String> {

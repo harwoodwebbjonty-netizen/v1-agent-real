@@ -20,6 +20,7 @@ import { initEmailWriter } from "./views/emailWriter";
 import { initOpportunityWorkspace } from "./views/opportunityWorkspace";
 import { initSalesIntelligence } from "./views/salesIntelligence";
 import { initSequences } from "./views/sequences";
+import { initOutreach } from "./views/outreach";
 import { initSettings } from "./views/settings";
 
 initTheme();
@@ -35,6 +36,7 @@ initColdCallLists();
 initSalesIntelligence();
 initEmailWriter();
 initSequences();
+initOutreach();
 initCalendar();
 initAnalytics();
 initSettings();

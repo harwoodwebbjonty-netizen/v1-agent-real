@@ -9,6 +9,7 @@ interface SavedView {
 }
 
 let selected = new Set<string>();
+let hasChargesFilter = false;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -17,6 +18,10 @@ function notify(): void {
 
 export function getSelectedIndustries(): Set<string> {
   return selected;
+}
+
+export function getHasChargesFilter(): boolean {
+  return hasChargesFilter;
 }
 
 /** External setter — used by Analytics' industry chart click-through to
@@ -39,8 +44,9 @@ export function initFiltersToggle(): void {
   const badge = document.querySelector<HTMLSpanElement>("#filters-count-badge")!;
 
   function updateBadge(): void {
-    badge.textContent = String(selected.size);
-    badge.classList.toggle("hidden", selected.size === 0);
+    const count = selected.size + (hasChargesFilter ? 1 : 0);
+    badge.textContent = String(count);
+    badge.classList.toggle("hidden", count === 0);
   }
   subscribeIndustryFilter(updateBadge);
   updateBadge();
@@ -108,6 +114,13 @@ export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): vo
 
   container.innerHTML = `
     <div class="sidebar-section">
+      <div class="sidebar-section-header"><span>Companies House</span></div>
+      <label class="checkbox-row">
+        <input type="checkbox" id="charges-filter-cb" ${hasChargesFilter ? "checked" : ""} />
+        Has active charges
+      </label>
+    </div>
+    <div class="sidebar-section">
       <div class="sidebar-section-header">
         <span>Industries</span>
         ${selected.size > 0 ? '<button id="clear-industry-filter-btn" class="btn btn-ghost btn-sm">Clear</button>' : ""}
@@ -140,6 +153,11 @@ export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): vo
         .join("")}
     </div>
   `;
+
+  container.querySelector<HTMLInputElement>("#charges-filter-cb")?.addEventListener("change", (e) => {
+    hasChargesFilter = (e.target as HTMLInputElement).checked;
+    notify();
+  });
 
   container.querySelectorAll<HTMLInputElement>("[data-industry]").forEach((cb) => {
     cb.addEventListener("change", () => toggleIndustry(cb.dataset.industry!));

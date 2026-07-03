@@ -10,6 +10,7 @@ export type ViewName =
   | "email-writer"
   | "sequences"
   | "calendar"
+  | "outreach"
   | "analytics"
   | "settings";
 

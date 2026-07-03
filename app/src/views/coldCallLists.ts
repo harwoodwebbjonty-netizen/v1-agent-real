@@ -13,6 +13,7 @@ import {
   importLeadsCsv,
   lookupCompanyPhone,
   scrapeLeadEmail,
+  toggleListLeadCalled,
   updateLead,
   updateLeadEmail,
   updateLeadPhone,
@@ -40,7 +41,7 @@ import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists
 import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
 
-const LIST_COLUMN_COUNT = 8; // 7 standard columns + the contacted-toggle column
+const LIST_COLUMN_COUNT = 9; // 7 standard columns + contacted-toggle column + called checkbox
 
 export function initColdCallLists(): void {
   const container = document.querySelector<HTMLDivElement>("#view-cold-call-lists")!;
@@ -103,10 +104,17 @@ export function initColdCallLists(): void {
             </div>
           </div>
 
+          <div class="ccl-called-filter">
+            <button class="ccl-filter-btn active" data-called="all">All</button>
+            <button class="ccl-filter-btn" data-called="not-called">Not Called</button>
+            <button class="ccl-filter-btn" data-called="called">Called</button>
+          </div>
+
           <div class="table-wrap">
             <table id="list-results-table">
               <thead>
                 <tr>
+                  <th>Called</th>
                   <th></th>
                   <th data-sort="company">Company</th>
                   <th data-sort="phone_number">Phone</th>
@@ -147,6 +155,7 @@ export function initColdCallLists(): void {
   let sortColumn: SortColumn = null;
   let sortDirection: SortDirection = "asc";
   let searchText = "";
+  let calledFilter: "all" | "called" | "not-called" = "all";
 
   function listRowHtml(list: LeadList, showOwner: boolean): string {
     return `
@@ -201,7 +210,12 @@ export function initColdCallLists(): void {
       renderEmptyState(listResultsBody, "No leads in this list yet — upload a CSV to get started.", LIST_COLUMN_COUNT);
       return;
     }
-    const visible = sortLeadsStable(filterLeads(currentListLeads, searchText, new Set()), sortColumn, sortDirection);
+
+    let filtered = filterLeads(currentListLeads, searchText, new Set());
+    if (calledFilter === "called") filtered = filtered.filter((l) => !!l.called_at);
+    else if (calledFilter === "not-called") filtered = filtered.filter((l) => !l.called_at);
+
+    const visible = sortLeadsStable(filtered, sortColumn, sortDirection);
     if (visible.length === 0) {
       renderEmptyState(listResultsBody, "No leads match your search.", LIST_COLUMN_COUNT);
       return;
@@ -224,9 +238,14 @@ export function initColdCallLists(): void {
         await updateLead(lead.id, { contactStatus: next });
         await refreshCurrentList();
       },
+      onToggleCalled: async (lead) => {
+        if (!currentListId) return;
+        await toggleListLeadCalled(currentListId, lead.id);
+        await refreshCurrentList();
+      },
       onGenerateEmail: (lead) => {
         setPendingEmailWriterLead(lead.id);
-        openTab("email-writer", "AI Email Writer");
+        openTab("outreach", "Outreach");
       },
     });
   }
@@ -284,11 +303,23 @@ export function initColdCallLists(): void {
     },
   };
 
+  const calledFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-filter-btn");
+  calledFilterBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      calledFilter = btn.dataset.called as "all" | "called" | "not-called";
+      calledFilterBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderListTable();
+    });
+  });
+
   async function openListDetail(listId: string): Promise<void> {
     currentListId = listId;
     sortColumn = null;
     sortDirection = "asc";
     searchText = "";
+    calledFilter = "all";
+    calledFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.called === "all"));
     listSearchInput.value = "";
     listDetailStatus.textContent = "";
     listDetailTitle.textContent = getLeadLists().find((l) => l.id === listId)?.name ?? "List";
