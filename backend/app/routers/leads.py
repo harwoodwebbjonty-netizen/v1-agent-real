@@ -1,6 +1,9 @@
 import json
+import logging
 import sqlite3
 from typing import Optional
+
+logger = logging.getLogger("app.leads")
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 
@@ -527,9 +530,11 @@ async def ch_enrich_all(
             if not company_number:
                 result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
                 if not result:
+                    logger.warning("CH enrich: no match found for '%s'", lead["company"])
                     continue
                 company_number = result.get("company_number", "")
             if not company_number:
+                logger.warning("CH enrich: got result but no company_number for '%s'", lead["company"])
                 continue
             profile = await get_company_profile(settings.companies_house_api_key, company_number) or {}
             charges, charges_total = await get_company_charges(settings.companies_house_api_key, company_number)
@@ -542,7 +547,8 @@ async def ch_enrich_all(
                 fields["industry"] = industry
             db.update_lead_fields(lead["id"], fields, now_iso())
             enriched += 1
-        except Exception:
+        except Exception as exc:
+            logger.warning("CH enrich failed for '%s': %s", lead["company"], exc)
             continue
     return {"enriched": enriched, "remaining": remaining_after}
 

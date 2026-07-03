@@ -5,6 +5,7 @@ Docs: https://developer-specs.company-information.service.gov.uk/companies-house
 
 import json
 import logging
+import re
 from typing import List, Optional
 
 import httpx
@@ -49,17 +50,41 @@ async def search_companies(
         return data.get("items", [])
 
 
+_LEGAL_SUFFIXES = re.compile(
+    r"\s+(limited|ltd\.?|plc\.?|llp\.?|llc\.?|inc\.?|co\.?|company|group|holdings?|services?|solutions?|consulting|consultants?|technologies|technology|tech|associates?|partners?|partnership|enterprises?|trading|international|uk|the)\s*$",
+    re.IGNORECASE,
+)
+
+
+def _name_variants(name: str) -> list[str]:
+    """Return the original name plus progressively stripped variants to maximise CH hit rate."""
+    variants = [name]
+    stripped = _LEGAL_SUFFIXES.sub("", name).strip()
+    if stripped and stripped != name:
+        variants.append(stripped)
+        # Strip again in case of "Acme Solutions Ltd" → "Acme Solutions" → "Acme"
+        stripped2 = _LEGAL_SUFFIXES.sub("", stripped).strip()
+        if stripped2 and stripped2 != stripped:
+            variants.append(stripped2)
+    return variants
+
+
 async def search_company_by_name(api_key: str, name: str) -> Optional[dict]:
-    """Text search by company name — returns the top active result or None."""
+    """Text search by company name — tries original name then stripped variants.
+    Returns the best active match, or the first result overall if none are active."""
     async with _client(api_key) as client:
-        r = await client.get("/search/companies", params={"q": name, "items_per_page": 3})
-        if r.status_code != 200:
-            return None
-        for item in r.json().get("items", []):
-            if item.get("company_status") == "active":
-                return item
-        items = r.json().get("items", [])
-        return items[0] if items else None
+        for variant in _name_variants(name):
+            r = await client.get("/search/companies", params={"q": variant, "items_per_page": 10})
+            if r.status_code != 200:
+                continue
+            items = r.json().get("items", [])
+            # Prefer an active company
+            for item in items:
+                if item.get("company_status") == "active":
+                    return item
+            if items:
+                return items[0]
+    return None
 
 
 async def get_company_profile(api_key: str, company_number: str) -> Optional[dict]:
