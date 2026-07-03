@@ -5,7 +5,7 @@ mod csv_log;
 
 use app_state::StoredSession;
 use auth_client::UserInfo;
-use backend_client::LeadRecord;
+use backend_client::{EnrichStatus, LeadRecord};
 use serde::Serialize;
 use tauri_plugin_opener::OpenerExt;
 
@@ -413,6 +413,27 @@ async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<ChEnrichResult, S
     let base_url = app_state::resolve_base_url(&app_handle);
     let (enriched, remaining) = backend_client::ch_enrich_all(&base_url, &session.token).await?;
     Ok(ChEnrichResult { enriched, remaining })
+}
+
+#[tauri::command]
+async fn ch_enrich_auto(app_handle: tauri::AppHandle) -> Result<EnrichStatus, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::ch_enrich_auto(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn ch_enrich_status(app_handle: tauri::AppHandle) -> Result<EnrichStatus, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::ch_enrich_status(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn ch_enrich_stop(app_handle: tauri::AppHandle) -> Result<EnrichStatus, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::ch_enrich_stop(&base_url, &session.token).await
 }
 
 #[tauri::command]
@@ -966,6 +987,9 @@ pub fn run() {
       import_leads_to_dashboard,
       toggle_list_lead_called,
       ch_enrich_all,
+      ch_enrich_auto,
+      ch_enrich_status,
+      ch_enrich_stop,
       dedup_leads,
       get_brand_voice,
       update_brand_voice,

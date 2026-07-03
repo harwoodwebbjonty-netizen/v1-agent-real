@@ -76,17 +76,27 @@ export interface RowHandlers {
   onGenerateEmail?: (lead: Lead) => void;
   /** Dashboard only: opens the activity modal for this lead. Renders a pulsing dot column on the left. */
   onActivityClick?: (lead: Lead) => void;
+  /** Bulk selection: toggling a row's checkbox. Caller owns the selectedIds set. */
+  onToggleSelect?: (lead: Lead, selected: boolean) => void;
 }
 
-const COLUMN_COUNT = 7;
+const COLUMN_COUNT = 8;
 
-export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handlers: RowHandlers): void {
+export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handlers: RowHandlers, selectedIds?: Set<string>): void {
   tbody.innerHTML = "";
   for (const lead of leads) {
+    const isSelected = selectedIds?.has(lead.id) ?? false;
     const row = document.createElement("tr");
     row.dataset.leadId = lead.id;
-    row.className = `lead-row${lead.called_at ? " lead-row-called" : ""}`;
+    row.className = `lead-row${lead.called_at ? " lead-row-called" : ""}${isSelected ? " lead-row-selected" : ""}`;
     row.innerHTML = `
+      ${
+        handlers.onToggleSelect
+          ? `<td class="select-cell">
+               <input type="checkbox" class="select-cb" ${isSelected ? "checked" : ""} title="Select row" />
+             </td>`
+          : ""
+      }
       ${
         handlers.onActivityClick
           ? `<td class="activity-col">
@@ -139,6 +149,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
         }
         ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
       </td>
+      <td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>
     `;
     row.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest(".inline-edit, .icon-btn")) return;
@@ -159,6 +170,12 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     copyBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       void copyToClipboard(lead.phone_number);
+    });
+
+    const selectCb = row.querySelector<HTMLInputElement>(".select-cb");
+    selectCb?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handlers.onToggleSelect!(lead, selectCb.checked);
     });
 
     const calledCb = row.querySelector<HTMLInputElement>(".called-cb");

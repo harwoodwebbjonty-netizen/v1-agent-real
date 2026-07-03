@@ -40,6 +40,8 @@ from app.services.auth_service import new_id, now_iso
 from app.services.companies_house_service import (
     _SIC_DESCRIPTIONS,
     build_ch_data_json,
+    build_not_found_ch_data_json,
+    build_partial_ch_data_json,
     extract_sic_industry,
     get_company_charges,
     get_company_officers,
@@ -159,6 +161,7 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         company_number=row["company_number"],
         ch_data=row["ch_data"],
         called_at=row["called_at"],
+        list_name=row["list_name"] if "list_name" in row.keys() else None,
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
         emails=[EmailOut(id=e["id"], email=e["email"], source=e["source"]) for e in db.list_emails(row["id"])],
         intelligence=intelligence,
@@ -180,7 +183,7 @@ def _require_lead_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
 @router.get("", response_model=LeadListResponse)
 def list_leads(current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadListResponse:
     names = _user_name_map()
-    return LeadListResponse(leads=[_to_lead_out(r, names, activity) for r in db.list_leads()])
+    return LeadListResponse(leads=[_to_lead_out(r, names, activity) for r in db.list_all_leads_for_user(current_user.id, current_user.role == "admin")])
 
 
 @router.post("", response_model=LeadOut)
@@ -480,38 +483,30 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
     return ImportLeadsResponse(imported=imported)
 
 
-@router.post("/ch-enrich-all")
-async def ch_enrich_all(
-    limit: int = 100,
-    current_user: CurrentUser = Depends(get_current_user),
-) -> dict:
-    """Searches Companies House by name for every lead that has no ch_data yet,
-    then fetches profile + charges + officers and writes industry/ch_data/company_number.
-    Processes at most `limit` leads per call (default 100, ~4 API requests each).
-    Already-enriched leads are always skipped, so repeated calls continue where the
-    previous one left off."""
-    settings = get_settings()
-    if not settings.companies_house_api_key:
-        raise HTTPException(status_code=400, detail="Companies House API key not configured")
+import asyncio as _asyncio
 
-    import json as _json
+_enrich_task: "_asyncio.Task[None] | None" = None
+_enrich_status: dict = {"running": False, "enriched": 0, "remaining": 0, "failed": 0}
 
-    def _needs_enrichment(lead: sqlite3.Row) -> bool:
-        """True if the lead is missing industry, or has old-schema ch_data (no 'charges' array)."""
-        if not lead["ch_data"]:
-            return True
-        if not lead["industry"]:
-            return True
-        try:
-            stored = _json.loads(lead["ch_data"])
-            # Old schema stored 'latest_charge' dict; new schema stores 'charges' list.
-            if "charges" not in stored:
-                return True
-        except Exception:
-            return True
-        return False
 
-    leads = db.list_leads()
+def _needs_enrichment(lead: sqlite3.Row) -> bool:
+    """True if this lead still needs a CH enrichment attempt."""
+    if not lead["ch_data"]:
+        return True
+    try:
+        stored = json.loads(lead["ch_data"])
+        if stored.get("not_found") or stored.get("partial"):
+            return False  # as good as we can get — don't retry
+        if "charges" not in stored:
+            return True   # old schema — upgrade
+        return not lead["industry"]  # re-enrich only if industry still missing
+    except Exception:
+        return True
+
+
+async def _run_enrichment_batch(api_key: str, user_id: str, is_admin: bool, limit: int) -> tuple[int, int]:
+    """Shared enrichment logic used by both the manual and auto endpoints."""
+    leads = db.list_all_leads_for_user(user_id, is_admin)
     needs_work = [l for l in leads if _needs_enrichment(l)]
     batch = needs_work[:limit]
     remaining_after = max(0, len(needs_work) - limit)
@@ -520,37 +515,95 @@ async def ch_enrich_all(
     for lead in batch:
         try:
             company_number = lead["company_number"] or ""
-            # If no company number, try to look it up (or extract from existing ch_data)
             if not company_number:
                 try:
-                    stored = _json.loads(lead["ch_data"] or "{}")
+                    stored = json.loads(lead["ch_data"] or "{}")
                     company_number = stored.get("company_number", "")
                 except Exception:
                     pass
             if not company_number:
-                result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
+                result = await search_company_by_name(api_key, lead["company"])
                 if not result:
-                    logger.warning("CH enrich: no match found for '%s'", lead["company"])
+                    db.update_lead_fields(lead["id"], {"ch_data": build_not_found_ch_data_json()}, now_iso())
+                    logger.warning("CH enrich: no CH record for '%s' — marked not_found", lead["company"])
                     continue
                 company_number = result.get("company_number", "")
-            if not company_number:
-                logger.warning("CH enrich: got result but no company_number for '%s'", lead["company"])
-                continue
-            profile = await get_company_profile(settings.companies_house_api_key, company_number) or {}
-            charges, charges_total = await get_company_charges(settings.companies_house_api_key, company_number)
-            officers = await get_company_officers(settings.companies_house_api_key, company_number)
+                if not company_number:
+                    db.update_lead_fields(lead["id"], {"ch_data": build_partial_ch_data_json(result)}, now_iso())
+                    logger.warning("CH enrich: no company_number in result for '%s' — stored partial", lead["company"])
+                    continue
+            profile = await get_company_profile(api_key, company_number) or {}
+            charges, charges_total = await get_company_charges(api_key, company_number)
+            officers = await get_company_officers(api_key, company_number)
             ch_data = build_ch_data_json(profile, charges, officers, charges_total)
             industry = extract_sic_industry(profile)
             fields: dict = {"company_number": company_number, "ch_data": ch_data}
-            # Always write industry when we can derive it; overwrite blank values
             if industry:
                 fields["industry"] = industry
             db.update_lead_fields(lead["id"], fields, now_iso())
             enriched += 1
         except Exception as exc:
             logger.warning("CH enrich failed for '%s': %s", lead["company"], exc)
-            continue
-    return {"enriched": enriched, "remaining": remaining_after}
+    return enriched, remaining_after
+
+
+@router.post("/ch-enrich-all")
+async def ch_enrich_all(
+    limit: int = 100,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Manual batch: enriches up to `limit` leads (default 100). Skips already-done leads.
+    Writes a sentinel for any company not found on CH so it stops being retried."""
+    settings = get_settings()
+    if not settings.companies_house_api_key:
+        raise HTTPException(status_code=400, detail="Companies House API key not configured")
+    enriched, remaining = await _run_enrichment_batch(
+        settings.companies_house_api_key, current_user.id, current_user.role == "admin", limit
+    )
+    return {"enriched": enriched, "remaining": remaining}
+
+
+async def _enrich_all_background(api_key: str, user_id: str, is_admin: bool) -> None:
+    global _enrich_status, _enrich_task
+    _enrich_status.update({"running": True, "enriched": 0, "failed": 0, "remaining": 0})
+    try:
+        while _enrich_status["running"]:
+            enriched_batch, remaining = await _run_enrichment_batch(api_key, user_id, is_admin, 100)
+            _enrich_status["enriched"] += enriched_batch
+            _enrich_status["remaining"] = remaining
+            if remaining == 0:
+                break
+            await _asyncio.sleep(30)  # ~400 CH API calls per batch; limit is 600/5min
+    finally:
+        _enrich_status["running"] = False
+        _enrich_task = None
+
+
+@router.post("/ch-enrich-auto")
+async def ch_enrich_auto(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """Starts a background job that enriches all leads in 100-lead batches until done.
+    Safe to call while already running — returns current status instead of starting a duplicate."""
+    global _enrich_task
+    settings = get_settings()
+    if not settings.companies_house_api_key:
+        raise HTTPException(status_code=400, detail="Companies House API key not configured")
+    if _enrich_task and not _enrich_task.done():
+        return _enrich_status
+    _enrich_task = _asyncio.create_task(
+        _enrich_all_background(settings.companies_house_api_key, current_user.id, current_user.role == "admin")
+    )
+    return _enrich_status
+
+
+@router.get("/ch-enrich-status")
+def ch_enrich_status_endpoint(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    return _enrich_status
+
+
+@router.post("/ch-enrich-stop")
+def ch_enrich_stop(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    _enrich_status["running"] = False
+    return _enrich_status
 
 
 @router.post("/dedup")

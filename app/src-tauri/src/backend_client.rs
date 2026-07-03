@@ -92,9 +92,18 @@ pub struct LeadRecord {
     pub company_number: Option<String>,
     pub ch_data: Option<String>,
     pub called_at: Option<String>,
+    pub list_name: Option<String>,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
     pub intelligence: Option<LeadIntelligence>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EnrichStatus {
+    pub running: bool,
+    pub enriched: usize,
+    pub remaining: usize,
+    pub failed: usize,
 }
 
 #[derive(Deserialize)]
@@ -455,6 +464,42 @@ pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<(usize, usize)
     let enriched = parsed["enriched"].as_u64().unwrap_or(0) as usize;
     let remaining = parsed["remaining"].as_u64().unwrap_or(0) as usize;
     Ok((enriched, remaining))
+}
+
+pub async fn ch_enrich_auto(base_url: &str, token: &str) -> Result<EnrichStatus, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/ch-enrich-auto", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
+pub async fn ch_enrich_status(base_url: &str, token: &str) -> Result<EnrichStatus, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/ch-enrich-status", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
+pub async fn ch_enrich_stop(base_url: &str, token: &str) -> Result<EnrichStatus, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/ch-enrich-stop", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
 }
 
 pub async fn dedup_leads(base_url: &str, token: &str) -> Result<usize, String> {

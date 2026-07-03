@@ -37,6 +37,7 @@ export interface Lead {
   company_number: string | null;
   ch_data: string | null;
   called_at: string | null;
+  list_name: string | null;
   refresh_tier: string | null;
   next_dg_refresh_at: string | null;
   last_dg_refreshed_at: string | null;
@@ -290,6 +291,25 @@ export async function importLeadsToDashboard(csvPath: string): Promise<number> {
 
 export async function chEnrichAll(): Promise<{ enriched: number; remaining: number }> {
   return invoke<{ enriched: number; remaining: number }>("ch_enrich_all");
+}
+
+export interface EnrichStatus {
+  running: boolean;
+  enriched: number;
+  remaining: number;
+  failed: number;
+}
+
+export async function chEnrichAuto(): Promise<EnrichStatus> {
+  return invoke<EnrichStatus>("ch_enrich_auto");
+}
+
+export async function chEnrichStatus(): Promise<EnrichStatus> {
+  return invoke<EnrichStatus>("ch_enrich_status");
+}
+
+export async function chEnrichStop(): Promise<EnrichStatus> {
+  return invoke<EnrichStatus>("ch_enrich_stop");
 }
 
 export async function dedupLeads(): Promise<number> {

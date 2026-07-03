@@ -185,7 +185,12 @@
                     </button>
                     <button id="import-csv-btn" class="btn btn-secondary">Import CSV</button>
                     <button id="enrich-btn" class="btn btn-secondary">Enrich from CH</button>
+                    <button id="auto-enrich-btn" class="btn btn-secondary">Auto-Enrich All</button>
                     <button id="export-btn" class="btn btn-secondary">Export CSV</button>
+                  </div>
+                  <div id="enrich-progress" class="enrich-progress hidden">
+                    <div class="enrich-progress-track"><div id="enrich-progress-fill" class="enrich-progress-fill"></div></div>
+                    <span id="enrich-progress-label" class="status-message"></span>
                   </div>
                 </div>
 
@@ -201,6 +206,7 @@
                         <th data-sort="industry">Industry</th>
                         <th data-sort="contact_status">Contact Status</th>
                         <th>Emails</th>
+                        <th>List</th>
                       </tr>
                     </thead>
                     <tbody id="results-body"></tbody>

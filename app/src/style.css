@@ -2858,6 +2858,67 @@ body.compact-rows td {
   accent-color: var(--primary);
 }
 
+/* Bulk action bar for cold call list multi-select */
+.ccl-bulk-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+/* Selection checkbox column */
+.select-cell {
+  width: 36px;
+  text-align: center;
+  padding: 0 var(--space-2);
+}
+
+.select-cell input[type="checkbox"],
+#ccl-select-all-cb {
+  cursor: pointer;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary);
+}
+
+/* Selected row highlight */
+.lead-row-selected td {
+  background: color-mix(in srgb, var(--primary) 8%, transparent);
+}
+
+/* List column badge */
+.list-badge {
+  background: var(--surface-2);
+  color: var(--text-muted);
+  font-size: var(--text-xs);
+}
+
+/* Auto-enrich progress bar */
+.enrich-progress {
+  margin-top: var(--space-2);
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.enrich-progress-track {
+  flex: 1;
+  height: 6px;
+  background: var(--border);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.enrich-progress-fill {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  width: 0%;
+}
+
 /* Side panel — Companies House charge rows */
 .ch-charges-list {
   display: flex;

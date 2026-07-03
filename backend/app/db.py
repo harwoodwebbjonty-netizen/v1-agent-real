@@ -742,6 +742,23 @@ def list_leads(list_id: Optional[str] = None) -> list[sqlite3.Row]:
         return conn.execute("SELECT * FROM leads WHERE list_id = ? ORDER BY timestamp", (list_id,)).fetchall()
 
 
+def list_all_leads_for_user(user_id: str, is_admin: bool) -> list[sqlite3.Row]:
+    """Returns all leads visible to the user: shared pool + their own cold-call-list leads.
+    Admins see every lead from every list. Includes list_name via LEFT JOIN."""
+    with get_connection() as conn:
+        if is_admin:
+            return conn.execute(
+                "SELECT l.*, ll.name AS list_name FROM leads l "
+                "LEFT JOIN lead_lists ll ON l.list_id = ll.id ORDER BY l.timestamp"
+            ).fetchall()
+        return conn.execute(
+            "SELECT l.*, ll.name AS list_name FROM leads l "
+            "LEFT JOIN lead_lists ll ON l.list_id = ll.id "
+            "WHERE l.list_id IS NULL OR l.owner_user_id = ? ORDER BY l.timestamp",
+            (user_id,),
+        ).fetchall()
+
+
 def get_lead(lead_id: str) -> Optional[sqlite3.Row]:
     with get_connection() as conn:
         return conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()

@@ -5,6 +5,9 @@ import {
   addLeadPhone,
   assignLead,
   chEnrichAll,
+  chEnrichAuto,
+  chEnrichStatus,
+  chEnrichStop,
   dedupLeads,
   deleteLeadEmail,
   deleteLeadPhone,
@@ -57,6 +60,10 @@ export function initDashboard(): void {
   const lookupBtn = document.querySelector<HTMLButtonElement>("#lookup-btn")!;
   const importCsvBtn = document.querySelector<HTMLButtonElement>("#import-csv-btn")!;
   const enrichBtn = document.querySelector<HTMLButtonElement>("#enrich-btn")!;
+  const autoEnrichBtn = document.querySelector<HTMLButtonElement>("#auto-enrich-btn")!;
+  const enrichProgress = document.querySelector<HTMLDivElement>("#enrich-progress")!;
+  const enrichProgressFill = document.querySelector<HTMLDivElement>("#enrich-progress-fill")!;
+  const enrichProgressLabel = document.querySelector<HTMLSpanElement>("#enrich-progress-label")!;
   const exportBtn = document.querySelector<HTMLButtonElement>("#export-btn")!;
   const refreshBtn = document.querySelector<HTMLButtonElement>("#refresh-btn")!;
   const searchInput = document.querySelector<HTMLInputElement>("#search-input")!;
@@ -336,6 +343,44 @@ export function initDashboard(): void {
       enrichBtn.textContent = "Enrich from CH";
     } finally {
       enrichBtn.disabled = false;
+    }
+  });
+
+  let _enrichPollInterval: ReturnType<typeof setInterval> | null = null;
+
+  function updateEnrichProgress(status: { running: boolean; enriched: number; remaining: number; failed: number }): void {
+    const total = status.enriched + status.remaining;
+    enrichProgress.classList.toggle("hidden", !status.running && status.enriched === 0);
+    if (total > 0) {
+      const pct = Math.round((status.enriched / total) * 100);
+      enrichProgressFill.style.width = `${pct}%`;
+    } else {
+      enrichProgressFill.style.width = "0%";
+    }
+    enrichProgressLabel.textContent = status.running
+      ? `Enriching… ${status.enriched} done, ${status.remaining} remaining${status.failed ? `, ${status.failed} failed` : ""}`
+      : `Done — enriched ${status.enriched}${status.failed ? `, ${status.failed} failed` : ""}`;
+    if (status.running) {
+      autoEnrichBtn.textContent = "Stop Auto-Enrich";
+      autoEnrichBtn.dataset.state = "running";
+    } else {
+      autoEnrichBtn.textContent = "Auto-Enrich All";
+      autoEnrichBtn.dataset.state = "idle";
+      if (_enrichPollInterval) { clearInterval(_enrichPollInterval); _enrichPollInterval = null; }
+      void refreshLeads();
+    }
+  }
+
+  void chEnrichStatus().then(updateEnrichProgress).catch(() => {/* ignore */});
+
+  autoEnrichBtn.addEventListener("click", async () => {
+    if (autoEnrichBtn.dataset.state === "running") {
+      try { const s = await chEnrichStop(); updateEnrichProgress(s); } catch { /* ignore */ }
+    } else {
+      try { const s = await chEnrichAuto(); updateEnrichProgress(s); } catch { return; }
+      _enrichPollInterval = setInterval(async () => {
+        try { const s = await chEnrichStatus(); updateEnrichProgress(s); } catch { /* ignore */ }
+      }, 5000);
     }
   });
 

@@ -215,6 +215,27 @@ def compute_ch_score(profile: dict, charges: list[dict]) -> int:
     return min(score, 100)
 
 
+def build_not_found_ch_data_json() -> str:
+    """Sentinel written when a company cannot be found on Companies House at all."""
+    return json.dumps({"not_found": True, "charges": [], "charges_total": 0})
+
+
+def build_partial_ch_data_json(search_result: dict) -> str:
+    """Partial record built from the name-search result when we have a hit but no company number."""
+    return json.dumps({
+        "company_number": search_result.get("company_number", ""),
+        "company_type": search_result.get("company_type", ""),
+        "company_status": search_result.get("company_status", ""),
+        "incorporation_date": search_result.get("date_of_creation", ""),
+        "registered_address": search_result.get("address", {}),
+        "sic_codes": [],
+        "charges_total": 0,
+        "charges": [],
+        "directors": [],
+        "partial": True,
+    })
+
+
 def build_ch_data_json(profile: dict, charges: list[dict], officers: list[dict], charges_total: int = 0) -> str:
     """Compact JSON to store on the lead — real filed data, no fabrication."""
     director_names = [

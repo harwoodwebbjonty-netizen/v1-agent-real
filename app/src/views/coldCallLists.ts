@@ -41,7 +41,7 @@ import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists
 import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
 
-const LIST_COLUMN_COUNT = 9; // 7 standard columns + contacted-toggle column + called checkbox
+const LIST_COLUMN_COUNT = 10; // 7 standard columns + select checkbox + contacted-toggle + called checkbox
 
 export function initColdCallLists(): void {
   const container = document.querySelector<HTMLDivElement>("#view-cold-call-lists")!;
@@ -104,6 +104,12 @@ export function initColdCallLists(): void {
             </div>
           </div>
 
+          <div id="ccl-bulk-bar" class="ccl-bulk-bar hidden">
+            <span id="ccl-bulk-count"></span>
+            <button id="ccl-bulk-called-btn" class="btn btn-secondary btn-sm">Mark as Called</button>
+            <button id="ccl-bulk-clear-btn" class="btn btn-ghost btn-sm">Clear</button>
+          </div>
+
           <div class="ccl-called-filter">
             <button class="ccl-filter-btn active" data-called="all">All</button>
             <button class="ccl-filter-btn" data-called="not-called">Not Called</button>
@@ -114,6 +120,7 @@ export function initColdCallLists(): void {
             <table id="list-results-table">
               <thead>
                 <tr>
+                  <th><input type="checkbox" id="ccl-select-all-cb" title="Select all visible" /></th>
                   <th>Called</th>
                   <th></th>
                   <th data-sort="company">Company</th>
@@ -149,6 +156,11 @@ export function initColdCallLists(): void {
   const listResultsBody = document.querySelector<HTMLTableSectionElement>("#list-results-body")!;
   const listSearchInput = document.querySelector<HTMLInputElement>("#list-search-input")!;
   const sortableHeaders = document.querySelectorAll<HTMLTableCellElement>("#list-results-table th[data-sort]");
+  const bulkBar = container.querySelector<HTMLDivElement>("#ccl-bulk-bar")!;
+  const bulkCount = container.querySelector<HTMLSpanElement>("#ccl-bulk-count")!;
+  const bulkCalledBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-called-btn")!;
+  const bulkClearBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-clear-btn")!;
+  const selectAllCb = container.querySelector<HTMLInputElement>("#ccl-select-all-cb")!;
 
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
@@ -156,6 +168,7 @@ export function initColdCallLists(): void {
   let sortDirection: SortDirection = "asc";
   let searchText = "";
   let calledFilter: "all" | "called" | "not-called" = "all";
+  let selectedLeadIds = new Set<string>();
 
   function listRowHtml(list: LeadList, showOwner: boolean): string {
     return `
@@ -202,6 +215,17 @@ export function initColdCallLists(): void {
     });
   }
 
+  function updateBulkBar(visibleLeads?: Lead[]): void {
+    const count = selectedLeadIds.size;
+    bulkBar.classList.toggle("hidden", count === 0);
+    bulkCount.textContent = `${count} selected`;
+    if (visibleLeads) {
+      const allVisible = visibleLeads.length > 0 && visibleLeads.every((l) => selectedLeadIds.has(l.id));
+      selectAllCb.checked = allVisible;
+      selectAllCb.indeterminate = !allVisible && count > 0;
+    }
+  }
+
   function renderListTable(): void {
     refreshIfOpen(currentListLeads);
     updateSortIndicators();
@@ -243,11 +267,19 @@ export function initColdCallLists(): void {
         await toggleListLeadCalled(currentListId, lead.id);
         await refreshCurrentList();
       },
+      onToggleSelect: (lead, selected) => {
+        if (selected) selectedLeadIds.add(lead.id);
+        else selectedLeadIds.delete(lead.id);
+        const row = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${lead.id}"]`);
+        if (row) row.classList.toggle("lead-row-selected", selected);
+        updateBulkBar(visible);
+      },
       onGenerateEmail: (lead) => {
         setPendingEmailWriterLead(lead.id);
         openTab("outreach", "Outreach");
       },
-    });
+    }, selectedLeadIds);
+    updateBulkBar(visible);
   }
 
   async function refreshCurrentList(): Promise<void> {
@@ -309,8 +341,44 @@ export function initColdCallLists(): void {
       calledFilter = btn.dataset.called as "all" | "called" | "not-called";
       calledFilterBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
+      selectedLeadIds.clear();
       renderListTable();
     });
+  });
+
+  selectAllCb.addEventListener("change", () => {
+    const visible = Array.from(listResultsBody.querySelectorAll<HTMLTableRowElement>("[data-lead-id]")).map((r) => r.dataset.leadId!);
+    if (selectAllCb.checked) visible.forEach((id) => selectedLeadIds.add(id));
+    else visible.forEach((id) => selectedLeadIds.delete(id));
+    visible.forEach((id) => {
+      const row = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${id}"]`);
+      if (row) {
+        row.classList.toggle("lead-row-selected", selectAllCb.checked);
+        const cb = row.querySelector<HTMLInputElement>(".select-cb");
+        if (cb) cb.checked = selectAllCb.checked;
+      }
+    });
+    updateBulkBar();
+  });
+
+  bulkClearBtn.addEventListener("click", () => {
+    selectedLeadIds.clear();
+    listResultsBody.querySelectorAll<HTMLTableRowElement>("[data-lead-id]").forEach((r) => {
+      r.classList.remove("lead-row-selected");
+      const cb = r.querySelector<HTMLInputElement>(".select-cb");
+      if (cb) cb.checked = false;
+    });
+    updateBulkBar();
+  });
+
+  bulkCalledBtn.addEventListener("click", async () => {
+    if (!currentListId || selectedLeadIds.size === 0) return;
+    bulkCalledBtn.disabled = true;
+    const ids = Array.from(selectedLeadIds);
+    await Promise.all(ids.map((id) => toggleListLeadCalled(currentListId!, id).catch(() => {})));
+    selectedLeadIds.clear();
+    await refreshCurrentList();
+    bulkCalledBtn.disabled = false;
   });
 
   async function openListDetail(listId: string): Promise<void> {
@@ -319,6 +387,7 @@ export function initColdCallLists(): void {
     sortDirection = "asc";
     searchText = "";
     calledFilter = "all";
+    selectedLeadIds.clear();
     calledFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.called === "all"));
     listSearchInput.value = "";
     listDetailStatus.textContent = "";
