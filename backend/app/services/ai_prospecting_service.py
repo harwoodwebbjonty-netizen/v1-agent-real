@@ -149,11 +149,11 @@ async def run_prospecting(
 
             try:
                 profile = await get_company_profile(api_key, company_number) or {}
-                charges = await get_company_charges(api_key, company_number)
+                charges, charges_total = await get_company_charges(api_key, company_number)
                 officers = await get_company_officers(api_key, company_number)
             except Exception as exc:
                 logger.warning("CH fetch failed for %s: %s", company_number, exc)
-                profile, charges, officers = {}, [], []
+                profile, charges, charges_total, officers = {}, [], 0, []
 
             ch_score = compute_ch_score(profile or {}, charges)
             if criteria.min_ch_score > 0 and ch_score < criteria.min_ch_score:
@@ -169,7 +169,7 @@ async def run_prospecting(
 
             county = extract_county(profile) if profile else ""
             sic_industry = extract_sic_industry(profile) if profile else ""
-            ch_data = build_ch_data_json(profile or {}, charges, officers)
+            ch_data = build_ch_data_json(profile or {}, charges, officers, charges_total)
 
             ch_parsed = json.loads(ch_data)
             director_name = ch_parsed.get("directors", [""])[0]

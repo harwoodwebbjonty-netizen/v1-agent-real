@@ -6,12 +6,60 @@ import { setPendingDashboardContactStatusFilter } from "../dashboardFilterHandof
 import { normalizeSicIndustry } from "../sic";
 import { getLeads, subscribe } from "../state";
 import { openTab } from "../tabs";
+import { escapeHtml } from "../utils";
 
 Chart.register(...registerables);
 
 let industryChart: Chart | null = null;
 let trendChart: Chart | null = null;
 let statusChart: Chart | null = null;
+let chargeLendersChart: Chart | null = null;
+
+interface Charge {
+  status: string;
+  created_on: string;
+  holders: string[];
+  classification: string;
+  description: string;
+}
+
+function parseCharges(leads: Lead[]): Charge[] {
+  const all: Charge[] = [];
+  for (const lead of leads) {
+    if (!lead.ch_data) continue;
+    try {
+      const d = JSON.parse(lead.ch_data);
+      if (Array.isArray(d.charges)) all.push(...(d.charges as Charge[]));
+    } catch { /* skip */ }
+  }
+  return all;
+}
+
+function computeChargeStats(leads: Lead[]) {
+  const charges = parseCharges(leads);
+  const outstanding = charges.filter((c) => c.status === "outstanding");
+  const leadsWithOutstanding = leads.filter((l) => {
+    if (!l.ch_data) return false;
+    try {
+      const d = JSON.parse(l.ch_data);
+      return Array.isArray(d.charges) && (d.charges as Charge[]).some((c) => c.status === "outstanding");
+    } catch { return false; }
+  });
+
+  const lenderCounts: Record<string, number> = {};
+  for (const c of outstanding) {
+    for (const h of c.holders) {
+      if (h) lenderCounts[h] = (lenderCounts[h] || 0) + 1;
+    }
+  }
+  const typeCounts: Record<string, number> = {};
+  for (const c of charges) {
+    const type = c.classification || "Unknown";
+    typeCounts[type] = (typeCounts[type] || 0) + 1;
+  }
+
+  return { outstanding: outstanding.length, leadsWithCharges: leadsWithOutstanding.length, lenderCounts, typeCounts };
+}
 
 function computeKpis(leads: Lead[]) {
   const total = leads.length;
@@ -194,6 +242,50 @@ function renderTrendChart(leads: Lead[]): void {
   });
 }
 
+function renderChargesAnalytics(leads: Lead[]): void {
+  const stats = computeChargeStats(leads);
+
+  document.querySelector("#charge-kpi-outstanding")!.textContent = String(stats.outstanding);
+  document.querySelector("#charge-kpi-leads")!.textContent = String(stats.leadsWithCharges);
+
+  // Top lenders bar chart
+  const lenders = Object.entries(stats.lenderCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 10);
+  const canvas = document.querySelector<HTMLCanvasElement>("#charge-lenders-chart");
+  if (canvas) {
+    chargeLendersChart?.destroy();
+    chargeLendersChart = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: lenders.map(([name]) => name),
+        datasets: [{ label: "Outstanding charges", data: lenders.map(([, n]) => n), backgroundColor: "#f59e0b" }],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { x: { beginAtZero: true, ticks: { precision: 0 } } },
+      },
+    });
+  }
+
+  // Charge type table
+  const tableEl = document.querySelector<HTMLElement>("#charge-type-table");
+  if (tableEl) {
+    const types = Object.entries(stats.typeCounts).sort((a, b) => b[1] - a[1]);
+    tableEl.innerHTML = types.length === 0
+      ? '<p class="empty-hint">No charges data yet — enrich leads from Companies House first.</p>'
+      : `<table class="charge-type-tbl">
+          <thead><tr><th>Charge type</th><th>Count</th></tr></thead>
+          <tbody>
+            ${types.map(([type, n]) => `<tr><td>${escapeHtml(type)}</td><td>${n}</td></tr>`).join("")}
+          </tbody>
+        </table>`;
+  }
+}
+
 function renderAnalytics(): void {
   const leads = getLeads();
   const emptyEl = document.querySelector("#analytics-empty")!;
@@ -213,6 +305,7 @@ function renderAnalytics(): void {
   renderStatusChart(leads);
   renderFunnel(leads);
   renderTrendChart(leads);
+  renderChargesAnalytics(leads);
 }
 
 export function initAnalytics(): void {
@@ -277,6 +370,25 @@ export function initAnalytics(): void {
         <section class="card">
           <h2 class="card-title">Monthly New Leads</h2>
           <div class="chart-wrap"><canvas id="trend-chart"></canvas></div>
+        </section>
+
+        <section class="card">
+          <h2 class="card-title">Companies House — Charges</h2>
+          <p class="card-subtitle">From enriched leads only. Enrich from the Leads page to populate.</p>
+          <div class="stats-grid" style="margin-bottom: var(--space-4)">
+            <div class="stat-card">
+              <span class="stat-label">Outstanding charges total</span>
+              <span id="charge-kpi-outstanding" class="stat-value">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Leads with outstanding charges</span>
+              <span id="charge-kpi-leads" class="stat-value">0</span>
+            </div>
+          </div>
+          <h3 class="card-subtitle" style="font-weight:600;margin-bottom:var(--space-2)">Top charge holders (lenders)</h3>
+          <div class="chart-wrap" style="min-height:200px"><canvas id="charge-lenders-chart"></canvas></div>
+          <h3 class="card-subtitle" style="font-weight:600;margin:var(--space-4) 0 var(--space-2)">Charge types</h3>
+          <div id="charge-type-table"></div>
         </section>
       </div>
     </main>

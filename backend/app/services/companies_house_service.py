@@ -70,12 +70,14 @@ async def get_company_profile(api_key: str, company_number: str) -> Optional[dic
         return r.json()
 
 
-async def get_company_charges(api_key: str, company_number: str) -> list[dict]:
+async def get_company_charges(api_key: str, company_number: str) -> tuple[list[dict], int]:
+    """Returns (items, total_count). Fetches up to 25 charges."""
     async with _client(api_key) as client:
-        r = await client.get(f"/company/{company_number}/charges", params={"items_per_page": 10})
+        r = await client.get(f"/company/{company_number}/charges", params={"items_per_page": 25})
         if r.status_code != 200:
-            return []
-        return r.json().get("items", [])
+            return [], 0
+        data = r.json()
+        return data.get("items", []), data.get("total_count", 0)
 
 
 async def get_company_officers(api_key: str, company_number: str) -> list[dict]:
@@ -188,12 +190,23 @@ def compute_ch_score(profile: dict, charges: list[dict]) -> int:
     return min(score, 100)
 
 
-def build_ch_data_json(profile: dict, charges: list[dict], officers: list[dict]) -> str:
+def build_ch_data_json(profile: dict, charges: list[dict], officers: list[dict], charges_total: int = 0) -> str:
     """Compact JSON to store on the lead — real filed data, no fabrication."""
     director_names = [
         o.get("name", "") for o in officers if o.get("officer_role") in ("director", "secretary")
     ][:5]
-    latest_charge = charges[0] if charges else None
+
+    charge_records = []
+    for charge in charges:
+        holders = [p.get("name", "") for p in charge.get("persons_entitled", [])]
+        charge_records.append({
+            "status": charge.get("status", ""),
+            "created_on": charge.get("created_on", ""),
+            "delivered_on": charge.get("delivered_on", ""),
+            "classification": charge.get("classification", {}).get("description", ""),
+            "holders": holders,
+            "description": charge.get("particulars", {}).get("description", ""),
+        })
 
     data = {
         "company_number": profile.get("company_number", ""),
@@ -206,15 +219,8 @@ def build_ch_data_json(profile: dict, charges: list[dict], officers: list[dict])
             "next_due": profile.get("accounts", {}).get("next_due", ""),
             "last_accounts": profile.get("accounts", {}).get("last_accounts", {}),
         },
-        "charges_total": len(charges),
-        "latest_charge": {
-            "created_on": latest_charge.get("created_on", "") if latest_charge else "",
-            "charge_number": latest_charge.get("charge_number", 0) if latest_charge else 0,
-            "chargee": (
-                latest_charge.get("particulars", {}).get("chargor_acting_as_bare_trustee")
-                or ""
-            ) if latest_charge else "",
-        },
+        "charges_total": charges_total or len(charges),
+        "charges": charge_records,
         "directors": director_names,
         "jurisdiction": profile.get("jurisdiction", ""),
     }

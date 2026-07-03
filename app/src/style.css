@@ -2857,3 +2857,59 @@ body.compact-rows td {
   height: 16px;
   accent-color: var(--primary);
 }
+
+/* Side panel — Companies House charge rows */
+.ch-charges-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.ch-charge-row {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+}
+
+.ch-charge-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-1);
+}
+
+.ch-charge-type {
+  font-weight: 500;
+  flex: 1;
+}
+
+.ch-charge-holders {
+  font-size: var(--text-xs);
+  margin-bottom: 2px;
+}
+
+.ch-charge-desc {
+  font-size: var(--text-xs);
+  margin-top: 2px;
+}
+
+/* Analytics — charge type table */
+.charge-type-tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+.charge-type-tbl th,
+.charge-type-tbl td {
+  padding: var(--space-1) var(--space-2);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+
+.charge-type-tbl th {
+  font-weight: 600;
+  color: var(--text-muted);
+}

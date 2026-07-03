@@ -28,6 +28,58 @@ let onSaveDetails:
 let onScrapeEmail: ((id: string) => Promise<void>) | null = null;
 let onGenerateIntelligence: ((id: string) => Promise<void>) | null = null;
 
+interface Charge {
+  status: string;
+  created_on: string;
+  delivered_on: string;
+  classification: string;
+  holders: string[];
+  description: string;
+}
+
+function renderChData(lead: Lead): void {
+  const el = document.querySelector("#ch-data-section")!;
+  if (!lead.ch_data) {
+    el.innerHTML = '<p class="empty-hint">Not enriched yet — click "Enrich from CH" on the Leads page.</p>';
+    return;
+  }
+  let d: Record<string, unknown> = {};
+  try { d = JSON.parse(lead.ch_data); } catch { /* ignore */ }
+
+  const charges: Charge[] = Array.isArray(d["charges"]) ? (d["charges"] as Charge[]) : [];
+  const outstandingCharges = charges.filter((c) => c.status === "outstanding");
+
+  const chargeBadge = (c: Charge) => {
+    const badge = c.status === "outstanding" ? "unverified" : "verified";
+    return `<span class="status-badge ${badge}">${escapeHtml(c.status || "unknown")}</span>`;
+  };
+
+  el.innerHTML = `
+    <dl class="info-list">
+      <dt>Company number</dt><dd>${escapeHtml(String(d["company_number"] || "—"))}</dd>
+      <dt>Type</dt><dd>${escapeHtml(String(d["company_type"] || "—"))}</dd>
+      <dt>Incorporated</dt><dd>${escapeHtml(String(d["incorporation_date"] || "—"))}</dd>
+      <dt>Directors</dt><dd>${escapeHtml((d["directors"] as string[] || []).join(", ") || "—")}</dd>
+      <dt>Charges on file</dt><dd>${escapeHtml(String(d["charges_total"] ?? charges.length))}</dd>
+      <dt>Outstanding charges</dt><dd>${outstandingCharges.length > 0 ? `<strong>${outstandingCharges.length}</strong>` : "0"}</dd>
+    </dl>
+    ${charges.length === 0
+      ? '<p class="empty-hint">No charges registered at Companies House.</p>'
+      : `<div class="ch-charges-list">
+          ${charges.map((c) => `
+            <div class="ch-charge-row">
+              <div class="ch-charge-header">
+                ${chargeBadge(c)}
+                <span class="ch-charge-type">${escapeHtml(c.classification || "Charge")}</span>
+                <span class="empty-hint">${escapeHtml(c.created_on || "")}</span>
+              </div>
+              ${c.holders.length > 0 ? `<div class="ch-charge-holders">Held by: <strong>${escapeHtml(c.holders.join(", "))}</strong></div>` : ""}
+              ${c.description ? `<div class="ch-charge-desc empty-hint">${escapeHtml(c.description)}</div>` : ""}
+            </div>`).join("")}
+         </div>`}
+  `;
+}
+
 function render(): void {
   if (!currentLead) return;
   const lead = currentLead;
@@ -52,6 +104,7 @@ function render(): void {
   renderAssignment(lead);
   renderPhones(lead);
   renderEmails(lead);
+  renderChData(lead);
   renderIntelligence(lead);
 }
 

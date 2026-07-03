@@ -491,15 +491,39 @@ async def ch_enrich_all(
     if not settings.companies_house_api_key:
         raise HTTPException(status_code=400, detail="Companies House API key not configured")
 
+    import json as _json
+
+    def _needs_enrichment(lead: sqlite3.Row) -> bool:
+        """True if the lead is missing industry, or has old-schema ch_data (no 'charges' array)."""
+        if not lead["ch_data"]:
+            return True
+        if not lead["industry"]:
+            return True
+        try:
+            stored = _json.loads(lead["ch_data"])
+            # Old schema stored 'latest_charge' dict; new schema stores 'charges' list.
+            if "charges" not in stored:
+                return True
+        except Exception:
+            return True
+        return False
+
     leads = db.list_leads()
-    unenriched = [l for l in leads if not l["ch_data"]]
-    batch = unenriched[:limit]
-    remaining_after = max(0, len(unenriched) - limit)
+    needs_work = [l for l in leads if _needs_enrichment(l)]
+    batch = needs_work[:limit]
+    remaining_after = max(0, len(needs_work) - limit)
 
     enriched = 0
     for lead in batch:
         try:
             company_number = lead["company_number"] or ""
+            # If no company number, try to look it up (or extract from existing ch_data)
+            if not company_number:
+                try:
+                    stored = _json.loads(lead["ch_data"] or "{}")
+                    company_number = stored.get("company_number", "")
+                except Exception:
+                    pass
             if not company_number:
                 result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
                 if not result:
@@ -508,12 +532,13 @@ async def ch_enrich_all(
             if not company_number:
                 continue
             profile = await get_company_profile(settings.companies_house_api_key, company_number) or {}
-            charges = await get_company_charges(settings.companies_house_api_key, company_number)
+            charges, charges_total = await get_company_charges(settings.companies_house_api_key, company_number)
             officers = await get_company_officers(settings.companies_house_api_key, company_number)
-            ch_data = build_ch_data_json(profile, charges, officers)
+            ch_data = build_ch_data_json(profile, charges, officers, charges_total)
             industry = extract_sic_industry(profile)
             fields: dict = {"company_number": company_number, "ch_data": ch_data}
-            if industry and not lead["industry"]:
+            # Always write industry when we can derive it; overwrite blank values
+            if industry:
                 fields["industry"] = industry
             db.update_lead_fields(lead["id"], fields, now_iso())
             enriched += 1
