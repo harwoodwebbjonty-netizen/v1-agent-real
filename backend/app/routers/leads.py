@@ -230,6 +230,11 @@ async def create_lead(
     return _to_lead_out(row, _user_name_map(), activity)
 
 
+@router.get("/ch-enrich-status")
+def ch_enrich_status_endpoint(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    return _enrich_status
+
+
 @router.get("/{lead_id}", response_model=LeadOut)
 def get_lead(lead_id: str, current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadOut:
     row = db.get_lead(lead_id)
@@ -467,8 +472,9 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
         company = entry.get("company")
         if not company:
             continue
+        lead_id = new_id()
         db.create_lead(
-            id=new_id(),
+            id=lead_id,
             timestamp=entry.get("timestamp") or created_at,
             company=company,
             phone_number=entry.get("phone_number", ""),
@@ -479,6 +485,11 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
             created_at=created_at,
             company_number=entry.get("company_number") or None,
         )
+        phone = (entry.get("phone_number") or "").strip()
+        if phone and phone != "not_found":
+            db.add_phone_ignore_duplicate(
+                id=new_id(), lead_id=lead_id, phone_number=phone, source="imported", created_at=created_at
+            )
         imported += 1
     return ImportLeadsResponse(imported=imported)
 
@@ -499,7 +510,10 @@ def _needs_enrichment(lead: sqlite3.Row) -> bool:
             return False  # as good as we can get — don't retry
         if "charges" not in stored:
             return True   # old schema — upgrade
-        return not lead["industry"]  # re-enrich only if industry still missing
+        if not lead["industry"]:
+            # Only retry if CH stored SIC codes we can map to an industry name
+            return bool(stored.get("sic_codes"))
+        return False
     except Exception:
         return True
 
@@ -592,11 +606,6 @@ async def ch_enrich_auto(current_user: CurrentUser = Depends(get_current_user)) 
     _enrich_task = _asyncio.create_task(
         _enrich_all_background(settings.companies_house_api_key, current_user.id, current_user.role == "admin")
     )
-    return _enrich_status
-
-
-@router.get("/ch-enrich-status")
-def ch_enrich_status_endpoint(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     return _enrich_status
 
 

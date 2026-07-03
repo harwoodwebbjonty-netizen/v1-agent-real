@@ -451,6 +451,19 @@ pub async fn toggle_list_lead_called(base_url: &str, token: &str, list_id: &str,
     Ok(parsed["called_at"].as_str().map(String::from))
 }
 
+pub async fn delete_lead_list(base_url: &str, token: &str, list_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/lead-lists/{}", base_url, list_id);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
 pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<(usize, usize), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/leads/ch-enrich-all", base_url);

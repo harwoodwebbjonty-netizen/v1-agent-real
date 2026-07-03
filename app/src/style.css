@@ -2858,6 +2858,23 @@ body.compact-rows td {
   accent-color: var(--primary);
 }
 
+/* Danger ghost button */
+.btn-danger {
+  color: #c0392b;
+  border-color: #c0392b;
+}
+.btn-danger:hover {
+  background: #c0392b;
+  color: #fff;
+}
+
+/* Enrichment filter strip */
+.ccl-enrich-filter {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-2) 0 var(--space-1);
+}
+
 /* Bulk action bar for cold call list multi-select */
 .ccl-bulk-bar {
   display: flex;

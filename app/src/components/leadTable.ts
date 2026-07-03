@@ -78,6 +78,8 @@ export interface RowHandlers {
   onActivityClick?: (lead: Lead) => void;
   /** Bulk selection: toggling a row's checkbox. Caller owns the selectedIds set. */
   onToggleSelect?: (lead: Lead, selected: boolean) => void;
+  /** Set to false in contexts (cold call lists) where the List column is redundant. Default true. */
+  showListColumn?: boolean;
 }
 
 const COLUMN_COUNT = 8;
@@ -149,7 +151,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
         }
         ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
       </td>
-      <td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>
+      ${handlers.showListColumn !== false ? `<td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>` : ""}
     `;
     row.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest(".inline-edit, .icon-btn")) return;

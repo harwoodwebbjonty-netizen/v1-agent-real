@@ -281,6 +281,10 @@ export async function importLeadsCsv(listId: string, csvPath: string): Promise<n
   return invoke<number>("import_leads_csv", { listId, csvPath });
 }
 
+export async function deleteLeadList(listId: string): Promise<void> {
+  return invoke<void>("delete_lead_list", { listId });
+}
+
 export async function toggleListLeadCalled(listId: string, leadId: string): Promise<string | null> {
   return invoke<string | null>("toggle_list_lead_called", { listId, leadId });
 }

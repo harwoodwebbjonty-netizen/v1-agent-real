@@ -15,6 +15,7 @@ from app.schemas_leads import (
 )
 from app.services.auth_service import new_id, now_iso
 
+
 router = APIRouter(prefix="/lead-lists", tags=["lead-lists"])
 
 
@@ -74,8 +75,9 @@ def import_leads_csv(
         company = entry.get("company")
         if not company:
             continue
+        lead_id = new_id()
         db.create_lead(
-            id=new_id(),
+            id=lead_id,
             timestamp=entry.get("timestamp") or created_at,
             company=company,
             phone_number=entry.get("phone_number", ""),
@@ -86,8 +88,23 @@ def import_leads_csv(
             created_at=created_at,
             list_id=list_id,
         )
+        phone = entry.get("phone_number", "").strip()
+        if phone and phone != "not_found":
+            db.add_phone_ignore_duplicate(
+                id=new_id(), lead_id=lead_id, phone_number=phone, source="imported", created_at=created_at
+            )
         imported += 1
     return ImportLeadsResponse(imported=imported)
+
+
+@router.delete("/{list_id}")
+def delete_lead_list(list_id: str, current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    lead_list = db.get_lead_list(list_id)
+    if lead_list is None:
+        raise HTTPException(status_code=404, detail="List not found")
+    _require_list_access(lead_list, current_user)
+    db.delete_lead_list(list_id)
+    return {"deleted": True}
 
 
 @router.patch("/{list_id}/leads/{lead_id}/toggle-called")

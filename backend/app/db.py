@@ -895,12 +895,19 @@ def count_leads_in_list(list_id: str) -> int:
 def toggle_lead_called(lead_id: str, list_id: str, now: str) -> Optional[str]:
     """Flips called_at between null (uncalled) and now (called). Returns the new value."""
     with get_connection() as conn:
-        row = conn.execute("SELECT called_at, list_id FROM leads WHERE id = ?", (lead_id,)).fetchone()
-        if not row or row["list_id"] != list_id:
+        row = conn.execute("SELECT called_at FROM leads WHERE id = ?", (lead_id,)).fetchone()
+        if not row:
             return None
         new_val: Optional[str] = None if row["called_at"] else now
         conn.execute("UPDATE leads SET called_at = ? WHERE id = ?", (new_val, lead_id))
         return new_val
+
+
+def delete_lead_list(list_id: str) -> None:
+    """Deletes a lead list. Leads in the list are also deleted."""
+    with get_connection() as conn:
+        conn.execute("DELETE FROM leads WHERE list_id = ?", (list_id,))
+        conn.execute("DELETE FROM lead_lists WHERE id = ?", (list_id,))
 
 
 # --- AI sales intelligence (append-only version history — never updated, never deleted) ---

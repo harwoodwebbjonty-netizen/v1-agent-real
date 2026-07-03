@@ -8,8 +8,9 @@ import {
   createLeadList,
   deleteLeadEmail,
   deleteLeadPhone,
+  deleteLeadList,
   generateLeadIntelligence,
-  getListLeads,
+  getLogEntries,
   importLeadsCsv,
   lookupCompanyPhone,
   scrapeLeadEmail,
@@ -82,6 +83,9 @@ export function initColdCallLists(): void {
               <button id="back-to-lists-btn" class="btn btn-ghost">← Back to lists</button>
               <h2 class="card-title" id="list-detail-title"></h2>
             </div>
+            <div class="card-header-actions">
+              <button id="delete-list-btn" class="btn btn-ghost btn-danger">Delete List</button>
+            </div>
           </div>
         </section>
 
@@ -114,6 +118,12 @@ export function initColdCallLists(): void {
             <button class="ccl-filter-btn active" data-called="all">All</button>
             <button class="ccl-filter-btn" data-called="not-called">Not Called</button>
             <button class="ccl-filter-btn" data-called="called">Called</button>
+          </div>
+          <div class="ccl-enrich-filter">
+            <button class="ccl-enrich-btn active" data-enrich="all">All</button>
+            <button class="ccl-enrich-btn" data-enrich="has-charges">Has Charges</button>
+            <button class="ccl-enrich-btn" data-enrich="enriched">Enriched</button>
+            <button class="ccl-enrich-btn" data-enrich="not-enriched">Not Enriched</button>
           </div>
 
           <div class="table-wrap">
@@ -161,6 +171,8 @@ export function initColdCallLists(): void {
   const bulkCalledBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-called-btn")!;
   const bulkClearBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-clear-btn")!;
   const selectAllCb = container.querySelector<HTMLInputElement>("#ccl-select-all-cb")!;
+  const deleteListBtn = container.querySelector<HTMLButtonElement>("#delete-list-btn")!;
+  const enrichFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-enrich-btn");
 
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
@@ -168,6 +180,7 @@ export function initColdCallLists(): void {
   let sortDirection: SortDirection = "asc";
   let searchText = "";
   let calledFilter: "all" | "called" | "not-called" = "all";
+  let enrichFilter: "all" | "enriched" | "has-charges" | "not-enriched" = "all";
   let selectedLeadIds = new Set<string>();
 
   function listRowHtml(list: LeadList, showOwner: boolean): string {
@@ -226,18 +239,28 @@ export function initColdCallLists(): void {
     }
   }
 
+  function hasCharges(lead: Lead): boolean {
+    try { return JSON.parse(lead.ch_data || "{}").charges?.length > 0; } catch { return false; }
+  }
+  function isEnriched(lead: Lead): boolean {
+    try { const d = JSON.parse(lead.ch_data || "{}"); return !!d.company_number && !d.not_found; } catch { return false; }
+  }
+
   function renderListTable(): void {
     refreshIfOpen(currentListLeads);
     updateSortIndicators();
 
     if (currentListLeads.length === 0) {
-      renderEmptyState(listResultsBody, "No leads in this list yet — upload a CSV to get started.", LIST_COLUMN_COUNT);
+      renderEmptyState(listResultsBody, "No leads yet — upload a CSV or search below.", LIST_COLUMN_COUNT);
       return;
     }
 
     let filtered = filterLeads(currentListLeads, searchText, new Set());
     if (calledFilter === "called") filtered = filtered.filter((l) => !!l.called_at);
     else if (calledFilter === "not-called") filtered = filtered.filter((l) => !l.called_at);
+    if (enrichFilter === "has-charges") filtered = filtered.filter(hasCharges);
+    else if (enrichFilter === "enriched") filtered = filtered.filter(isEnriched);
+    else if (enrichFilter === "not-enriched") filtered = filtered.filter((l) => !isEnriched(l));
 
     const visible = sortLeadsStable(filtered, sortColumn, sortDirection);
     if (visible.length === 0) {
@@ -278,13 +301,14 @@ export function initColdCallLists(): void {
         setPendingEmailWriterLead(lead.id);
         openTab("outreach", "Outreach");
       },
+      showListColumn: false,
     }, selectedLeadIds);
     updateBulkBar(visible);
   }
 
   async function refreshCurrentList(): Promise<void> {
     if (!currentListId) return;
-    currentListLeads = await getListLeads(currentListId);
+    currentListLeads = await getLogEntries();
     renderListTable();
   }
 
@@ -346,6 +370,28 @@ export function initColdCallLists(): void {
     });
   });
 
+  enrichFilterBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      enrichFilter = btn.dataset.enrich as "all" | "enriched" | "has-charges" | "not-enriched";
+      enrichFilterBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedLeadIds.clear();
+      renderListTable();
+    });
+  });
+
+  deleteListBtn.addEventListener("click", async () => {
+    if (!currentListId) return;
+    const listName = listDetailTitle.textContent || "this list";
+    if (!confirm(`Delete "${listName}"? This will also delete all leads in this list and cannot be undone.`)) return;
+    try {
+      await deleteLeadList(currentListId);
+      backToOverview();
+    } catch (err) {
+      alert(`Failed to delete list: ${err}`);
+    }
+  });
+
   selectAllCb.addEventListener("change", () => {
     const visible = Array.from(listResultsBody.querySelectorAll<HTMLTableRowElement>("[data-lead-id]")).map((r) => r.dataset.leadId!);
     if (selectAllCb.checked) visible.forEach((id) => selectedLeadIds.add(id));
@@ -387,8 +433,10 @@ export function initColdCallLists(): void {
     sortDirection = "asc";
     searchText = "";
     calledFilter = "all";
+    enrichFilter = "all";
     selectedLeadIds.clear();
     calledFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.called === "all"));
+    enrichFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === "all"));
     listSearchInput.value = "";
     listDetailStatus.textContent = "";
     listDetailTitle.textContent = getLeadLists().find((l) => l.id === listId)?.name ?? "List";

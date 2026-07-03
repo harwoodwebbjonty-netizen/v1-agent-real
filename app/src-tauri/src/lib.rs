@@ -393,6 +393,13 @@ async fn get_list_leads(app_handle: tauri::AppHandle, list_id: String) -> Result
 /// Reads the user-picked CSV (arbitrary column layout) and bulk-imports it
 /// into the given list. Never touches `csv_log.rs`'s own fixed-format log.
 #[tauri::command]
+async fn delete_lead_list(app_handle: tauri::AppHandle, list_id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_lead_list(&base_url, &session.token, &list_id).await
+}
+
+#[tauri::command]
 async fn import_leads_csv(app_handle: tauri::AppHandle, list_id: String, csv_path: String) -> Result<usize, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -983,6 +990,7 @@ pub fn run() {
       create_lead_list,
       list_lead_lists,
       get_list_leads,
+      delete_lead_list,
       import_leads_csv,
       import_leads_to_dashboard,
       toggle_list_lead_called,
