@@ -322,14 +322,20 @@ export function initDashboard(): void {
     enrichBtn.disabled = true;
     enrichBtn.textContent = "Enriching...";
     try {
-      const enriched = await chEnrichAll();
+      const { enriched, remaining } = await chEnrichAll();
       await refreshLeads();
-      alert(`Enriched ${enriched} lead(s) with Companies House data (industry, company number, accounts, directors).`);
+      if (remaining > 0) {
+        enrichBtn.textContent = `Enrich from CH (${remaining} left)`;
+        statusMessage.textContent = `Enriched ${enriched} — ${remaining} still to go. Click again to continue.`;
+      } else {
+        statusMessage.textContent = `Enriched ${enriched} lead(s). All done.`;
+        enrichBtn.textContent = "Enrich from CH";
+      }
     } catch (err) {
-      alert(`Enrichment failed: ${err}`);
+      statusMessage.textContent = `Enrichment failed: ${err}`;
+      enrichBtn.textContent = "Enrich from CH";
     } finally {
       enrichBtn.disabled = false;
-      enrichBtn.textContent = "Enrich from CH";
     }
   });
 

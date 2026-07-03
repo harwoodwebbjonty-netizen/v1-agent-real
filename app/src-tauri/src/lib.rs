@@ -6,7 +6,14 @@ mod csv_log;
 use app_state::StoredSession;
 use auth_client::UserInfo;
 use backend_client::LeadRecord;
+use serde::Serialize;
 use tauri_plugin_opener::OpenerExt;
+
+#[derive(Serialize)]
+struct ChEnrichResult {
+    enriched: usize,
+    remaining: usize,
+}
 
 fn require_session(app_handle: &tauri::AppHandle) -> Result<StoredSession, String> {
     app_state::load_session(app_handle).ok_or_else(|| "Not logged in".to_string())
@@ -401,10 +408,11 @@ async fn toggle_list_lead_called(app_handle: tauri::AppHandle, list_id: String, 
 }
 
 #[tauri::command]
-async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<usize, String> {
+async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<ChEnrichResult, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::ch_enrich_all(&base_url, &session.token).await
+    let (enriched, remaining) = backend_client::ch_enrich_all(&base_url, &session.token).await?;
+    Ok(ChEnrichResult { enriched, remaining })
 }
 
 #[tauri::command]

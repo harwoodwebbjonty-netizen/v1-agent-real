@@ -478,25 +478,29 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
 
 
 @router.post("/ch-enrich-all")
-async def ch_enrich_all(current_user: CurrentUser = Depends(get_current_user)) -> dict:
-    """Searches Companies House by name for every lead that has no company_number yet,
-    then fetches profile + charges + officers and writes industry/ch_data/company_number."""
+async def ch_enrich_all(
+    limit: int = 100,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Searches Companies House by name for every lead that has no ch_data yet,
+    then fetches profile + charges + officers and writes industry/ch_data/company_number.
+    Processes at most `limit` leads per call (default 100, ~4 API requests each).
+    Already-enriched leads are always skipped, so repeated calls continue where the
+    previous one left off."""
     settings = get_settings()
     if not settings.companies_house_api_key:
         raise HTTPException(status_code=400, detail="Companies House API key not configured")
 
     leads = db.list_leads()
+    unenriched = [l for l in leads if not l["ch_data"]]
+    batch = unenriched[:limit]
+    remaining_after = max(0, len(unenriched) - limit)
+
     enriched = 0
-    for lead in leads:
-        # Skip if already fully enriched
-        if lead["ch_data"]:
-            continue
+    for lead in batch:
         try:
             company_number = lead["company_number"] or ""
-            # If we don't have a company number yet, search by name
             if not company_number:
-                if not settings.companies_house_api_key:
-                    continue
                 result = await search_company_by_name(settings.companies_house_api_key, lead["company"])
                 if not result:
                     continue
@@ -515,7 +519,7 @@ async def ch_enrich_all(current_user: CurrentUser = Depends(get_current_user)) -
             enriched += 1
         except Exception:
             continue
-    return {"enriched": enriched}
+    return {"enriched": enriched, "remaining": remaining_after}
 
 
 @router.post("/dedup")

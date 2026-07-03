@@ -442,7 +442,7 @@ pub async fn toggle_list_lead_called(base_url: &str, token: &str, list_id: &str,
     Ok(parsed["called_at"].as_str().map(String::from))
 }
 
-pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<usize, String> {
+pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<(usize, usize), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/leads/ch-enrich-all", base_url);
     let response = client
@@ -452,7 +452,9 @@ pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<usize, String>
         .await
         .map_err(|e| format!("Failed to reach backend: {}", e))?;
     let parsed: serde_json::Value = handle_response(response).await?;
-    Ok(parsed["enriched"].as_u64().unwrap_or(0) as usize)
+    let enriched = parsed["enriched"].as_u64().unwrap_or(0) as usize;
+    let remaining = parsed["remaining"].as_u64().unwrap_or(0) as usize;
+    Ok((enriched, remaining))
 }
 
 pub async fn dedup_leads(base_url: &str, token: &str) -> Result<usize, String> {

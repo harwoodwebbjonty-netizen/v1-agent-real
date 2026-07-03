@@ -288,8 +288,8 @@ export async function importLeadsToDashboard(csvPath: string): Promise<number> {
   return invoke<number>("import_leads_to_dashboard", { csvPath });
 }
 
-export async function chEnrichAll(): Promise<number> {
-  return invoke<number>("ch_enrich_all");
+export async function chEnrichAll(): Promise<{ enriched: number; remaining: number }> {
+  return invoke<{ enriched: number; remaining: number }>("ch_enrich_all");
 }
 
 export async function dedupLeads(): Promise<number> {
