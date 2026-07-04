@@ -239,7 +239,8 @@ def build_partial_ch_data_json(search_result: dict) -> str:
 def build_ch_data_json(profile: dict, charges: list[dict], officers: list[dict], charges_total: int = 0) -> str:
     """Compact JSON to store on the lead — real filed data, no fabrication."""
     director_names = [
-        o.get("name", "") for o in officers if o.get("officer_role") in ("director", "secretary")
+        o.get("name", "") for o in officers
+        if o.get("officer_role") in ("director", "secretary", "llp-member", "llp-designated-member")
     ][:5]
 
     charge_records = []

@@ -510,8 +510,11 @@ def _needs_enrichment(lead: sqlite3.Row) -> bool:
             return False  # as good as we can get — don't retry
         if "charges" not in stored:
             return True   # old schema — upgrade
+        # Bad company number: profile 404'd so stored ch_data has empty company_number
+        # even though the leads table has a number. Re-enrich via name search.
+        if lead["company_number"] and not stored.get("company_number"):
+            return True
         if not lead["industry"]:
-            # Only retry if CH stored SIC codes we can map to an industry name
             return bool(stored.get("sic_codes"))
         return False
     except Exception:
@@ -546,7 +549,18 @@ async def _run_enrichment_batch(api_key: str, user_id: str, is_admin: bool, limi
                     db.update_lead_fields(lead["id"], {"ch_data": build_partial_ch_data_json(result)}, now_iso())
                     logger.warning("CH enrich: no company_number in result for '%s' — stored partial", lead["company"])
                     continue
-            profile = await get_company_profile(api_key, company_number) or {}
+            profile = await get_company_profile(api_key, company_number)
+            if profile is None:
+                # Stored company number is invalid (404) — try resolving by name
+                logger.warning("CH enrich: profile 404 for number '%s' (%s) — trying name search", company_number, lead["company"])
+                name_result = await search_company_by_name(api_key, lead["company"])
+                if name_result:
+                    company_number = name_result.get("company_number", "")
+                if not company_number:
+                    db.update_lead_fields(lead["id"], {"ch_data": build_not_found_ch_data_json()}, now_iso())
+                    logger.warning("CH enrich: name search also failed for '%s' — marked not_found", lead["company"])
+                    continue
+                profile = await get_company_profile(api_key, company_number) or {}
             charges, charges_total = await get_company_charges(api_key, company_number)
             officers = await get_company_officers(api_key, company_number)
             ch_data = build_ch_data_json(profile, charges, officers, charges_total)

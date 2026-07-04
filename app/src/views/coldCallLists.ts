@@ -182,6 +182,7 @@ export function initColdCallLists(): void {
   let calledFilter: "all" | "called" | "not-called" = "all";
   let enrichFilter: "all" | "enriched" | "has-charges" | "not-enriched" = "all";
   let selectedLeadIds = new Set<string>();
+  let lastToggledIndex = -1; // for shift-click range selection
 
   function listRowHtml(list: LeadList, showOwner: boolean): string {
     return `
@@ -290,11 +291,28 @@ export function initColdCallLists(): void {
         await toggleListLeadCalled(currentListId, lead.id);
         await refreshCurrentList();
       },
-      onToggleSelect: (lead, selected) => {
-        if (selected) selectedLeadIds.add(lead.id);
-        else selectedLeadIds.delete(lead.id);
-        const row = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${lead.id}"]`);
-        if (row) row.classList.toggle("lead-row-selected", selected);
+      onToggleSelect: (lead, selected, shiftKey) => {
+        const currentIndex = visible.findIndex((l) => l.id === lead.id);
+        if (shiftKey && lastToggledIndex >= 0 && currentIndex >= 0) {
+          const lo = Math.min(lastToggledIndex, currentIndex);
+          const hi = Math.max(lastToggledIndex, currentIndex);
+          for (let i = lo; i <= hi; i++) {
+            if (selected) selectedLeadIds.add(visible[i].id);
+            else selectedLeadIds.delete(visible[i].id);
+            const r = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${visible[i].id}"]`);
+            if (r) {
+              r.classList.toggle("lead-row-selected", selected);
+              const cb = r.querySelector<HTMLInputElement>(".select-cb");
+              if (cb) cb.checked = selected;
+            }
+          }
+        } else {
+          if (selected) selectedLeadIds.add(lead.id);
+          else selectedLeadIds.delete(lead.id);
+          const row = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${lead.id}"]`);
+          if (row) row.classList.toggle("lead-row-selected", selected);
+        }
+        lastToggledIndex = currentIndex;
         updateBulkBar(visible);
       },
       onGenerateEmail: (lead) => {
@@ -366,6 +384,7 @@ export function initColdCallLists(): void {
       calledFilterBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       selectedLeadIds.clear();
+      lastToggledIndex = -1;
       renderListTable();
     });
   });
@@ -376,6 +395,7 @@ export function initColdCallLists(): void {
       enrichFilterBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       selectedLeadIds.clear();
+      lastToggledIndex = -1;
       renderListTable();
     });
   });
@@ -409,6 +429,7 @@ export function initColdCallLists(): void {
 
   bulkClearBtn.addEventListener("click", () => {
     selectedLeadIds.clear();
+    lastToggledIndex = -1;
     listResultsBody.querySelectorAll<HTMLTableRowElement>("[data-lead-id]").forEach((r) => {
       r.classList.remove("lead-row-selected");
       const cb = r.querySelector<HTMLInputElement>(".select-cb");
@@ -435,6 +456,7 @@ export function initColdCallLists(): void {
     calledFilter = "all";
     enrichFilter = "all";
     selectedLeadIds.clear();
+    lastToggledIndex = -1;
     calledFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.called === "all"));
     enrichFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === "all"));
     listSearchInput.value = "";

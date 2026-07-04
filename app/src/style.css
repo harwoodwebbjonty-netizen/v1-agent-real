@@ -894,7 +894,7 @@ th,
 td {
   padding: var(--space-3) var(--space-4);
   text-align: left;
-  vertical-align: top;
+  vertical-align: middle;
   border-bottom: 1px solid var(--border);
   font-variant-numeric: tabular-nums;
 }

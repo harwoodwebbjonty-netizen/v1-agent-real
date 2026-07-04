@@ -76,8 +76,8 @@ export interface RowHandlers {
   onGenerateEmail?: (lead: Lead) => void;
   /** Dashboard only: opens the activity modal for this lead. Renders a pulsing dot column on the left. */
   onActivityClick?: (lead: Lead) => void;
-  /** Bulk selection: toggling a row's checkbox. Caller owns the selectedIds set. */
-  onToggleSelect?: (lead: Lead, selected: boolean) => void;
+  /** Bulk selection: toggling a row's checkbox. Caller owns the selectedIds set. shiftKey enables range select. */
+  onToggleSelect?: (lead: Lead, selected: boolean, shiftKey: boolean) => void;
   /** Set to false in contexts (cold call lists) where the List column is redundant. Default true. */
   showListColumn?: boolean;
 }
@@ -122,14 +122,16 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
           : ""
       }
       <td>${escapeHtml(lead.company)}</td>
-      <td class="contact-cell">
-        ${
-          lead.phone_number && lead.phone_number !== "not_found"
-            ? `<span>${escapeHtml(lead.phone_number)}</span>
-               <a class="icon-btn" href="tel:${escapeHtml(lead.phone_number)}" title="Call">📞</a>
-               <button class="icon-btn copy-phone-btn" type="button" title="Copy">⧉</button>`
-            : `<span class="empty-hint">—</span>`
-        }
+      <td>
+        <div class="contact-cell">
+          ${
+            lead.phone_number && lead.phone_number !== "not_found"
+              ? `<span>${escapeHtml(lead.phone_number)}</span>
+                 <a class="icon-btn" href="tel:${escapeHtml(lead.phone_number)}" title="Call">📞</a>
+                 <button class="icon-btn copy-phone-btn" type="button" title="Copy">⧉</button>`
+              : `<span class="empty-hint">—</span>`
+          }
+        </div>
       </td>
       <td>${lead.source_url ? `<a href="${escapeHtml(lead.source_url)}" target="_blank">${escapeHtml(lead.source_url)}</a>` : ""}</td>
       <td><span class="status-badge ${lead.status}">${lead.status.replace("_", " ")}</span></td>
@@ -143,13 +145,15 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
           ).join("")}
         </select>
       </td>
-      <td class="contact-cell">
-        ${
-          lead.emails.length > 0
-            ? `<span class="status-badge unverified">✉ ${lead.emails.length}</span>`
-            : `<span class="empty-hint">—</span>`
-        }
-        ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
+      <td>
+        <div class="contact-cell">
+          ${
+            lead.emails.length > 0
+              ? `<span class="status-badge unverified">✉ ${lead.emails.length}</span>`
+              : `<span class="empty-hint">—</span>`
+          }
+          ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
+        </div>
       </td>
       ${handlers.showListColumn !== false ? `<td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>` : ""}
     `;
@@ -177,7 +181,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     const selectCb = row.querySelector<HTMLInputElement>(".select-cb");
     selectCb?.addEventListener("click", (event) => {
       event.stopPropagation();
-      handlers.onToggleSelect!(lead, selectCb.checked);
+      handlers.onToggleSelect!(lead, selectCb.checked, (event as MouseEvent).shiftKey);
     });
 
     const calledCb = row.querySelector<HTMLInputElement>(".called-cb");
