@@ -415,6 +415,20 @@ async fn toggle_list_lead_called(app_handle: tauri::AppHandle, list_id: String, 
 }
 
 #[tauri::command]
+async fn add_leads_to_list(app_handle: tauri::AppHandle, list_id: String, lead_ids: Vec<String>) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::add_leads_to_list(&base_url, &session.token, &list_id, lead_ids).await
+}
+
+#[tauri::command]
+async fn set_lead_follow_up(app_handle: tauri::AppHandle, lead_id: String, follow_up_at: Option<String>) -> Result<backend_client::LeadRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::set_lead_follow_up(&base_url, &session.token, &lead_id, follow_up_at).await
+}
+
+#[tauri::command]
 async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<ChEnrichResult, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -994,6 +1008,8 @@ pub fn run() {
       import_leads_csv,
       import_leads_to_dashboard,
       toggle_list_lead_called,
+      add_leads_to_list,
+      set_lead_follow_up,
       ch_enrich_all,
       ch_enrich_auto,
       ch_enrich_status,

@@ -1,0 +1,609 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WCF BDE Weekly Performance Scorecard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  :root {
+    --navy: #17365D;
+    --input-bg: #DCE6F1;
+    --green-bg: #C6EFCE; --green-fg: #006100;
+    --amber-bg: #FFEB9C; --amber-fg: #9C6500;
+    --red-bg: #FFC7CE;   --red-fg: #9C0006;
+    --border: #d8dde3;
+  }
+  * { box-sizing: border-box; }
+  body {
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 24px;
+    color: #1f2933;
+  }
+  .layout {
+    max-width: 1320px;
+    margin: 0 auto;
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+  .sidebar {
+    width: 240px;
+    flex-shrink: 0;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    padding: 20px;
+  }
+  .sidebar h2 {
+    margin: 0 0 14px;
+    font-size: 0.95rem;
+    color: var(--navy);
+  }
+  .sidebar label {
+    display: block;
+    font-size: 0.72rem;
+    font-weight: 600;
+    color: #52606d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+  }
+  .sidebar select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 0.9rem;
+    margin-bottom: 14px;
+    background: #fff;
+  }
+  .sidebar button { width: 100%; margin-bottom: 8px; }
+  .sidebar .hint { font-size: 0.75rem; color: #8d99a6; margin-top: 12px; line-height: 1.4; }
+  .card {
+    flex: 1;
+    min-width: 0;
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.08);
+    overflow: hidden;
+  }
+  .header {
+    background: var(--navy);
+    color: #fff;
+    padding: 20px 28px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+  .header h1 { margin: 0; font-size: 1.3rem; font-weight: 600; }
+  .header .saved-indicator { font-size: 0.8rem; opacity: 0.85; }
+  .meta {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+    padding: 20px 28px;
+    border-bottom: 1px solid var(--border);
+    background: #fafbfc;
+  }
+  .meta label {
+    display: block;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: #52606d;
+    text-transform: uppercase;
+    letter-spacing: 0.03em;
+    margin-bottom: 6px;
+  }
+  .meta input {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--input-bg);
+    font-size: 0.95rem;
+  }
+  .table-wrap { padding: 8px 28px 28px; overflow-x: auto; }
+  table { width: 100%; border-collapse: collapse; font-size: 0.9rem; min-width: 880px; }
+  th, td {
+    border: 1px solid var(--border);
+    padding: 8px 10px;
+    text-align: left;
+    vertical-align: middle;
+  }
+  thead th {
+    background: var(--navy);
+    color: #fff;
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+    position: sticky;
+    top: 0;
+  }
+  tbody tr:nth-child(even) { background: #f7f9fb; }
+  td.metric { font-weight: 600; }
+  td input[type="number"], td input[type="text"] {
+    width: 100%;
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 6px 8px;
+    font-size: 0.88rem;
+  }
+  td input.editable { background: var(--input-bg); }
+  td.readonly { background: #f0f2f4; color: #52606d; }
+  .pct { text-align: center; font-weight: 600; }
+  .rag {
+    text-align: center;
+    font-weight: 700;
+    border-radius: 5px;
+    padding: 5px 0;
+  }
+  .rag.green { background: var(--green-bg); color: var(--green-fg); }
+  .rag.amber { background: var(--amber-bg); color: var(--amber-fg); }
+  .rag.red   { background: var(--red-bg);   color: var(--red-fg); }
+  .rag.blank { background: transparent; color: #aab2bb; }
+  .toolbar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 28px 24px;
+    flex-wrap: wrap;
+  }
+  .weight-toggle {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.85rem;
+    color: #52606d;
+    margin-left: auto;
+    cursor: pointer;
+  }
+  .weight-toggle input { cursor: pointer; }
+  .weight-col { display: none; }
+  table.show-weight .weight-col { display: table-cell; }
+  button {
+    border: none;
+    border-radius: 6px;
+    padding: 9px 16px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:disabled { opacity: 0.5; cursor: not-allowed; }
+  .btn-primary { background: var(--navy); color: #fff; }
+  .btn-secondary { background: #e4e9ee; color: #1f2933; }
+  .btn-danger { background: #fdeceb; color: #b3261e; }
+  @media print {
+    body { background: #fff; padding: 0; }
+    .sidebar { display: none; }
+    .card { box-shadow: none; border-radius: 0; }
+    .toolbar { display: none; }
+  }
+  @media (max-width: 720px) {
+    .layout { flex-direction: column; }
+    .sidebar { width: 100%; }
+  }
+</style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Scorecards</h2>
+      <label for="profileSelect">Select profile</label>
+      <select id="profileSelect" disabled></select>
+      <button class="btn-primary" id="newProfileBtn" disabled>+ New scorecard</button>
+      <button class="btn-danger" id="deleteProfileBtn" disabled>Delete this scorecard</button>
+      <div class="hint">Each scorecard is saved separately under one BDE's name. Switching the dropdown loads that person's data. Everything is synced to the cloud, so it's the same on every device.</div>
+    </aside>
+
+    <div class="card">
+      <div class="header">
+        <h1>WCF BDE Weekly Performance Scorecard</h1>
+        <span class="saved-indicator" id="savedIndicator">Connecting...</span>
+      </div>
+
+      <div class="meta">
+        <div>
+          <label for="weekCommencing">Week commencing</label>
+          <input type="date" id="weekCommencing">
+        </div>
+        <div>
+          <label for="bdeName">BDE name</label>
+          <input type="text" id="bdeName" placeholder="Enter name">
+        </div>
+        <div>
+          <label for="manager">Manager</label>
+          <input type="text" id="manager" value="Michael Canavan">
+        </div>
+        <div>
+          <label for="reviewDate">Review date</label>
+          <input type="date" id="reviewDate">
+        </div>
+      </div>
+
+      <div class="table-wrap">
+        <table id="scorecardTable">
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Weekly Target</th>
+              <th>Actual</th>
+              <th class="weight-col">Priority / Weight</th>
+              <th>% of Target</th>
+              <th>RAG</th>
+              <th>Manager Notes</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody id="tableBody"></tbody>
+        </table>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn-primary" onclick="window.print()">Print / Save as PDF</button>
+        <button class="btn-secondary" id="resetBtn" disabled>Reset this scorecard</button>
+        <label class="weight-toggle">
+          <input type="checkbox" id="toggleWeight">
+          Show Priority / Weight column
+        </label>
+      </div>
+    </div>
+  </div>
+
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAlcPBofiX_p2si-FOz5Pf1iGFLsIvN0Vk",
+  authDomain: "wcf-scorecard.firebaseapp.com",
+  projectId: "wcf-scorecard",
+  storageBucket: "wcf-scorecard.firebasestorage.app",
+  messagingSenderId: "328466706251",
+  appId: "1:328466706251:web:73e6d515ada80f2e4242ce",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storeDocRef = doc(db, "scorecardApp", "store");
+
+// targetValue is the number used for the % of Target calc. For the two
+// percentage-based metrics, "Actual" is entered as a percent (e.g. 95
+// for 95%) and compared against a target of 100.
+const METRICS = [
+  { key: "calls",     name: "Calls",                         target: 675,    targetValue: 675, weight: "15%" },
+  { key: "talkTime",  name: "Talk Time (hours)",              target: 10,     targetValue: 10,  weight: "25%" },
+  { key: "dmConvos",  name: "Decision Maker Conversations",   target: 50,     targetValue: 50,  weight: "20%" },
+  { key: "leads",     name: "Qualified Leads Passed",         target: 3,      targetValue: 3,   weight: "30%" },
+  { key: "campaigns", name: "Mass Email Campaigns",           target: 3,      targetValue: 3,   weight: "5%" },
+  { key: "followUp",  name: "Follow-up Emails",               target: "100%", targetValue: 100, weight: "5%", isPercent: true },
+  { key: "crm",       name: "CRM Compliance",                 target: "100%", targetValue: 100, weight: "Required", isPercent: true },
+];
+
+const LEGACY_MULTI_KEY = "wcfScorecardStore";   // local multi-profile version, pre-cloud
+const LEGACY_SINGLE_KEY = "wcfWeeklyScorecard"; // original single-scorecard version
+const WEIGHT_PREF_KEY = "wcfWeeklyScorecardShowWeight";
+
+let STORE = null;
+let persistTimer = null;
+let suppressRemoteRefresh = false;
+
+function genId() {
+  return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+function blankProfile(id, name) {
+  return { id, name: name || "Untitled", weekCommencing: "", bdeName: name || "", manager: "Michael Canavan", reviewDate: "", rows: {} };
+}
+
+function buildSeedStore() {
+  // One-time migration path for anyone who used the earlier local-only versions
+  // of this app, so existing data isn't lost when moving to cloud storage.
+  try {
+    const multiRaw = localStorage.getItem(LEGACY_MULTI_KEY);
+    if (multiRaw) {
+      const parsed = JSON.parse(multiRaw);
+      if (parsed && parsed.profiles && Object.keys(parsed.profiles).length) return parsed;
+    }
+  } catch (e) { /* ignore corrupt data */ }
+
+  try {
+    const singleRaw = localStorage.getItem(LEGACY_SINGLE_KEY);
+    if (singleRaw) {
+      const legacy = JSON.parse(singleRaw);
+      const id = genId();
+      const store = { profiles: {}, activeId: id };
+      store.profiles[id] = {
+        id,
+        name: legacy.bdeName || "Migrated scorecard",
+        weekCommencing: legacy.weekCommencing || "",
+        bdeName: legacy.bdeName || "",
+        manager: legacy.manager || "Michael Canavan",
+        reviewDate: legacy.reviewDate || "",
+        rows: legacy.rows || {},
+      };
+      return store;
+    }
+  } catch (e) { /* ignore corrupt data */ }
+
+  const id = genId();
+  return { profiles: { [id]: blankProfile(id, "") }, activeId: id };
+}
+
+function getActiveProfile() {
+  return STORE.profiles[STORE.activeId];
+}
+
+function setIndicator(text) {
+  document.getElementById("savedIndicator").textContent = text;
+}
+
+function setControlsEnabled(enabled) {
+  document.getElementById("profileSelect").disabled = !enabled;
+  document.getElementById("newProfileBtn").disabled = !enabled;
+  document.getElementById("deleteProfileBtn").disabled = !enabled;
+  document.getElementById("resetBtn").disabled = !enabled;
+}
+
+function ragFor(pct) {
+  if (pct === "" || pct === null || pct === undefined || isNaN(pct)) return { label: "", cls: "blank" };
+  if (pct >= 1) return { label: "Green", cls: "green" };
+  if (pct >= 0.85) return { label: "Amber", cls: "amber" };
+  return { label: "Red", cls: "red" };
+}
+
+function buildTable() {
+  const body = document.getElementById("tableBody");
+  body.innerHTML = "";
+  METRICS.forEach(m => {
+    const tr = document.createElement("tr");
+
+    const tdMetric = document.createElement("td");
+    tdMetric.className = "metric";
+    tdMetric.textContent = m.name;
+    tr.appendChild(tdMetric);
+
+    const tdTarget = document.createElement("td");
+    tdTarget.className = "readonly";
+    tdTarget.textContent = m.target;
+    tr.appendChild(tdTarget);
+
+    const tdActual = document.createElement("td");
+    const actualInput = document.createElement("input");
+    actualInput.type = "number";
+    actualInput.className = "editable";
+    actualInput.id = "actual_" + m.key;
+    actualInput.step = "any";
+    if (m.isPercent) actualInput.placeholder = "% actual";
+    tdActual.appendChild(actualInput);
+    tr.appendChild(tdActual);
+
+    const tdWeight = document.createElement("td");
+    tdWeight.className = "readonly weight-col";
+    tdWeight.textContent = m.weight;
+    tr.appendChild(tdWeight);
+
+    const tdPct = document.createElement("td");
+    tdPct.className = "pct";
+    tdPct.id = "pct_" + m.key;
+    tr.appendChild(tdPct);
+
+    const tdRag = document.createElement("td");
+    const ragSpan = document.createElement("div");
+    ragSpan.className = "rag blank";
+    ragSpan.id = "rag_" + m.key;
+    tdRag.appendChild(ragSpan);
+    tr.appendChild(tdRag);
+
+    const tdNotes = document.createElement("td");
+    const notesInput = document.createElement("input");
+    notesInput.type = "text";
+    notesInput.className = "editable";
+    notesInput.id = "notes_" + m.key;
+    tdNotes.appendChild(notesInput);
+    tr.appendChild(tdNotes);
+
+    const tdAction = document.createElement("td");
+    const actionInput = document.createElement("input");
+    actionInput.type = "text";
+    actionInput.className = "editable";
+    actionInput.id = "action_" + m.key;
+    tdAction.appendChild(actionInput);
+    tr.appendChild(tdAction);
+
+    body.appendChild(tr);
+
+    actualInput.addEventListener("input", () => updateRow(m, true));
+    notesInput.addEventListener("input", persist);
+    actionInput.addEventListener("input", persist);
+  });
+}
+
+function updateRow(m, shouldPersist) {
+  const actualInput = document.getElementById("actual_" + m.key);
+  const pctCell = document.getElementById("pct_" + m.key);
+  const ragCell = document.getElementById("rag_" + m.key);
+  const actual = parseFloat(actualInput.value);
+
+  if (actualInput.value === "" || isNaN(actual)) {
+    pctCell.textContent = "";
+    ragCell.textContent = "";
+    ragCell.className = "rag blank";
+  } else {
+    const pct = actual / m.targetValue;
+    pctCell.textContent = (pct * 100).toFixed(0) + "%";
+    const rag = ragFor(pct);
+    ragCell.textContent = rag.label;
+    ragCell.className = "rag " + rag.cls;
+  }
+  if (shouldPersist) persist();
+}
+
+function persist() {
+  const profile = getActiveProfile();
+  profile.weekCommencing = document.getElementById("weekCommencing").value;
+  profile.bdeName = document.getElementById("bdeName").value;
+  profile.manager = document.getElementById("manager").value;
+  profile.reviewDate = document.getElementById("reviewDate").value;
+  profile.rows = profile.rows || {};
+  METRICS.forEach(m => {
+    profile.rows[m.key] = {
+      actual: document.getElementById("actual_" + m.key).value,
+      notes: document.getElementById("notes_" + m.key).value,
+      action: document.getElementById("action_" + m.key).value,
+    };
+  });
+  profile.name = profile.bdeName.trim() || "Untitled";
+  refreshProfileDropdown();
+  schedulePersist();
+}
+
+function schedulePersist() {
+  setIndicator("Saving...");
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(writeStore, 500);
+}
+
+function writeStore() {
+  suppressRemoteRefresh = true;
+  setDoc(storeDocRef, STORE)
+    .then(() => setIndicator("Synced " + new Date().toLocaleTimeString()))
+    .catch(err => {
+      console.error(err);
+      setIndicator("Sync failed - check your internet connection");
+    })
+    .finally(() => { suppressRemoteRefresh = false; });
+}
+
+function loadProfileIntoForm() {
+  const profile = getActiveProfile();
+  document.getElementById("weekCommencing").value = profile.weekCommencing || "";
+  document.getElementById("bdeName").value = profile.bdeName || "";
+  document.getElementById("manager").value = profile.manager || "Michael Canavan";
+  document.getElementById("reviewDate").value = profile.reviewDate || "";
+  METRICS.forEach(m => {
+    const row = (profile.rows || {})[m.key] || {};
+    document.getElementById("actual_" + m.key).value = row.actual || "";
+    document.getElementById("notes_" + m.key).value = row.notes || "";
+    document.getElementById("action_" + m.key).value = row.action || "";
+    updateRow(m, false);
+  });
+}
+
+function refreshProfileDropdown() {
+  const select = document.getElementById("profileSelect");
+  const ids = Object.keys(STORE.profiles);
+  select.innerHTML = "";
+  ids.forEach(id => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = STORE.profiles[id].name || "Untitled";
+    if (id === STORE.activeId) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function switchProfile(id) {
+  STORE.activeId = id;
+  loadProfileIntoForm();
+  refreshProfileDropdown();
+  writeStore();
+}
+
+function createProfile() {
+  const name = prompt("Name for the new scorecard (e.g. the BDE's name):", "");
+  if (name === null) return; // cancelled
+  const id = genId();
+  STORE.profiles[id] = blankProfile(id, name.trim());
+  STORE.activeId = id;
+  loadProfileIntoForm();
+  refreshProfileDropdown();
+  writeStore();
+}
+
+function deleteProfile() {
+  const profile = getActiveProfile();
+  if (!confirm('Delete the scorecard for "' + (profile.name || "Untitled") + '"? This cannot be undone.')) return;
+  delete STORE.profiles[STORE.activeId];
+  const remaining = Object.keys(STORE.profiles);
+  if (remaining.length === 0) {
+    const id = genId();
+    STORE.profiles[id] = blankProfile(id, "");
+    STORE.activeId = id;
+  } else {
+    STORE.activeId = remaining[0];
+  }
+  loadProfileIntoForm();
+  refreshProfileDropdown();
+  writeStore();
+}
+
+async function init() {
+  buildTable();
+
+  const table = document.getElementById("scorecardTable");
+  const toggle = document.getElementById("toggleWeight");
+  const showWeight = localStorage.getItem(WEIGHT_PREF_KEY) === "true";
+  toggle.checked = showWeight;
+  table.classList.toggle("show-weight", showWeight);
+  toggle.addEventListener("change", () => {
+    table.classList.toggle("show-weight", toggle.checked);
+    localStorage.setItem(WEIGHT_PREF_KEY, toggle.checked);
+  });
+
+  try {
+    const snap = await getDoc(storeDocRef);
+    if (snap.exists()) {
+      STORE = snap.data();
+    } else {
+      STORE = buildSeedStore();
+      await setDoc(storeDocRef, STORE);
+    }
+  } catch (err) {
+    console.error(err);
+    setIndicator("Could not connect to cloud database - check your internet connection");
+    return;
+  }
+
+  refreshProfileDropdown();
+  loadProfileIntoForm();
+  setControlsEnabled(true);
+  setIndicator("Synced " + new Date().toLocaleTimeString());
+
+  ["weekCommencing", "bdeName", "manager", "reviewDate"].forEach(id => {
+    document.getElementById(id).addEventListener("input", persist);
+  });
+  document.getElementById("profileSelect").addEventListener("change", e => switchProfile(e.target.value));
+  document.getElementById("newProfileBtn").addEventListener("click", createProfile);
+  document.getElementById("deleteProfileBtn").addEventListener("click", deleteProfile);
+  document.getElementById("resetBtn").addEventListener("click", () => {
+    if (confirm("Clear all data for this scorecard? This cannot be undone.")) {
+      const id = getActiveProfile().id;
+      STORE.profiles[id] = blankProfile(id, "");
+      loadProfileIntoForm();
+      refreshProfileDropdown();
+      writeStore();
+    }
+  });
+
+  onSnapshot(storeDocRef, snap => {
+    if (suppressRemoteRefresh || snap.metadata.hasPendingWrites || !snap.exists()) return;
+    STORE = snap.data();
+    if (!STORE.profiles[STORE.activeId]) {
+      STORE.activeId = Object.keys(STORE.profiles)[0];
+    }
+    refreshProfileDropdown();
+    loadProfileIntoForm();
+    setIndicator("Updated from another device " + new Date().toLocaleTimeString());
+  });
+}
+
+document.addEventListener("DOMContentLoaded", init);
+</script>
+</body>
+</html>

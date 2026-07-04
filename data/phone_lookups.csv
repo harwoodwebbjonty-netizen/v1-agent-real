@@ -83,3 +83,36 @@ timestamp,company,phone_number,source_url,status,notes
 2026-06-22T08:43:53.354407+00:00,PROOF PRODUCTIONS LTD,not_found,n/a,not_found,Preston PR2 3AQ; no website or phone found
 2026-06-22T08:43:53.385252+00:00,HENDLER WHOLESALE LTD,01405 480000,https://www.hendler.co.uk/contact-us,verified,"Motorcycle parts wholesale; Thorne, Doncaster"
 2026-06-22T08:43:53.414394+00:00,PAD CONTRACTS LIMITED,01992 767676,https://www.padcontracts.co.uk/contact-us/,verified,"Architectural metalwork; Waltham Abbey, Essex"
+2026-06-26T08:38:16.530881+00:00,TROOPS LIMITED,01623 651561,https://troopsfruitandveg.co.uk/contact-us/,verified,"Troops Fruit and Veg, Rock Valley, Mansfield NG18 2HA"
+2026-06-26T08:38:16.564232+00:00,CS ROBERTS RESIDENTIAL LTD,not_found,n/a,not_found,No company found under this exact name; searches return unrelated Roberts Property Bournemouth
+2026-06-26T08:38:16.595075+00:00,COTTESWOLD HOUSE DENTAL CARE (GLOUCESTER) LTD,01452 346770,https://www.cotteswoldhouse.co.uk/contact/,verified,New patients line; existing patients: 01452 524024
+2026-06-26T08:38:16.626839+00:00,TELEFONICA DIGITAL LIMITED,not_found,n/a,not_found,Registered entity (co no. 07884976) at Worthing; no public-facing phone - likely holding/dormant company
+2026-06-26T08:38:16.657382+00:00,CLOSE PROTECTION SECURITY LTD,not_found,n/a,not_found,Company in administration (co no. 10670461); no active phone found
+2026-06-26T08:38:16.688738+00:00,WINCH SYSTEMS LIMITED,01482 620991,https://www.winchsystems.co.uk/contact-us,verified,"Craven House, Hull HU9 1AP"
+2026-06-26T08:38:16.720100+00:00,SKINNY COFFEE CLUB LTD,not_found,n/a,not_found,Contact form/email only on website
+2026-06-26T08:38:28.222687+00:00,PACKAGING INNOVATIONS UK LIMITED,01795 430064,https://www.packaginginnovations.co.uk/contact,verified,"Albion Place, Maidstone, Kent ME14 5EG"
+2026-06-26T08:38:28.254995+00:00,FOSTERING FOR YOU LIMITED,0330 123 9433,https://www.fosteringforyou.co.uk/contact-us/,verified,"Studio 2.06, The Light Bulb, 1 Filament Walk, London SW18 4GQ"
+2026-06-26T08:38:28.285876+00:00,FORMAT ARCHITECTS LTD,0121 726 6710,https://formatarchitects.co.uk/contact/,verified,"Studio 28, 50-54 St Pauls Square, Birmingham B3 1QS"
+2026-06-26T08:38:28.316204+00:00,INSPIRESULTS LTD,not_found,n/a,not_found,No website or phone found
+2026-06-26T08:38:28.347928+00:00,MERKO (EUROPE) LTD,01263 515030,http://www.merko.co.uk/contact-us.html,unverified,"Hempstead Road Business Centre, Holt NR25 6EE; website JS-rendered but number confirmed via directories and merko.co.uk"
+2026-06-26T08:38:28.377837+00:00,AMBROSE PROPERTIES LTD,not_found,n/a,not_found,London SW17 7TW; no website or phone found
+2026-06-26T08:38:28.409064+00:00,MODCON CABIN TRADER LTD,0333 404 8822,https://modconcabins.co.uk/contact-us/,verified,"Castiard House, Flaxley, Newnham GL14 1JR; trades as ModCon Cabins"
+2026-06-26T08:38:41.044757+00:00,WHITE BROS. (N'CLE-ON-TYNE) LIMITED,0191 213 0455,https://whitebros.co.uk/contact/,verified,"Gosforth Industrial Estate, Christon Rd, Newcastle NE3 1XD; stainless steel fabrication"
+2026-06-26T08:38:41.074906+00:00,THIRST SOLUTION LTD,0844 800 1993,https://www.businessmagnet.co.uk/company/thirstsolution-128836.htm,unverified,"Laburnum House, Old Church Road, Uphill, Weston-Super-Mare BS23 4XL; website JS-rendered"
+2026-06-26T08:38:41.104615+00:00,WESTONS GROUP LIMITED,01243 699639,https://westons-group.co.uk/,verified,"Unit 18 Orchard Business Park, Arundel BN18 0GA; trades as Westons Garden and Property Services"
+2026-06-26T08:38:41.134064+00:00,LONDON LUXURY SERVICING LTD,0208 450 7683,https://www.llscars.co.uk/contact-us/,unverified,"100 Cricklewood Broadway, London NW2 3EL; website JS-rendered, number from search"
+2026-06-26T08:38:41.163977+00:00,XEVA LIMITED,01256 406050,https://www.xeva.group/contact-us,verified,"Unit 5, The Ringway Centre, Edison Road, Basingstoke RG21 6YH; radio/comms equipment distributor"
+2026-06-26T08:38:41.193759+00:00,DWP SERVICES LIMITED,not_found,n/a,not_found,"Co no. 10199097, Oakley House, Tetbury Road, Cirencester GL7 1US; construction company, no website or phone found"
+2026-06-26T08:38:41.224037+00:00,OPTIMAL FM LIMITED,0141 404 0134,https://www.optimalfm.co.uk/contact-us/,verified,"120 Carnegie Road, Glasgow G52 4JZ; facilities management"
+2026-06-26T08:38:52.548457+00:00,LLC CONTRACTORS LIMITED,not_found,n/a,not_found,London SW15 3AP; no website or phone found
+2026-06-26T08:38:52.579692+00:00,TIBA TEMPEH LTD,not_found,n/a,not_found,Newcastle NE20 0FJ; contact form only on website
+2026-06-26T08:38:52.610159+00:00,PAINTVINE (UK) LIMITED,not_found,n/a,not_found,London N16 8JG; email-only contact
+2026-06-26T08:38:52.642347+00:00,GILDA & PEARL LTD,0207 499 7060,https://gildapearl.co.uk/pages/contact,unverified,"Studio 105, 280 Mare St, London E8 1HE; luxury lingerie, website JS-rendered"
+2026-06-26T08:38:52.672551+00:00,MASONS FASTENERS LTD,0121 766 7500,https://www.masonsfasteners.com/,unverified,"Unit 34 Coleshill Industrial Estate, Station Road, Coleshill B46 1JT; website empty but confirmed in multiple directories"
+2026-06-26T08:38:52.701987+00:00,HAGLEY PARK LIMITED LIABILITY PARTNERSHIP,01562 307308,https://www.hagleypark.co.uk/contact/,verified,"Birmingham Road, Hagley, Stourbridge DY9 9LR; visitor centre and park"
+2026-06-26T08:38:52.733929+00:00,ARDEN INTERNATIONAL MOTORSPORT LIMITED,01295 268022,https://www.arden-motorsport.com/contact,verified,"3b Thorpe Way, Banbury, Oxfordshire OX16 4SP"
+2026-06-26T08:39:01.999263+00:00,TWICKENHAM AIRCONDITIONING LTD,0208 977 0208,https://www.twickenhamac.co.uk/contact/,verified,"Unit 11 Teddington Business Park, Station Road, Teddington TW11 9BQ"
+2026-06-26T08:39:02.029477+00:00,HIND CARE LTD,0161 747 5365,https://www.cqc.org.uk/provider/1-21960258497,unverified,"71 Crofts Bank Road, Urmston, Manchester M41 0UB; from CQC records for Mrs R Hind / Hind Care"
+2026-06-26T08:39:02.059701+00:00,EMPOWER AV SOLUTIONS LTD,0845 2996299,https://empowerav.com/contact/,verified,"PO Box 6406, Leighton Buzzard, Bedfordshire LU7 6DZ; AV/tech distributor"
+2026-06-26T08:39:02.089805+00:00,GROWTH FORTE LTD,07587 545007,https://growthforte.com/contact,verified,London; marketing consultancy; mobile number listed in website footer
+2026-06-26T08:39:02.119558+00:00,RICHMOND EVENTS LIMITED,0208 487 2200,https://richmondevents.com/about/contact-us,verified,"St Leonards House, St Leonards Road, London SW14 7LY; UK events/forums business"

@@ -58,6 +58,7 @@ class LeadOut(BaseModel):
     company_number: Optional[str] = None
     ch_data: Optional[str] = None
     called_at: Optional[str] = None
+    follow_up_at: Optional[str] = None
     list_name: Optional[str] = None
     phones: list[PhoneOut]
     emails: list[EmailOut]

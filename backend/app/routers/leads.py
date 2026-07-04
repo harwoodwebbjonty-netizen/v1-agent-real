@@ -161,6 +161,7 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         company_number=row["company_number"],
         ch_data=row["ch_data"],
         called_at=row["called_at"],
+        follow_up_at=row["follow_up_at"] if "follow_up_at" in row.keys() else None,
         list_name=row["list_name"] if "list_name" in row.keys() else None,
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
         emails=[EmailOut(id=e["id"], email=e["email"], source=e["source"]) for e in db.list_emails(row["id"])],
@@ -278,6 +279,26 @@ def assign_lead(
 
     updated = db.get_lead(lead_id)
     return _to_lead_out(updated, _user_name_map(), activity)
+
+
+# --- Follow-up scheduling ---
+
+class SetFollowUpRequest(BaseModel):
+    follow_up_at: Optional[str] = None  # ISO datetime string, or null to clear
+
+
+@router.patch("/{lead_id}/follow-up", response_model=LeadOut)
+def set_follow_up(
+    lead_id: str, body: SetFollowUpRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
+) -> LeadOut:
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+    db.set_lead_follow_up(lead_id, body.follow_up_at)
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 # --- Phone numbers (manual CRUD — independent of the AI phone-lookup pipeline above) ---

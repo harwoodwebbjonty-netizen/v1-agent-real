@@ -4,6 +4,7 @@ import {
   type LeadList,
   addLeadEmail,
   addLeadPhone,
+  addLeadsToList,
   assignLead,
   createLeadList,
   deleteLeadEmail,
@@ -111,13 +112,22 @@ export function initColdCallLists(): void {
           <div id="ccl-bulk-bar" class="ccl-bulk-bar hidden">
             <span id="ccl-bulk-count"></span>
             <button id="ccl-bulk-called-btn" class="btn btn-secondary btn-sm">Mark as Called</button>
+            <button id="ccl-bulk-add-btn" class="btn btn-secondary btn-sm">Add to This List</button>
             <button id="ccl-bulk-clear-btn" class="btn btn-ghost btn-sm">Clear</button>
           </div>
 
-          <div class="ccl-called-filter">
-            <button class="ccl-filter-btn active" data-called="all">All</button>
-            <button class="ccl-filter-btn" data-called="not-called">Not Called</button>
-            <button class="ccl-filter-btn" data-called="called">Called</button>
+          <div class="ccl-filter-row">
+            <div class="ccl-called-filter">
+              <button class="ccl-filter-btn active" data-called="all">All</button>
+              <button class="ccl-filter-btn" data-called="not-called">Not Called</button>
+              <button class="ccl-filter-btn" data-called="called">Called</button>
+              <button class="ccl-filter-btn" data-called="follow-up">Follow-up Due</button>
+            </div>
+            <div class="ccl-scope-filter">
+              <button class="ccl-scope-btn active" data-scope="all">All Leads</button>
+              <button class="ccl-scope-btn" data-scope="this-list">This List Only</button>
+              <button class="ccl-scope-btn" data-scope="unassigned">Unassigned</button>
+            </div>
           </div>
           <div class="ccl-enrich-filter">
             <button class="ccl-enrich-btn active" data-enrich="all">All</button>
@@ -169,18 +179,21 @@ export function initColdCallLists(): void {
   const bulkBar = container.querySelector<HTMLDivElement>("#ccl-bulk-bar")!;
   const bulkCount = container.querySelector<HTMLSpanElement>("#ccl-bulk-count")!;
   const bulkCalledBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-called-btn")!;
+  const bulkAddBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-add-btn")!;
   const bulkClearBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-clear-btn")!;
   const selectAllCb = container.querySelector<HTMLInputElement>("#ccl-select-all-cb")!;
   const deleteListBtn = container.querySelector<HTMLButtonElement>("#delete-list-btn")!;
   const enrichFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-enrich-btn");
+  const scopeFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-scope-btn");
 
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
   let sortColumn: SortColumn = null;
   let sortDirection: SortDirection = "asc";
   let searchText = "";
-  let calledFilter: "all" | "called" | "not-called" = "all";
+  let calledFilter: "all" | "called" | "not-called" | "follow-up" = "all";
   let enrichFilter: "all" | "enriched" | "has-charges" | "not-enriched" = "all";
+  let scopeFilter: "all" | "this-list" | "unassigned" = "all";
   let selectedLeadIds = new Set<string>();
   let lastToggledIndex = -1; // for shift-click range selection
 
@@ -256,14 +269,28 @@ export function initColdCallLists(): void {
       return;
     }
 
+    const now = new Date();
+    const isFollowUpDue = (l: Lead) => !!l.follow_up_at && new Date(l.follow_up_at) <= now;
+
     let filtered = filterLeads(currentListLeads, searchText, new Set());
+    // Scope filter
+    if (scopeFilter === "this-list") filtered = filtered.filter((l) => l.list_id === currentListId);
+    else if (scopeFilter === "unassigned") filtered = filtered.filter((l) => !l.list_id);
+    // Called filter
     if (calledFilter === "called") filtered = filtered.filter((l) => !!l.called_at);
     else if (calledFilter === "not-called") filtered = filtered.filter((l) => !l.called_at);
+    else if (calledFilter === "follow-up") filtered = filtered.filter(isFollowUpDue);
+    // Enrichment filter
     if (enrichFilter === "has-charges") filtered = filtered.filter(hasCharges);
     else if (enrichFilter === "enriched") filtered = filtered.filter(isEnriched);
     else if (enrichFilter === "not-enriched") filtered = filtered.filter((l) => !isEnriched(l));
 
-    const visible = sortLeadsStable(filtered, sortColumn, sortDirection);
+    // Sort: follow-up due leads first, then apply user sort
+    const sorted = sortLeadsStable(filtered, sortColumn, sortDirection);
+    const visible = [
+      ...sorted.filter(isFollowUpDue),
+      ...sorted.filter((l) => !isFollowUpDue(l)),
+    ];
     if (visible.length === 0) {
       renderEmptyState(listResultsBody, "No leads match your search.", LIST_COLUMN_COUNT);
       return;
@@ -448,6 +475,32 @@ export function initColdCallLists(): void {
     bulkCalledBtn.disabled = false;
   });
 
+  bulkAddBtn.addEventListener("click", async () => {
+    if (!currentListId || selectedLeadIds.size === 0) return;
+    bulkAddBtn.disabled = true;
+    const ids = Array.from(selectedLeadIds);
+    try {
+      await addLeadsToList(currentListId, ids);
+      selectedLeadIds.clear();
+      lastToggledIndex = -1;
+      await refreshCurrentList();
+    } catch (err) {
+      alert(`Failed to add leads: ${err}`);
+    }
+    bulkAddBtn.disabled = false;
+  });
+
+  scopeFilterBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      scopeFilter = btn.dataset.scope as "all" | "this-list" | "unassigned";
+      scopeFilterBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      selectedLeadIds.clear();
+      lastToggledIndex = -1;
+      renderListTable();
+    });
+  });
+
   async function openListDetail(listId: string): Promise<void> {
     currentListId = listId;
     sortColumn = null;
@@ -455,10 +508,12 @@ export function initColdCallLists(): void {
     searchText = "";
     calledFilter = "all";
     enrichFilter = "all";
+    scopeFilter = "all";
     selectedLeadIds.clear();
     lastToggledIndex = -1;
     calledFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.called === "all"));
     enrichFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === "all"));
+    scopeFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.scope === "all"));
     listSearchInput.value = "";
     listDetailStatus.textContent = "";
     listDetailTitle.textContent = getLeadLists().find((l) => l.id === listId)?.name ?? "List";

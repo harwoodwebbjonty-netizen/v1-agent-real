@@ -361,6 +361,14 @@ def _migration_009_called_at(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leads ADD COLUMN called_at TEXT")
 
 
+def _migration_010_follow_up(conn: sqlite3.Connection) -> None:
+    """Scheduled follow-up date: salesperson can snooze a lead and have it
+    resurface at the top of their cold call list on the target date."""
+    lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "follow_up_at" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN follow_up_at TEXT")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -373,8 +381,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (7, _migration_007_prospecting_named_lists),
     (8, _migration_008_activity_feed),
     (9, _migration_009_called_at),
+    (10, _migration_010_follow_up),
 ]
-CURRENT_SCHEMA_VERSION = 9
+CURRENT_SCHEMA_VERSION = 10
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -908,6 +917,25 @@ def delete_lead_list(list_id: str) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM leads WHERE list_id = ?", (list_id,))
         conn.execute("DELETE FROM lead_lists WHERE id = ?", (list_id,))
+
+
+def add_leads_to_list(lead_ids: list[str], list_id: str) -> int:
+    """Move existing leads into a list (sets their list_id). Returns count updated."""
+    if not lead_ids:
+        return 0
+    placeholders = ",".join("?" * len(lead_ids))
+    with get_connection() as conn:
+        conn.execute(
+            f"UPDATE leads SET list_id = ? WHERE id IN ({placeholders})",
+            [list_id, *lead_ids],
+        )
+        return len(lead_ids)
+
+
+def set_lead_follow_up(lead_id: str, follow_up_at: Optional[str]) -> None:
+    """Set or clear the follow-up date for a lead."""
+    with get_connection() as conn:
+        conn.execute("UPDATE leads SET follow_up_at = ? WHERE id = ?", (follow_up_at, lead_id))
 
 
 # --- AI sales intelligence (append-only version history — never updated, never deleted) ---

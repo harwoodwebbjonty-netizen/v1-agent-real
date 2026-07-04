@@ -92,6 +92,7 @@ pub struct LeadRecord {
     pub company_number: Option<String>,
     pub ch_data: Option<String>,
     pub called_at: Option<String>,
+    pub follow_up_at: Option<String>,
     pub list_name: Option<String>,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
@@ -462,6 +463,35 @@ pub async fn delete_lead_list(base_url: &str, token: &str, list_id: &str) -> Res
         .map_err(|e| format!("Failed to reach backend: {}", e))?;
     let _: serde_json::Value = handle_response(response).await?;
     Ok(())
+}
+
+pub async fn add_leads_to_list(base_url: &str, token: &str, list_id: &str, lead_ids: Vec<String>) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/lead-lists/{}/add-leads", base_url, list_id);
+    let body = serde_json::json!({ "lead_ids": lead_ids });
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+pub async fn set_lead_follow_up(base_url: &str, token: &str, lead_id: &str, follow_up_at: Option<String>) -> Result<LeadRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/follow-up", base_url, lead_id);
+    let body = serde_json::json!({ "follow_up_at": follow_up_at });
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
 }
 
 pub async fn ch_enrich_all(base_url: &str, token: &str) -> Result<(usize, usize), String> {

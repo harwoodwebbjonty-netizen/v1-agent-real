@@ -292,6 +292,21 @@
         </div>
         <button id="save-details-btn" class="btn btn-secondary">Save Details</button>
 
+        <h4>Follow-up</h4>
+        <div class="follow-up-section">
+          <div class="follow-up-quick-btns">
+            <button class="btn btn-ghost btn-sm follow-up-quick" data-days="1">Tomorrow</button>
+            <button class="btn btn-ghost btn-sm follow-up-quick" data-days="7">1 week</button>
+            <button class="btn btn-ghost btn-sm follow-up-quick" data-days="30">1 month</button>
+          </div>
+          <div class="follow-up-custom-row">
+            <input id="follow-up-date-input" type="date" class="search-input" />
+            <button id="follow-up-set-btn" class="btn btn-secondary btn-sm">Set</button>
+            <button id="follow-up-clear-btn" class="btn btn-ghost btn-sm">Clear</button>
+          </div>
+          <div id="follow-up-current" class="status-message"></div>
+        </div>
+
         <h4>Notes</h4>
         <textarea id="side-panel-notes" rows="4"></textarea>
         <button id="side-panel-save-notes-btn" class="btn btn-secondary">Save Notes</button>

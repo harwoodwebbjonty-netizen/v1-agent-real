@@ -1,5 +1,5 @@
 import type { EmailEntry, Lead, LeadIntelligence, LeadIntelligenceVersion, PhoneEntry, UserInfo } from "../api";
-import { EMAIL_PATTERN, getLeadIntelligenceHistory, PHONE_PATTERN } from "../api";
+import { EMAIL_PATTERN, getLeadIntelligenceHistory, PHONE_PATTERN, setLeadFollowUp } from "../api";
 import { copyToClipboard } from "../contact";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { openTab } from "../tabs";
@@ -104,8 +104,26 @@ function render(): void {
   renderAssignment(lead);
   renderPhones(lead);
   renderEmails(lead);
+  renderFollowUp(lead);
   renderChData(lead);
   renderIntelligence(lead);
+}
+
+function renderFollowUp(lead: Lead): void {
+  const dateInput = document.querySelector<HTMLInputElement>("#follow-up-date-input")!;
+  const current = document.querySelector<HTMLElement>("#follow-up-current")!;
+  dateInput.value = lead.follow_up_at ? lead.follow_up_at.slice(0, 10) : "";
+  if (lead.follow_up_at) {
+    const d = new Date(lead.follow_up_at);
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    const isOverdue = d < today;
+    const label = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+    current.textContent = isOverdue ? `Overdue: ${label}` : `Scheduled: ${label}`;
+    current.style.color = isOverdue ? "var(--danger)" : "var(--accent-text)";
+  } else {
+    current.textContent = "No follow-up scheduled";
+    current.style.color = "";
+  }
 }
 
 export function formatDate(iso: string): string {
@@ -552,6 +570,29 @@ export function initSidePanel(callbacks: SidePanelCallbacks): void {
     } catch (err) {
       phoneError.textContent = String(err);
     }
+  });
+
+  // Follow-up scheduling
+  const followUpDateInput = document.querySelector<HTMLInputElement>("#follow-up-date-input")!;
+  document.querySelectorAll<HTMLButtonElement>(".follow-up-quick").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!currentLead) return;
+      const days = parseInt(btn.dataset.days ?? "0", 10);
+      const d = new Date(); d.setDate(d.getDate() + days);
+      const iso = d.toISOString().slice(0, 10) + "T09:00:00";
+      currentLead = await setLeadFollowUp(currentLead.id, iso);
+      renderFollowUp(currentLead);
+    });
+  });
+  document.querySelector("#follow-up-set-btn")!.addEventListener("click", async () => {
+    if (!currentLead || !followUpDateInput.value) return;
+    currentLead = await setLeadFollowUp(currentLead.id, followUpDateInput.value + "T09:00:00");
+    renderFollowUp(currentLead);
+  });
+  document.querySelector("#follow-up-clear-btn")!.addEventListener("click", async () => {
+    if (!currentLead) return;
+    currentLead = await setLeadFollowUp(currentLead.id, null);
+    renderFollowUp(currentLead);
   });
 
   const emailInput = document.querySelector<HTMLInputElement>("#add-email-input")!;

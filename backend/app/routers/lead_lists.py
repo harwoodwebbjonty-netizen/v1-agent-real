@@ -1,6 +1,8 @@
 import sqlite3
+from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 
 from app import db
 from app.dependencies import CurrentUser, get_current_user
@@ -117,3 +119,19 @@ def toggle_lead_called(
     _require_list_access(lead_list, current_user)
     new_called_at = db.toggle_lead_called(lead_id, list_id, now_iso())
     return {"called_at": new_called_at}
+
+
+class AddLeadsRequest(BaseModel):
+    lead_ids: List[str]
+
+
+@router.post("/{list_id}/add-leads")
+def add_leads_to_list(
+    list_id: str, body: AddLeadsRequest, current_user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    lead_list = db.get_lead_list(list_id)
+    if lead_list is None:
+        raise HTTPException(status_code=404, detail="List not found")
+    _require_list_access(lead_list, current_user)
+    count = db.add_leads_to_list(body.lead_ids, list_id)
+    return {"added": count}

@@ -1644,6 +1644,29 @@ select.inline-edit { min-width: 110px; }
   font-variant-numeric: tabular-nums;
 }
 
+.follow-up-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) 0;
+}
+
+.follow-up-quick-btns {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.follow-up-custom-row {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.follow-up-custom-row input[type="date"] {
+  flex: 1;
+}
+
 .history-list {
   list-style: none;
   padding: 0;
@@ -2818,12 +2841,35 @@ body.compact-rows td {
   border-bottom-color: var(--primary);
 }
 
-/* Cold call lists — called filter strip */
-.ccl-called-filter {
+/* Cold call lists — filter row (called + scope filters side by side) */
+.ccl-filter-row {
+  display: flex;
+  gap: var(--space-6);
+  flex-wrap: wrap;
+  align-items: center;
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.ccl-called-filter,
+.ccl-scope-filter {
   display: flex;
   gap: var(--space-2);
-  padding: var(--space-3) 0 var(--space-2);
 }
+
+.ccl-scope-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.ccl-scope-btn:hover { border-color: var(--primary); color: var(--text); }
+.ccl-scope-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
 
 .ccl-filter-btn {
   background: none;

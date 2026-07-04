@@ -37,6 +37,7 @@ export interface Lead {
   company_number: string | null;
   ch_data: string | null;
   called_at: string | null;
+  follow_up_at: string | null;
   list_name: string | null;
   refresh_tier: string | null;
   next_dg_refresh_at: string | null;
@@ -287,6 +288,14 @@ export async function deleteLeadList(listId: string): Promise<void> {
 
 export async function toggleListLeadCalled(listId: string, leadId: string): Promise<string | null> {
   return invoke<string | null>("toggle_list_lead_called", { listId, leadId });
+}
+
+export async function addLeadsToList(listId: string, leadIds: string[]): Promise<void> {
+  return invoke<void>("add_leads_to_list", { listId, leadIds });
+}
+
+export async function setLeadFollowUp(leadId: string, followUpAt: string | null): Promise<Lead> {
+  return invoke<Lead>("set_lead_follow_up", { leadId, followUpAt });
 }
 
 export async function importLeadsToDashboard(csvPath: string): Promise<number> {
