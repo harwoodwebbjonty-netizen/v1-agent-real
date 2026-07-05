@@ -12,6 +12,7 @@ const NAV_TITLES: Record<ViewName, string> = {
   "email-writer": "AI Email Writer",
   sequences: "Sequences",
   outreach: "Outreach",
+  "win-back": "Win-back",
   calendar: "Calendar",
   analytics: "Analytics",
   settings: "Settings",

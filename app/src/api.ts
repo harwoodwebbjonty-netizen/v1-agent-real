@@ -831,3 +831,58 @@ export async function getBatchActivitySummaries(
 export async function getActivityStatus(): Promise<{ configured: boolean }> {
   return invoke<{ configured: boolean }>("get_activity_status");
 }
+
+// --- Win-back campaigns ---
+
+export interface WinBackCampaign {
+  id: string;
+  name: string;
+  status: "generating" | "ready" | "error";
+  total: number;
+  generated: number;
+  created_at: string;
+}
+
+export interface WinBackEmail {
+  id: string;
+  campaign_id: string;
+  lead_id: string;
+  subject: string;
+  body: string;
+  send_status: "draft" | "sent";
+  sent_at: string | null;
+  send_method: string | null;
+  company: string;
+  contact_name: string;
+  contact_email: string;
+  created_at: string;
+}
+
+export interface WinBackCampaignDetail {
+  campaign: WinBackCampaign;
+  emails: WinBackEmail[];
+}
+
+export async function createWinBackCampaign(name: string, leadIds: string[]): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign", { name, leadIds });
+}
+
+export async function getWinBackCampaigns(): Promise<WinBackCampaign[]> {
+  return invoke<WinBackCampaign[]>("get_win_back_campaigns");
+}
+
+export async function getWinBackCampaign(campaignId: string): Promise<WinBackCampaignDetail> {
+  return invoke<WinBackCampaignDetail>("get_win_back_campaign", { campaignId });
+}
+
+export async function sendWinBackEmail(campaignId: string, emailId: string, provider = "gmail"): Promise<void> {
+  await invoke("send_win_back_email", { campaignId, emailId, provider });
+}
+
+export async function sendAllWinBackEmails(campaignId: string, provider = "gmail"): Promise<{ sent: number; failed: number }> {
+  return invoke("send_all_win_back_emails", { campaignId, provider });
+}
+
+export async function exportWinBackMailchimp(campaignId: string, provider = "gmail"): Promise<string> {
+  return invoke<string>("export_win_back_mailchimp", { campaignId, provider });
+}

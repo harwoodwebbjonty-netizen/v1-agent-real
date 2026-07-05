@@ -5,7 +5,7 @@ mod csv_log;
 
 use app_state::StoredSession;
 use auth_client::UserInfo;
-use backend_client::{EnrichStatus, LeadRecord};
+use backend_client::{EnrichStatus, LeadRecord, WinBackCampaign, WinBackEmail};
 use serde::Serialize;
 use tauri_plugin_opener::OpenerExt;
 
@@ -950,6 +950,57 @@ async fn migrate_local_leads_to_team(app_handle: tauri::AppHandle) -> Result<usi
     backend_client::migrate_leads(&base_url, &session.token, payload).await
 }
 
+// --- Win-back campaigns ---
+
+#[derive(Serialize)]
+struct WinBackCampaignDetail {
+    campaign: WinBackCampaign,
+    emails: Vec<WinBackEmail>,
+}
+
+#[tauri::command]
+async fn create_win_back_campaign(app_handle: tauri::AppHandle, name: String, lead_ids: Vec<String>) -> Result<WinBackCampaign, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_win_back_campaign(&base_url, &session.token, &name, lead_ids).await
+}
+
+#[tauri::command]
+async fn get_win_back_campaigns(app_handle: tauri::AppHandle) -> Result<Vec<WinBackCampaign>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_win_back_campaigns(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn get_win_back_campaign(app_handle: tauri::AppHandle, campaign_id: String) -> Result<WinBackCampaignDetail, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    let (campaign, emails) = backend_client::get_win_back_campaign(&base_url, &session.token, &campaign_id).await?;
+    Ok(WinBackCampaignDetail { campaign, emails })
+}
+
+#[tauri::command]
+async fn send_win_back_email(app_handle: tauri::AppHandle, campaign_id: String, email_id: String, provider: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::send_win_back_email(&base_url, &session.token, &campaign_id, &email_id, &provider).await
+}
+
+#[tauri::command]
+async fn send_all_win_back_emails(app_handle: tauri::AppHandle, campaign_id: String, provider: String) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::send_all_win_back_emails(&base_url, &session.token, &campaign_id, &provider).await
+}
+
+#[tauri::command]
+async fn export_win_back_mailchimp(app_handle: tauri::AppHandle, campaign_id: String, provider: String) -> Result<String, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::export_win_back_mailchimp(&base_url, &session.token, &campaign_id, &provider).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -1056,7 +1107,13 @@ pub fn run() {
       get_batch_activity_summaries,
       get_activity_status,
       export_log_csv,
-      migrate_local_leads_to_team
+      migrate_local_leads_to_team,
+      create_win_back_campaign,
+      get_win_back_campaigns,
+      get_win_back_campaign,
+      send_win_back_email,
+      send_all_win_back_emails,
+      export_win_back_mailchimp
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

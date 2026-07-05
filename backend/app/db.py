@@ -369,6 +369,37 @@ def _migration_010_follow_up(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leads ADD COLUMN follow_up_at TEXT")
 
 
+def _migration_011_win_back(conn: sqlite3.Connection) -> None:
+    """Win-back campaign manager: bulk AI-generated re-engagement emails for
+    dormant or lost leads, with optional Mailchimp export."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS win_back_campaigns (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            created_by TEXT NOT NULL,
+            status TEXT NOT NULL DEFAULT 'generating',
+            total INTEGER NOT NULL DEFAULT 0,
+            generated INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS win_back_emails (
+            id TEXT PRIMARY KEY,
+            campaign_id TEXT NOT NULL REFERENCES win_back_campaigns(id),
+            lead_id TEXT NOT NULL,
+            subject TEXT,
+            body TEXT,
+            send_status TEXT NOT NULL DEFAULT 'draft',
+            sent_at TEXT,
+            send_method TEXT,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_win_back_emails_campaign ON win_back_emails(campaign_id);
+        """
+    )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -382,8 +413,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (8, _migration_008_activity_feed),
     (9, _migration_009_called_at),
     (10, _migration_010_follow_up),
+    (11, _migration_011_win_back),
 ]
-CURRENT_SCHEMA_VERSION = 10
+CURRENT_SCHEMA_VERSION = 11
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1585,4 +1617,70 @@ def update_lead_dg_refresh(lead_id: str, tier: str, next_refresh_at: str, last_r
         conn.execute(
             "UPDATE leads SET refresh_tier = ?, next_dg_refresh_at = ?, last_dg_refreshed_at = ? WHERE id = ?",
             (tier, next_refresh_at, last_refreshed_at, lead_id),
+        )
+
+
+# --- win-back campaigns ---
+
+def create_win_back_campaign(id: str, name: str, created_by: str, total: int, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at) "
+            "VALUES (?, ?, ?, 'generating', ?, 0, ?)",
+            (id, name, created_by, total, created_at),
+        )
+
+
+def get_win_back_campaigns(user_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM win_back_campaigns WHERE created_by = ? ORDER BY created_at DESC",
+            (user_id,),
+        ).fetchall()
+
+
+def get_win_back_campaign(campaign_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM win_back_campaigns WHERE id = ?", (campaign_id,)
+        ).fetchone()
+
+
+def get_win_back_emails(campaign_id: str) -> list[sqlite3.Row]:
+    """Returns win_back_emails joined with lead contact info."""
+    with get_connection() as conn:
+        return conn.execute(
+            """SELECT we.*, l.company, l.contact_name, l.contact_title,
+                      (SELECT e.email FROM lead_emails e WHERE e.lead_id = l.id ORDER BY e.created_at LIMIT 1) AS contact_email
+               FROM win_back_emails we
+               JOIN leads l ON l.id = we.lead_id
+               WHERE we.campaign_id = ?
+               ORDER BY we.created_at""",
+            (campaign_id,),
+        ).fetchall()
+
+
+def upsert_win_back_email(campaign_id: str, lead_id: str, email_id: str, subject: str, body: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO win_back_emails (id, campaign_id, lead_id, subject, body, send_status, created_at)
+               VALUES (?, ?, ?, ?, ?, 'draft', ?)
+               ON CONFLICT(id) DO UPDATE SET subject = excluded.subject, body = excluded.body""",
+            (email_id, campaign_id, lead_id, subject, body, created_at),
+        )
+
+
+def update_win_back_campaign_progress(campaign_id: str, generated: int, status: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE win_back_campaigns SET generated = ?, status = ? WHERE id = ?",
+            (generated, status, campaign_id),
+        )
+
+
+def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE win_back_emails SET send_status = 'sent', send_method = ?, sent_at = ? WHERE id = ?",
+            (method, sent_at, email_id),
         )

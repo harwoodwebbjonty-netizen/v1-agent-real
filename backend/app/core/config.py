@@ -35,6 +35,11 @@ class Settings(BaseSettings):
     # — all activity dots stay grey and no background refreshes run.
     datagardener_api_key: str = ""
 
+    # Mailchimp — optional, for win-back campaign export. Leave empty to
+    # disable; the export button returns a clear "not configured" error.
+    mailchimp_api_key: str = ""
+    mailchimp_audience_id: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

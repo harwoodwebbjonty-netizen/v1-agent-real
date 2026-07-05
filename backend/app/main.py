@@ -24,6 +24,7 @@ from app.routers import (
     leads,
     sequences,
     users,
+    win_back,
 )
 from app.schemas import LookupRequest, LookupResult
 from app.schemas_chat import LeadChatRequest, LeadChatResponse
@@ -55,6 +56,7 @@ app.include_router(email_oauth.router)
 app.include_router(sequences.router)
 app.include_router(ai_prospecting.router)
 app.include_router(activity.router)
+app.include_router(win_back.router)
 
 
 async def _sequence_scheduler_loop() -> None:

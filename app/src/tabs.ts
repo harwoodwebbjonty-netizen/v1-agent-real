@@ -11,6 +11,7 @@ export type ViewName =
   | "sequences"
   | "calendar"
   | "outreach"
+  | "win-back"
   | "analytics"
   | "settings";
 

@@ -1907,3 +1907,132 @@ pub async fn get_activity_status(base_url: &str, token: &str) -> Result<serde_js
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
 }
+
+// --- Win-back campaigns ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WinBackCampaign {
+    pub id: String,
+    pub name: String,
+    pub status: String,
+    pub total: usize,
+    pub generated: usize,
+    pub created_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WinBackEmail {
+    pub id: String,
+    pub campaign_id: String,
+    pub lead_id: String,
+    pub subject: String,
+    pub body: String,
+    pub send_status: String,
+    pub sent_at: Option<String>,
+    pub send_method: Option<String>,
+    pub company: String,
+    pub contact_name: String,
+    pub contact_email: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct WinBackCampaignsWrapper {
+    campaigns: Vec<WinBackCampaign>,
+}
+
+#[derive(Deserialize)]
+struct WinBackCampaignDetailWrapper {
+    campaign: WinBackCampaign,
+    emails: Vec<WinBackEmail>,
+}
+
+#[derive(Serialize)]
+struct CreateWinBackCampaignRequest {
+    name: String,
+    lead_ids: Vec<String>,
+}
+
+#[derive(Serialize)]
+struct WinBackSendRequest {
+    provider: String,
+}
+
+pub async fn create_win_back_campaign(base_url: &str, token: &str, name: &str, lead_ids: Vec<String>) -> Result<WinBackCampaign, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateWinBackCampaignRequest { name: name.to_string(), lead_ids })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn get_win_back_campaigns(base_url: &str, token: &str) -> Result<Vec<WinBackCampaign>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: WinBackCampaignsWrapper = handle_response(response).await?;
+    Ok(wrapper.campaigns)
+}
+
+pub async fn get_win_back_campaign(base_url: &str, token: &str, campaign_id: &str) -> Result<(WinBackCampaign, Vec<WinBackEmail>), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns/{}", base_url, campaign_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: WinBackCampaignDetailWrapper = handle_response(response).await?;
+    Ok((wrapper.campaign, wrapper.emails))
+}
+
+pub async fn send_win_back_email(base_url: &str, token: &str, campaign_id: &str, email_id: &str, provider: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns/{}/send/{}", base_url, campaign_id, email_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&WinBackSendRequest { provider: provider.to_string() })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response::<serde_json::Value>(response).await.map(|_| ())
+}
+
+pub async fn send_all_win_back_emails(base_url: &str, token: &str, campaign_id: &str, provider: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns/{}/send-all", base_url, campaign_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&WinBackSendRequest { provider: provider.to_string() })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn export_win_back_mailchimp(base_url: &str, token: &str, campaign_id: &str, provider: &str) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns/{}/export-mailchimp", base_url, campaign_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&WinBackSendRequest { provider: provider.to_string() })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let val: serde_json::Value = handle_response(response).await?;
+    Ok(val["mailchimp_url"].as_str().unwrap_or("").to_string())
+}
