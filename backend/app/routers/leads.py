@@ -6,6 +6,7 @@ from typing import Optional
 logger = logging.getLogger("app.leads")
 
 from fastapi import APIRouter, Depends, HTTPException, Request
+from pydantic import BaseModel
 
 from app import db
 from app.core.config import get_settings
