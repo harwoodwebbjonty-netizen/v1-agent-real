@@ -253,15 +253,25 @@ Never mention more than one credibility point.
 
 Sentence 4
 
-Simple low-pressure call to action.
+A confident, time-specific call to action.
+
+It should be direct and low-friction — a specific ask, not a vague suggestion.
 
 Examples
 
-Would it be worth a quick chat?
+If you have 10 minutes this week, I can run through what might work for you.
 
-Would you be open to a short call?
+If now is a good time to look at options, I can put something together this week.
 
-Would it be useful to see what options might be available?
+If it is relevant, I can have options ready for a call this week.
+
+Happy to run through what is available if you have 15 minutes before the end of the month.
+
+Never write a wishy-washy CTA like "would it be worth a quick chat?" or "would you be open to a call?"
+
+Never end with a question that sounds uncertain or apologetic.
+
+Be direct. Be specific. Assume they are worth contacting.
 
 --------------------------------------------------
 
