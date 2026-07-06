@@ -449,10 +449,9 @@ export function initSettings(): void {
       _currentLimits = usage.limits;
       creditLimitsRows.innerHTML = Object.entries(CREDIT_FEATURE_LABELS)
         .map(([key, { label, cost }]) => {
-          const feat = key as keyof CreditLimits;
-          const spend = (usage.spend[key] ?? 0).toFixed(2);
-          const limit = usage.limits[feat] ?? 0;
           const limitKey = `limit_${key}` as keyof CreditLimits;
+          const spend = (usage.spend[key] ?? 0).toFixed(2);
+          const limit = usage.limits[limitKey] ?? 0;
           const pct = limit > 0 ? Math.min(100, ((usage.spend[key] ?? 0) / limit) * 100) : 0;
           const overBudget = limit > 0 && (usage.spend[key] ?? 0) >= limit;
           return `<tr style="border-top:1px solid var(--border)">
