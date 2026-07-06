@@ -549,7 +549,8 @@ export function initColdCallLists(): void {
       setTimeout(() => { listDetailStatus.textContent = ""; }, 3000);
       return;
     }
-    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number? This uses phone lookup credits.`)) return;
+    const estimatedCost = (missing.length * 0.03).toFixed(2);
+    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number?\n\nEstimated cost: ~£${estimatedCost}\n\nThis uses phone lookup credits.`)) return;
     findPhonesBtn.disabled = true;
     for (let i = 0; i < missing.length; i++) {
       const lead = missing[i];

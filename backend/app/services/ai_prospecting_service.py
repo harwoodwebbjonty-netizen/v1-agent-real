@@ -203,6 +203,7 @@ async def run_prospecting(
     cumulative_cost_gbp = 0.0
     credit_limit = criteria.credit_limit_gbp  # 0 = no limit
     credit_limit_hit = False
+    credit_limit_note: str | None = None
     run_meta: dict = {}  # filled in by _iter_companies (ch_total)
 
     try:
@@ -314,13 +315,25 @@ async def run_prospecting(
             db.update_prospecting_run(run_id, {"created": created})
 
             if criteria.run_ai_enrichment and ch_score >= max(criteria.min_ch_score, 20):
-                # Check credit limit before incurring AI cost
+                # Check per-run limit before incurring AI cost
                 if credit_limit > 0 and cumulative_cost_gbp + AI_COST_PER_LEAD_GBP > credit_limit:
                     logger.info(
-                        "Credit limit £%.2f reached (spent £%.2f) — stopping AI enrichment",
+                        "Per-run credit limit £%.2f reached (spent £%.2f) — stopping AI enrichment",
                         credit_limit, cumulative_cost_gbp,
                     )
                     credit_limit_hit = True
+                    credit_limit_note = f"Per-run credit limit £{credit_limit:.2f} reached"
+                    break
+
+                # Check global monthly limit from Settings
+                global_ok, global_spent, global_limit = db.check_credit_limit(owner_user_id, "ai_prospecting")
+                if not global_ok:
+                    logger.info(
+                        "Monthly AI Prospecting limit £%.2f reached (spent £%.2f) — stopping",
+                        global_limit, global_spent,
+                    )
+                    credit_limit_hit = True
+                    credit_limit_note = f"Monthly AI Prospecting limit £{global_limit:.2f} reached (spent £{global_spent:.2f})"
                     break
 
                 try:
@@ -357,7 +370,7 @@ async def run_prospecting(
         if skipped_score: skip_parts.append(f"{skipped_score} below CH score")
         skip_note = ("; ".join(skip_parts)) if skip_parts else None
         if credit_limit_hit:
-            credit_note = f"Credit limit £{credit_limit:.2f} reached"
+            credit_note = credit_limit_note or f"Credit limit £{credit_limit:.2f} reached"
             completion_note = f"{credit_note}. {skip_note}" if skip_note else credit_note
         else:
             completion_note = skip_note

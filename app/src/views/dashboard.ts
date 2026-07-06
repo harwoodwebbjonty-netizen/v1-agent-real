@@ -394,7 +394,8 @@ export function initDashboard(): void {
       setTimeout(() => { statusMessage.textContent = ""; }, 3000);
       return;
     }
-    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number? This uses phone lookup credits.`)) return;
+    const estimatedCost = (missing.length * 0.03).toFixed(2);
+    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number?\n\nEstimated cost: ~£${estimatedCost}\n\nThis uses phone lookup credits.`)) return;
     findPhonesDashboardBtn.disabled = true;
     for (let i = 0; i < missing.length; i++) {
       statusMessage.textContent = `Looking up ${missing[i].company} (${i + 1}/${missing.length})...`;
