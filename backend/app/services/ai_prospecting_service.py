@@ -4,6 +4,7 @@ Phase 4 (AI narrative) and 5 (AI score) reuse the existing
 generate_sales_intelligence call — only triggered for leads that cleared the
 free pre-filter score, keeping per-lead AI cost minimal."""
 
+import asyncio
 import json
 import logging
 from datetime import date, datetime, timedelta
@@ -14,6 +15,7 @@ from app.core.config import get_settings
 from app.schemas_ai_prospecting import ProspectingCriteria
 from app.services.auth_service import new_id, now_iso
 from app.services.companies_house_service import (
+    CHRateLimitError,
     build_ch_data_json,
     compute_ch_score,
     extract_county,
@@ -84,37 +86,69 @@ def _passes_charge_filters(charges: list, criteria: ProspectingCriteria) -> bool
     return True
 
 
+_CH_PAGE_SIZE = 100  # CH API max per request
+_CH_MAX_RESULTS = 10_000  # Hard cap — CH advanced search caps around 1,000/query
+
+
 async def _search_all_locations(
     api_key: str, criteria: ProspectingCriteria
 ) -> list[dict]:
-    """Run one CH search per location and deduplicate by company_number."""
+    """Paginate CH advanced search across all selected locations, deduplicating by
+    company_number. Skips a page gracefully on rate limit or error (leaves gap)."""
     effective_locations = criteria.locations or ([criteria.location] if criteria.location else [""])
-    per_loc = max(10, min(100, criteria.max_results // max(1, len(effective_locations))))
+    target = min(criteria.max_results, _CH_MAX_RESULTS)
 
     seen: set[str] = set()
     combined: list[dict] = []
+
     for loc in effective_locations:
-        try:
-            items = await search_companies(
-                api_key,
-                location=loc,
-                sic_codes=criteria.sic_codes or None,
-                company_type=criteria.company_type,
-                incorporated_from=criteria.incorporated_from,
-                incorporated_to=criteria.incorporated_to,
-                size=min(per_loc, 100),
-            )
-        except Exception as exc:
-            logger.warning("CH search failed for location %r: %s", loc, exc)
-            items = []
+        if len(combined) >= target:
+            break
+        start_index = 0
+        consecutive_errors = 0
+        while len(combined) < target:
+            batch = min(_CH_PAGE_SIZE, target - len(combined))
+            try:
+                items = await search_companies(
+                    api_key,
+                    location=loc,
+                    sic_codes=criteria.sic_codes or None,
+                    company_type=criteria.company_type,
+                    incorporated_from=criteria.incorporated_from,
+                    incorporated_to=criteria.incorporated_to,
+                    size=batch,
+                    start_index=start_index,
+                )
+                consecutive_errors = 0
+            except CHRateLimitError:
+                logger.warning("CH rate limit on search for %r at index %d — sleeping 3s and skipping page", loc, start_index)
+                await asyncio.sleep(3)
+                start_index += batch  # skip this page, leave gap
+                consecutive_errors += 1
+                if consecutive_errors >= 3:
+                    break  # stop trying this location
+                continue
+            except Exception as exc:
+                logger.warning("CH search failed for location %r at index %d: %s", loc, start_index, exc)
+                break  # skip remaining pages for this location
 
-        for item in items:
-            num = item.get("company_number", "")
-            if num not in seen:
-                seen.add(num)
-                combined.append(item)
+            if not items:
+                break  # no more results for this location/query
 
-    return combined[: criteria.max_results]
+            for item in items:
+                num = item.get("company_number", "")
+                if num not in seen:
+                    seen.add(num)
+                    combined.append(item)
+
+            if len(items) < batch:
+                break  # last page returned fewer than requested — we're done
+
+            start_index += len(items)
+            # Brief pause between pages to stay within CH rate limits
+            await asyncio.sleep(0.3)
+
+    return combined[:target]
 
 
 async def run_prospecting(
@@ -151,6 +185,12 @@ async def run_prospecting(
                 profile = await get_company_profile(api_key, company_number) or {}
                 charges, charges_total = await get_company_charges(api_key, company_number)
                 officers = await get_company_officers(api_key, company_number)
+            except CHRateLimitError:
+                logger.warning("CH rate limit hit for %s — sleeping 5s and skipping (leaving gap)", company_number)
+                await asyncio.sleep(5)
+                skipped += 1
+                db.update_prospecting_run(run_id, {"skipped": skipped})
+                continue
             except Exception as exc:
                 logger.warning("CH fetch failed for %s: %s", company_number, exc)
                 profile, charges, charges_total, officers = {}, [], 0, []

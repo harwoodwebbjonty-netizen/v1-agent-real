@@ -15,6 +15,10 @@ logger = logging.getLogger("app.companies_house")
 CH_BASE_URL = "https://api.company-information.service.gov.uk"
 
 
+class CHRateLimitError(Exception):
+    """Raised when the Companies House API returns HTTP 429."""
+
+
 def _client(api_key: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(auth=(api_key, ""), base_url=CH_BASE_URL, timeout=15.0)
 
@@ -28,10 +32,13 @@ async def search_companies(
     incorporated_from: str = "",
     incorporated_to: str = "",
     size: int = 20,
+    start_index: int = 0,
 ) -> list[dict]:
     """Advanced Company Search — returns companies matching the given criteria.
     Results are NOT already-in-CRM-checked; dedup is the caller's responsibility."""
     params: dict = {"company_status": "active", "company_type": company_type, "size": size}
+    if start_index > 0:
+        params["start_index"] = start_index
     if location:
         params["location"] = location
     if sic_codes:
@@ -43,6 +50,8 @@ async def search_companies(
 
     async with _client(api_key) as client:
         r = await client.get("/advanced-search/companies", params=params)
+        if r.status_code == 429:
+            raise CHRateLimitError("CH search rate limited")
         if r.status_code != 200:
             logger.warning("CH search returned %d: %s", r.status_code, r.text[:200])
             return []
@@ -90,6 +99,8 @@ async def search_company_by_name(api_key: str, name: str) -> Optional[dict]:
 async def get_company_profile(api_key: str, company_number: str) -> Optional[dict]:
     async with _client(api_key) as client:
         r = await client.get(f"/company/{company_number}")
+        if r.status_code == 429:
+            raise CHRateLimitError("CH profile rate limited")
         if r.status_code != 200:
             return None
         return r.json()
@@ -99,6 +110,8 @@ async def get_company_charges(api_key: str, company_number: str) -> tuple[list[d
     """Returns (items, total_count). Fetches up to 25 charges."""
     async with _client(api_key) as client:
         r = await client.get(f"/company/{company_number}/charges", params={"items_per_page": 25})
+        if r.status_code == 429:
+            raise CHRateLimitError("CH charges rate limited")
         if r.status_code != 200:
             return [], 0
         data = r.json()
@@ -111,6 +124,8 @@ async def get_company_officers(api_key: str, company_number: str) -> list[dict]:
             f"/company/{company_number}/officers",
             params={"items_per_page": 10, "order_by": "appointed_on"},
         )
+        if r.status_code == 429:
+            raise CHRateLimitError("CH officers rate limited")
         if r.status_code != 200:
             return []
         return [o for o in r.json().get("items", []) if not o.get("resigned_on")]

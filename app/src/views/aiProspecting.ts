@@ -463,11 +463,11 @@ function buildMultiSelectHtml(
   </div>`;
 }
 
-function buildRangeSliderHtml(id: string, min: number, max: number, value: number, label: string, hint: string): string {
+function buildRangeSliderHtml(id: string, min: number, max: number, value: number, label: string, hint: string, step = 1): string {
   return `<div class="prospecting-field">
     <label class="stat-label">${escapeHtml(label)}${hint ? `<span class="p-tip"><span class="p-tip-icon">?</span><span class="p-tip-content">${escapeHtml(hint)}</span></span>` : ""}</label>
     <div class="p-slider-wrap">
-      <input type="range" class="p-slider" id="slider-${escapeHtml(id)}" min="${min}" max="${max}" value="${value}" />
+      <input type="range" class="p-slider" id="slider-${escapeHtml(id)}" min="${min}" max="${max}" value="${value}" step="${step}" />
       <input type="number" class="search-input p-slider-num" id="num-${escapeHtml(id)}" min="${min}" max="${max}" value="${value}" />
     </div>
   </div>`;
@@ -593,7 +593,7 @@ export function initAiProspecting(): void {
 
                 <!-- Sliders row -->
                 <div class="prospecting-fields-row">
-                  ${buildRangeSliderHtml("max-results", 1, 100, state.maxResults, "Max results", "Maximum number of companies to return per search. Capped at 100 per Companies House API limit.")}
+                  ${buildRangeSliderHtml("max-results", 1, 10000, state.maxResults, "Max results", "Total leads to discover. Uses pagination across multiple CH search pages (100 per page). Each location searched adds up to ~1,000 results — add more locations to scale up. Runs in the background; close the app and come back.", 50)}
                   ${buildRangeSliderHtml("min-score", 0, 100, state.minChScore, "Min CH score (0 = all)", "Free pre-filter score from Companies House data — new charges, sector fit, company age. No AI cost. Set to 30+ to focus on companies with recent borrowing activity.")}
                 </div>
 
@@ -1018,13 +1018,45 @@ export function initAiProspecting(): void {
     });
   }
 
+  function _formatRunEta(run: ProspectingRun): string {
+    const processed = run.created + run.skipped;
+    if (processed < 5 || run.found === 0) return "";
+    const startedAt = new Date(run.started_at).getTime();
+    const elapsedSecs = (Date.now() - startedAt) / 1000;
+    const rate = processed / elapsedSecs;
+    const remaining = run.found - processed;
+    if (rate <= 0 || remaining <= 0) return "";
+    const etaSecs = remaining / rate;
+    if (etaSecs < 90) return "< 2 min remaining";
+    const mins = Math.round(etaSecs / 60);
+    return `~${mins} min remaining`;
+  }
+
+  function _formatRunCost(run: ProspectingRun): string {
+    try {
+      const c = JSON.parse(run.criteria) as Partial<ProspectingCriteria>;
+      if (!c.run_ai_enrichment) return "";
+      const cost = (run.created * 0.15).toFixed(2);
+      return `est. £${cost} credits`;
+    } catch {
+      return "";
+    }
+  }
+
   function pollRun(runId: string, container: HTMLDivElement): void {
     if (pollTimer) clearTimeout(pollTimer);
     async function check() {
       try {
         const run = await getProspectingRun(runId);
         const msg = container.querySelector<HTMLSpanElement>("#run-status-msg");
-        if (msg) msg.textContent = `Running — found ${run.found} · added ${run.created} · skipped ${run.skipped}`;
+        if (msg) {
+          const parts = [`Running — found ${run.found} · added ${run.created} · skipped ${run.skipped}`];
+          const eta = _formatRunEta(run);
+          const cost = _formatRunCost(run);
+          if (eta) parts.push(eta);
+          if (cost) parts.push(cost);
+          msg.textContent = parts.join(" · ");
+        }
         if (run.status === "running") {
           pollTimer = setTimeout(check, 3000);
         } else {
