@@ -6,6 +6,8 @@ import {
   listProspectingRuns,
   startProspectingRun,
 } from "../api";
+import { refreshLeads } from "../state";
+import { refreshLeadLists } from "../leadLists";
 import { escapeHtml } from "../utils";
 
 // ---------------------------------------------------------------------------
@@ -1166,6 +1168,9 @@ export function initAiProspecting(): void {
         } else {
           const btn = container.querySelector<HTMLButtonElement>("#run-prospecting-btn");
           if (btn) btn.disabled = false;
+          // Refresh leads + lists so new leads appear in Results and Cold Call Lists
+          void refreshLeads();
+          void refreshLeadLists();
           await render();
         }
       } catch {
