@@ -595,7 +595,7 @@ export function initAiProspecting(): void {
 
                 <!-- Sliders row -->
                 <div class="prospecting-fields-row">
-                  ${buildRangeSliderHtml("max-results", 1, 10000, state.maxResults, "Max results", "Total leads to discover. Uses pagination across multiple CH search pages (100 per page). Each location searched adds up to ~1,000 results — add more locations to scale up. Runs in the background; close the app and come back.", 50)}
+                  ${buildRangeSliderHtml("max-results", 1, 10000, state.maxResults, "Leads to add", "Target number of leads that pass your filters to add to the CRM. The system scans as many CH companies as needed (up to 10,000) until it finds this many matching your criteria.", 50)}
                   ${buildRangeSliderHtml("min-score", 0, 100, state.minChScore, "Min CH score (0 = all)", "Free pre-filter score from Companies House data — new charges, sector fit, company age. No AI cost. Set to 30+ to focus on companies with recent borrowing activity.")}
                 </div>
 
@@ -611,7 +611,7 @@ export function initAiProspecting(): void {
                     <span class="stat-label">
                       Est. total cost:
                       <strong style="color:var(--accent)">£${(state.maxResults * 0.15).toFixed(2)}</strong>
-                      <span class="empty-hint">(if all ${state.maxResults} leads pass filters)</span>
+                      <span class="empty-hint">(if all ${state.maxResults} leads are enriched)</span>
                     </span>
                     <label class="stat-label" style="display:flex;align-items:center;gap:var(--space-2);white-space:nowrap">
                       Credit limit (£)

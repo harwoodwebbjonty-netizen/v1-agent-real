@@ -87,27 +87,23 @@ def _passes_charge_filters(charges: list, criteria: ProspectingCriteria) -> bool
 
 
 _CH_PAGE_SIZE = 100  # CH API max per request
-_CH_MAX_RESULTS = 10_000  # Hard cap — CH advanced search caps around 1,000/query
+_CH_MAX_SCAN = 10_000  # Maximum CH companies to examine in a single run
 
 
-async def _search_all_locations(
-    api_key: str, criteria: ProspectingCriteria
-) -> list[dict]:
-    """Paginate CH advanced search across all selected locations, deduplicating by
-    company_number. Skips a page gracefully on rate limit or error (leaves gap)."""
+async def _iter_companies(api_key: str, criteria: ProspectingCriteria):
+    """Async generator: yields CH companies across all locations, deduplicating by
+    company_number. Skips pages gracefully on rate limit (leaves gap). Stops after
+    _CH_MAX_SCAN companies to prevent runaway runs."""
     effective_locations = criteria.locations or ([criteria.location] if criteria.location else [""])
-    target = min(criteria.max_results, _CH_MAX_RESULTS)
-
     seen: set[str] = set()
-    combined: list[dict] = []
+    total_yielded = 0
 
     for loc in effective_locations:
-        if len(combined) >= target:
+        if total_yielded >= _CH_MAX_SCAN:
             break
         start_index = 0
         consecutive_errors = 0
-        while len(combined) < target:
-            batch = min(_CH_PAGE_SIZE, target - len(combined))
+        while total_yielded < _CH_MAX_SCAN:
             try:
                 items = await search_companies(
                     api_key,
@@ -116,39 +112,37 @@ async def _search_all_locations(
                     company_type=criteria.company_type,
                     incorporated_from=criteria.incorporated_from,
                     incorporated_to=criteria.incorporated_to,
-                    size=batch,
+                    size=_CH_PAGE_SIZE,
                     start_index=start_index,
                 )
                 consecutive_errors = 0
             except CHRateLimitError:
                 logger.warning("CH rate limit on search for %r at index %d — sleeping 3s and skipping page", loc, start_index)
                 await asyncio.sleep(3)
-                start_index += batch  # skip this page, leave gap
+                start_index += _CH_PAGE_SIZE
                 consecutive_errors += 1
                 if consecutive_errors >= 3:
-                    break  # stop trying this location
+                    break
                 continue
             except Exception as exc:
                 logger.warning("CH search failed for location %r at index %d: %s", loc, start_index, exc)
-                break  # skip remaining pages for this location
+                break
 
             if not items:
-                break  # no more results for this location/query
+                break
 
             for item in items:
                 num = item.get("company_number", "")
                 if num not in seen:
                     seen.add(num)
-                    combined.append(item)
+                    total_yielded += 1
+                    yield item
 
-            if len(items) < batch:
-                break  # last page returned fewer than requested — we're done
+            if len(items) < _CH_PAGE_SIZE:
+                break  # last page — no more results for this location
 
             start_index += len(items)
-            # Brief pause between pages to stay within CH rate limits
             await asyncio.sleep(0.3)
-
-    return combined[:target]
 
 
 async def run_prospecting(
@@ -166,6 +160,7 @@ async def run_prospecting(
         return
 
     AI_COST_PER_LEAD_GBP = 0.15
+    target = min(criteria.max_results, _CH_MAX_SCAN)
     found = created = skipped = 0
     skipped_crm = skipped_charge = skipped_score = 0
     cumulative_cost_gbp = 0.0
@@ -173,13 +168,12 @@ async def run_prospecting(
     credit_limit_hit = False
 
     try:
-        companies = await _search_all_locations(api_key, criteria)
-        found = len(companies)
-        db.update_prospecting_run(run_id, {"found": found})
-
-        for item in companies:
-            if credit_limit_hit:
+        async for item in _iter_companies(api_key, criteria):
+            if created >= target or credit_limit_hit:
                 break
+
+            found += 1
+            db.update_prospecting_run(run_id, {"found": found})
 
             company_number = item.get("company_number", "")
             company_name = item.get("company_name") or item.get("title", "Unknown")
