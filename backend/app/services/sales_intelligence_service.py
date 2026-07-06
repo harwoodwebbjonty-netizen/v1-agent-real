@@ -133,7 +133,7 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text()
 
 
-async def _research(company: str, website: str) -> str:
+async def _research(company: str, website: str, max_uses: int = 5) -> str:
     """Phase 1: agentic research with web_search/web_fetch. Raises
     IntelligenceExtractionError on a terminal failure (refusal / continuation
     limit exhausted / no text produced) — there's no sensible "not found"
@@ -148,13 +148,17 @@ async def _research(company: str, website: str) -> str:
         "content": f"Research this company for sales call preparation: {company}.{website_line}",
     }
     messages = [original_message]
+    research_tools = [
+        {"type": "web_search_20260209", "name": "web_search", "max_uses": max_uses},
+        {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": max_uses},
+    ]
 
     response = await client.messages.create(
         model=settings.model,
         max_tokens=RESEARCH_MAX_TOKENS,
         system=system_prompt,
         messages=messages,
-        tools=RESEARCH_TOOLS,
+        tools=research_tools,
     )
 
     continuations = 0
@@ -165,7 +169,7 @@ async def _research(company: str, website: str) -> str:
             max_tokens=RESEARCH_MAX_TOKENS,
             system=system_prompt,
             messages=messages,
-            tools=RESEARCH_TOOLS,
+            tools=research_tools,
         )
         continuations += 1
 
@@ -210,9 +214,9 @@ async def _extract(research_text: str) -> SalesIntelligenceResult:
     return SalesIntelligenceResult(**data)
 
 
-async def generate_sales_intelligence(company: str, website: str) -> SalesIntelligenceResult:
+async def generate_sales_intelligence(company: str, website: str, max_uses: int = 5) -> SalesIntelligenceResult:
     try:
-        research_text = await _research(company, website)
+        research_text = await _research(company, website, max_uses=max_uses)
     except anthropic.APIError as exc:
         raise IntelligenceExtractionError(f"Anthropic API error during research: {exc}") from exc
 

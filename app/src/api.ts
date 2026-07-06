@@ -863,8 +863,8 @@ export interface WinBackCampaignDetail {
   emails: WinBackEmail[];
 }
 
-export async function createWinBackCampaign(name: string, leadIds: string[]): Promise<WinBackCampaign> {
-  return invoke<WinBackCampaign>("create_win_back_campaign", { name, leadIds });
+export async function createWinBackCampaign(name: string, leadIds: string[], depth = "standard"): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign", { name, leadIds, depth });
 }
 
 export async function getWinBackCampaigns(): Promise<WinBackCampaign[]> {
@@ -902,6 +902,6 @@ export async function parseWinBackCsv(path: string): Promise<WinBackCsvRow[]> {
   return invoke<WinBackCsvRow[]>("parse_win_back_csv", { path });
 }
 
-export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[]): Promise<WinBackCampaign> {
-  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows });
+export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard"): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, depth });
 }

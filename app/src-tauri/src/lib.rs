@@ -959,10 +959,10 @@ struct WinBackCampaignDetail {
 }
 
 #[tauri::command]
-async fn create_win_back_campaign(app_handle: tauri::AppHandle, name: String, lead_ids: Vec<String>) -> Result<WinBackCampaign, String> {
+async fn create_win_back_campaign(app_handle: tauri::AppHandle, name: String, lead_ids: Vec<String>, depth: String) -> Result<WinBackCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_win_back_campaign(&base_url, &session.token, &name, lead_ids).await
+    backend_client::create_win_back_campaign(&base_url, &session.token, &name, lead_ids, &depth).await
 }
 
 #[tauri::command]
@@ -1011,10 +1011,11 @@ async fn create_win_back_campaign_from_csv(
     app_handle: tauri::AppHandle,
     name: String,
     rows: Vec<backend_client::WinBackCsvRow>,
+    depth: String,
 ) -> Result<WinBackCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows).await
+    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, &depth).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

@@ -159,6 +159,11 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
         <div class="wb-picker-bar">
           <input id="wb-name-input" class="search-input" type="text"
             placeholder="Campaign name (e.g. Q3 Win-back)" style="width:280px" />
+          <select id="wb-depth-select" class="search-input" style="width:220px" title="Research depth controls how many web searches are run per lead">
+            <option value="quick">Quick scan (3 searches) ~$0.04/lead</option>
+            <option value="standard" selected>Standard (5 searches) ~$0.10/lead</option>
+            <option value="deep">Deep research (10 searches) ~$0.20/lead</option>
+          </select>
           <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length})</button>
         </div>
         <table class="data-table">
@@ -190,12 +195,14 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
 
   container.querySelector<HTMLButtonElement>("#wb-generate-btn")!.addEventListener("click", async () => {
     const nameInput = container.querySelector<HTMLInputElement>("#wb-name-input")!;
+    const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
     const name = nameInput.value.trim() || `Win-back ${new Date().toLocaleDateString()}`;
+    const depth = depthSelect.value;
     const btn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
     btn.disabled = true;
     btn.textContent = "Creating...";
     try {
-      const campaign = await createWinBackCampaignFromCsv(name, rows);
+      const campaign = await createWinBackCampaignFromCsv(name, rows, depth);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
       btn.disabled = false;

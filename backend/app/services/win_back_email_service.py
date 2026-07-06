@@ -80,7 +80,7 @@ async def generate_win_back_email(lead_context: dict) -> dict:
     user_message = _format_lead_sources(lead_context)
     client = _client()
     response = await client.messages.create(
-        model=get_settings().model,
+        model=get_settings().extraction_model,
         system=system_prompt,
         messages=[{"role": "user", "content": user_message}],
         max_tokens=MAX_TOKENS,

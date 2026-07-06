@@ -28,9 +28,14 @@ router = APIRouter(prefix="/win-back", tags=["win-back"])
 
 # --- Pydantic schemas ---
 
+DEPTH_TO_MAX_USES: dict[str, int] = {"quick": 3, "standard": 5, "deep": 10}
+CAMPAIGN_CONCURRENCY = 8
+
+
 class CreateCampaignRequest(BaseModel):
     name: str
     lead_ids: List[str]
+    depth: str = "standard"
 
 
 class CsvLeadRow(BaseModel):
@@ -47,6 +52,7 @@ class CsvLeadRow(BaseModel):
 class CreateCampaignFromCsvRequest(BaseModel):
     name: str
     rows: List[CsvLeadRow]
+    depth: str = "standard"
 
 
 class SendEmailRequest(BaseModel):
@@ -67,64 +73,80 @@ def _days_since(iso_ts: str) -> float:
         return 999.0
 
 
-async def _generate_campaign(campaign_id: str, lead_ids: list, user_id: str) -> None:
+async def _generate_campaign(campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard") -> None:
+    max_uses = DEPTH_TO_MAX_USES.get(depth, 5)
+    semaphore = asyncio.Semaphore(CAMPAIGN_CONCURRENCY)
+    completed = 0
+
     try:
         brand_voice_row = db.get_brand_voice(user_id)
         brand_voice = dict(brand_voice_row) if brand_voice_row else {}
         user_row = db.get_user_by_id(user_id)
         sender_name = user_row["name"] if user_row else ""
 
-        for i, lead_id in enumerate(lead_ids):
-            lead = db.get_lead(lead_id)
-            if lead is None:
-                logger.warning("Win-back: lead %s not found, skipping", lead_id)
-                db.update_win_back_campaign_progress(campaign_id, i + 1, "generating")
-                continue
-
-            intel = db.get_latest_lead_intelligence(lead_id)
-            if not intel or _days_since(intel["created_at"]) > 30:
+        async def _process_lead(lead_id: str) -> None:
+            nonlocal completed
+            async with semaphore:
                 try:
-                    result = await generate_sales_intelligence(lead["company"], lead["website"] or "")
-                    db.add_lead_intelligence_version(
-                        new_id(),
-                        lead_id,
-                        {
-                            "executive_summary": result.executive_summary,
-                            "sales_summary": result.sales_summary,
-                            "pain_points": json.dumps(result.pain_points.model_dump()),
-                            "buying_signals": json.dumps(result.buying_signals),
-                            "conversation_starters": json.dumps(result.conversation_starters),
-                            "discovery_questions": json.dumps(result.discovery_questions),
-                            "objection_handling": json.dumps([o.model_dump() for o in result.objection_handling]),
-                            "pitch_angle": result.pitch_angle,
-                            "call_brief": result.call_brief,
-                            "score_breakdown": json.dumps(result.score_breakdown.model_dump()),
-                            "lead_score": result.lead_score,
-                            "lead_temperature": result.lead_temperature,
-                            "confidence_note": result.confidence_note,
-                        },
-                        now_iso(),
-                    )
+                    lead = db.get_lead(lead_id)
+                    if lead is None:
+                        logger.warning("Win-back: lead %s not found, skipping", lead_id)
+                        return
+
                     intel = db.get_latest_lead_intelligence(lead_id)
+                    if not intel or _days_since(intel["created_at"]) > 30:
+                        try:
+                            result = await generate_sales_intelligence(
+                                lead["company"], lead["website"] or "", max_uses=max_uses
+                            )
+                            db.add_lead_intelligence_version(
+                                new_id(), lead_id,
+                                {
+                                    "executive_summary": result.executive_summary,
+                                    "sales_summary": result.sales_summary,
+                                    "pain_points": json.dumps(result.pain_points.model_dump()),
+                                    "buying_signals": json.dumps(result.buying_signals),
+                                    "conversation_starters": json.dumps(result.conversation_starters),
+                                    "discovery_questions": json.dumps(result.discovery_questions),
+                                    "objection_handling": json.dumps([o.model_dump() for o in result.objection_handling]),
+                                    "pitch_angle": result.pitch_angle,
+                                    "call_brief": result.call_brief,
+                                    "score_breakdown": json.dumps(result.score_breakdown.model_dump()),
+                                    "lead_score": result.lead_score,
+                                    "lead_temperature": result.lead_temperature,
+                                    "confidence_note": result.confidence_note,
+                                },
+                                now_iso(),
+                            )
+                            intel = db.get_latest_lead_intelligence(lead_id)
+                        except Exception:
+                            logger.exception("Win-back: intelligence generation failed for %s", lead_id)
+
+                    phones = db.list_phones(lead_id)
+                    emails_list = db.list_emails(lead_id)
+                    ctx = build_lead_context(lead, phones, emails_list, intel, sender_name, brand_voice)
+                    if intel:
+                        ctx["ch_data"] = _format_ch_data(lead)
+
+                    try:
+                        email_result = await generate_win_back_email(ctx)
+                        db.upsert_win_back_email(
+                            campaign_id, lead_id, new_id(),
+                            email_result["subject"], email_result["body"], now_iso(),
+                        )
+                    except Exception:
+                        logger.exception("Win-back: email generation failed for %s", lead_id)
+
                 except Exception:
-                    logger.exception("Win-back: intelligence generation failed for %s", lead_id)
+                    logger.exception("Win-back: unexpected error processing lead %s", lead_id)
+                finally:
+                    completed += 1
+                    is_last = completed == len(lead_ids)
+                    db.update_win_back_campaign_progress(
+                        campaign_id, completed, "ready" if is_last else "generating"
+                    )
 
-            phones = db.list_phones(lead_id)
-            emails_list = db.list_emails(lead_id)
-            ctx = build_lead_context(lead, phones, emails_list, intel, sender_name, brand_voice)
-
-            if intel:
-                ctx["ch_data"] = _format_ch_data(lead)
-
-            try:
-                email_result = await generate_win_back_email(ctx)
-                email_id = new_id()
-                db.upsert_win_back_email(campaign_id, lead_id, email_id, email_result["subject"], email_result["body"], now_iso())
-            except Exception:
-                logger.exception("Win-back: email generation failed for %s", lead_id)
-
-            is_last = i + 1 == len(lead_ids)
-            db.update_win_back_campaign_progress(campaign_id, i + 1, "ready" if is_last else "generating")
+        await asyncio.gather(*[_process_lead(lid) for lid in lead_ids], return_exceptions=True)
 
     except Exception:
         logger.exception("Win-back: campaign generation task crashed for %s", campaign_id)
@@ -201,7 +223,7 @@ async def create_campaign(
         total=len(body.lead_ids),
         created_at=now_iso(),
     )
-    asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id))
+    asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id, body.depth))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
@@ -254,7 +276,7 @@ async def create_campaign_from_csv(
         total=len(lead_ids),
         created_at=ts,
     )
-    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id))
+    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
