@@ -978,9 +978,9 @@ def toggle_lead_called(lead_id: str, list_id: str, now: str) -> Optional[str]:
 
 
 def delete_lead_list(list_id: str) -> None:
-    """Deletes a lead list. Leads in the list are also deleted."""
+    """Deletes a lead list. Leads are unassigned (list_id → NULL) and kept in the global pool."""
     with get_connection() as conn:
-        conn.execute("DELETE FROM leads WHERE list_id = ?", (list_id,))
+        conn.execute("UPDATE leads SET list_id = NULL WHERE list_id = ?", (list_id,))
         conn.execute("DELETE FROM lead_lists WHERE id = ?", (list_id,))
 
 

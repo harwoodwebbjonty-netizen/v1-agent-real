@@ -3256,6 +3256,49 @@ body.compact-rows td {
   width: 0%;
 }
 
+/* Dashboard quick-filter strip (phone + enrich) */
+.dash-filter-strip {
+  display: flex;
+  align-items: center;
+  gap: var(--space-5);
+  flex-wrap: wrap;
+  padding: var(--space-2) 0 var(--space-1);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-1);
+}
+
+.dash-enrich-inline {
+  padding: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+.dash-phone-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.dash-phone-btn:hover { border-color: var(--primary); color: var(--text); }
+.dash-phone-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+.dash-enrich-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.dash-enrich-btn:hover { border-color: var(--primary); color: var(--text); }
+.dash-enrich-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
 /* Side panel — Companies House charge rows */
 .ch-charges-list {
   display: flex;

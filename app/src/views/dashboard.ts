@@ -84,6 +84,8 @@ export function initDashboard(): void {
   let isInitialLoad = true;
   let statusFilter: Lead["status"] | null = null;
   let contactStatusMinRank: number | null = null;
+  let dashPhoneFilter: "all" | "has-phone" | "no-phone" = "all";
+  let dashEnrichFilter: "all" | "has-charges" | "enriched" | "not-enriched" = "all";
 
   // Animates a stat card's number from its current displayed value to the
   // new one — purely cosmetic, runs once per data refresh, cheap (a single
@@ -151,11 +153,17 @@ export function initDashboard(): void {
       renderEmptyState(resultsBody, "No leads yet — run a lookup above to get started.");
       return;
     }
-    const visible = sortLeadsStable(
-      filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank, getHasChargesFilter(), getSelectedChargeTypes()),
-      sortColumn,
-      sortDirection
-    );
+    let filtered = filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank, getHasChargesFilter(), getSelectedChargeTypes());
+    if (dashPhoneFilter === "has-phone") filtered = filtered.filter((l) => !!(l.phone_number && l.phone_number !== "not_found"));
+    else if (dashPhoneFilter === "no-phone") filtered = filtered.filter((l) => !l.phone_number || l.phone_number === "not_found");
+    if (dashEnrichFilter === "has-charges") {
+      filtered = filtered.filter((l) => { try { return JSON.parse(l.ch_data || "{}").charges?.length > 0; } catch { return false; } });
+    } else if (dashEnrichFilter === "enriched") {
+      filtered = filtered.filter((l) => { try { const d = JSON.parse(l.ch_data || "{}"); return !!d.company_number && !d.not_found; } catch { return false; } });
+    } else if (dashEnrichFilter === "not-enriched") {
+      filtered = filtered.filter((l) => { try { const d = JSON.parse(l.ch_data || "{}"); return !d.company_number || !!d.not_found; } catch { return true; } });
+    }
+    const visible = sortLeadsStable(filtered, sortColumn, sortDirection);
     if (visible.length === 0) {
       renderEmptyState(resultsBody, "No leads match the current filters.");
       return;
@@ -246,6 +254,26 @@ export function initDashboard(): void {
   initFiltersToggle();
   subscribeTeam(() => setTeamMembers(getTeamMembers()));
   initSidePanel(dashboardSidePanelCallbacks);
+
+  const dashPhoneBtns = document.querySelectorAll<HTMLButtonElement>(".dash-phone-btn");
+  dashPhoneBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      dashPhoneFilter = btn.dataset.phone as "all" | "has-phone" | "no-phone";
+      dashPhoneBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderTable();
+    });
+  });
+
+  const dashEnrichBtns = document.querySelectorAll<HTMLButtonElement>(".dash-enrich-btn");
+  dashEnrichBtns.forEach((btn) => {
+    btn.addEventListener("click", () => {
+      dashEnrichFilter = btn.dataset.enrich as "all" | "has-charges" | "enriched" | "not-enriched";
+      dashEnrichBtns.forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
+      renderTable();
+    });
+  });
 
   sortableHeaders.forEach((th) => {
     th.addEventListener("click", () => {

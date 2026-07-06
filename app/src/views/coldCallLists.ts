@@ -43,7 +43,7 @@ import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists
 import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
 
-const LIST_COLUMN_COUNT = 11; // select + called + status-dot + company + phone + source + status + industry + contact-status + emails + notes
+const LIST_COLUMN_COUNT = 12; // select + called + status-dot + company + phone + source + status + industry + contact-status + emails + list + notes
 
 export function initColdCallLists(): void {
   const container = document.querySelector<HTMLDivElement>("#view-cold-call-lists")!;
@@ -178,6 +178,7 @@ export function initColdCallLists(): void {
               <th data-sort="industry">Industry</th>
               <th data-sort="contact_status">Contact Status</th>
               <th>Emails</th>
+              <th>List</th>
               <th class="notes-header-col">Notes</th>
             </tr>
           </thead>
@@ -398,7 +399,7 @@ export function initColdCallLists(): void {
         const idx = currentListLeads.findIndex((l) => l.id === lead.id);
         if (idx >= 0) currentListLeads[idx] = { ...currentListLeads[idx], notes };
       },
-      showListColumn: false,
+      showListColumn: true,
     }, selectedLeadIds);
     updateBulkBar(visible);
   }
