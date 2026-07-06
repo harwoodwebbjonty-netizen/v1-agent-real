@@ -400,6 +400,30 @@ def _migration_011_win_back(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_012_credit_tracking(conn: sqlite3.Connection) -> None:
+    """Credit usage tracking and per-user credit limit settings."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS credit_usage (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            feature TEXT NOT NULL,
+            amount_gbp REAL NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_credit_usage_user ON credit_usage(user_id, created_at);
+
+        CREATE TABLE IF NOT EXISTS user_settings (
+            user_id TEXT NOT NULL,
+            key TEXT NOT NULL,
+            value TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            PRIMARY KEY (user_id, key)
+        );
+        """
+    )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -414,8 +438,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (9, _migration_009_called_at),
     (10, _migration_010_follow_up),
     (11, _migration_011_win_back),
+    (12, _migration_012_credit_tracking),
 ]
-CURRENT_SCHEMA_VERSION = 11
+CURRENT_SCHEMA_VERSION = 12
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1705,3 +1730,76 @@ def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
             "UPDATE win_back_emails SET send_status = 'sent', send_method = ?, sent_at = ? WHERE id = ?",
             (method, sent_at, email_id),
         )
+
+
+# ---------------------------------------------------------------------------
+# Credit tracking
+# ---------------------------------------------------------------------------
+
+CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting"]
+
+# Approximate cost per operation (GBP) — used for limit enforcement checks
+CREDIT_COST = {
+    "phone_lookup": 0.03,
+    "sales_intel": 0.15,
+    "win_back": 0.03,
+    "ai_prospecting": 0.15,
+}
+
+
+def record_credit_spend(spend_id: str, user_id: str, feature: str, amount_gbp: float, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO credit_usage (id, user_id, feature, amount_gbp, created_at) VALUES (?, ?, ?, ?, ?)",
+            (spend_id, user_id, feature, amount_gbp, created_at),
+        )
+
+
+def get_monthly_credit_spend(user_id: str) -> dict:
+    month_start = datetime.now().strftime("%Y-%m-01T00:00:00")
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT feature, SUM(amount_gbp) as total FROM credit_usage WHERE user_id = ? AND created_at >= ? GROUP BY feature",
+            (user_id, month_start),
+        ).fetchall()
+    return {row["feature"]: row["total"] for row in rows}
+
+
+def get_user_setting(user_id: str, key: str, default: str = "") -> str:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT value FROM user_settings WHERE user_id = ? AND key = ?",
+            (user_id, key),
+        ).fetchone()
+    return row["value"] if row else default
+
+
+def set_user_setting(user_id: str, key: str, value: str, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR REPLACE INTO user_settings (user_id, key, value, updated_at) VALUES (?, ?, ?, ?)",
+            (user_id, key, value, updated_at),
+        )
+
+
+def get_all_user_settings(user_id: str) -> dict:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT key, value FROM user_settings WHERE user_id = ?", (user_id,)
+        ).fetchall()
+    return {row["key"]: row["value"] for row in rows}
+
+
+def check_credit_limit(user_id: str, feature: str) -> tuple[bool, float, float]:
+    """Returns (allowed, spent_this_month, limit). allowed=True when no limit or within budget."""
+    limit_str = get_user_setting(user_id, f"limit_{feature}", "0")
+    try:
+        limit = float(limit_str)
+    except (ValueError, TypeError):
+        limit = 0.0
+    if limit <= 0:
+        return True, 0.0, 0.0
+    spend = get_monthly_credit_spend(user_id).get(feature, 0.0)
+    cost = CREDIT_COST.get(feature, 0.0)
+    allowed = (spend + cost) <= limit
+    return allowed, spend, limit

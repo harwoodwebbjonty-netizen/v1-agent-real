@@ -205,11 +205,20 @@ async def create_lead(
             raise HTTPException(status_code=403, detail="You don't have access to this list.")
         owner_user_id = lead_list["owner_user_id"]
 
+    # Credit limit check
+    allowed, spent, limit = db.check_credit_limit(current_user.id, "phone_lookup")
+    if not allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Monthly credit limit reached for Phone Lookup (spent £{spent:.2f} of £{limit:.2f}). Update your limit in Settings → Credit Limits.",
+        )
+
     # Calls the existing, unchanged AI pipeline function — this router is the
     # only place that persists its result, the service itself stays pure.
     result = await lookup_company_phone(body.company)
 
     created_at = now_iso()
+    db.record_credit_spend(new_id(), current_user.id, "phone_lookup", db.CREDIT_COST["phone_lookup"], created_at)
     actual_lead_id = db.create_lead(
         id=new_id(),
         timestamp=created_at,
@@ -436,6 +445,13 @@ async def generate_intelligence_route(
         raise HTTPException(status_code=404, detail="Lead not found")
     _require_lead_access(lead, current_user)
 
+    allowed, spent, limit = db.check_credit_limit(current_user.id, "sales_intel")
+    if not allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Monthly credit limit reached for Sales Intelligence (spent £{spent:.2f} of £{limit:.2f}). Update your limit in Settings → Credit Limits.",
+        )
+
     try:
         db.acquire_intelligence_lock(lead_id, now_iso())
     except sqlite3.IntegrityError:
@@ -463,6 +479,7 @@ async def generate_intelligence_route(
             },
             now_iso(),
         )
+        db.record_credit_spend(new_id(), current_user.id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
     except IntelligenceExtractionError:
         raise HTTPException(
             status_code=502, detail="AI returned an incomplete result after retrying. Please try again."

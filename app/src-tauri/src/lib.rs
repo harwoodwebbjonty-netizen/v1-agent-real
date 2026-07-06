@@ -534,6 +534,32 @@ async fn update_brand_voice(
     backend_client::update_brand_voice(&base_url, &session.token, &brand_voice).await
 }
 
+// --- Credit settings ---
+
+#[tauri::command]
+async fn get_credit_limits(app_handle: tauri::AppHandle) -> Result<backend_client::CreditLimits, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_credit_limits(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn save_credit_limits(
+    app_handle: tauri::AppHandle,
+    limits: backend_client::CreditLimits,
+) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::save_credit_limits(&base_url, &session.token, &limits).await
+}
+
+#[tauri::command]
+async fn get_credit_usage(app_handle: tauri::AppHandle) -> Result<backend_client::CreditUsage, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_credit_usage(&base_url, &session.token).await
+}
+
 // --- AI Email Writer: templates ---
 
 #[tauri::command]
@@ -1085,6 +1111,9 @@ pub fn run() {
       dedup_leads,
       get_brand_voice,
       update_brand_voice,
+      get_credit_limits,
+      save_credit_limits,
+      get_credit_usage,
       create_email_template,
       list_email_templates,
       update_email_template,

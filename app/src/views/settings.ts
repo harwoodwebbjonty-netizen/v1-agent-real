@@ -1,6 +1,8 @@
 import { save } from "@tauri-apps/plugin-dialog";
 import {
   type BrandVoice,
+  type CreditLimits,
+  type CreditUsage,
   checkBackendHealth,
   connectEmailAccount,
   createTeamMember,
@@ -9,8 +11,10 @@ import {
   exportLogCsv,
   getBackendBaseUrl,
   getBrandVoice,
+  getCreditUsage,
   listEmailOAuthAccounts,
   migrateLocalLeadsToTeam,
+  saveCreditLimits,
   setBackendBaseUrl,
   updateBrandVoice,
   updateTeamMember,
@@ -97,6 +101,30 @@ export function initSettings(): void {
           <input type="checkbox" id="compact-rows-checkbox" />
           Compact table rows
         </label>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Credit Limits</h2>
+        <p class="card-subtitle">Monthly spending caps per AI feature. Leave at £0 for no limit. Resets on the 1st of each month. Companies House data enrichment is always <strong>free</strong>.</p>
+        <div id="credit-usage-content">
+          <table class="credit-limits-table" style="width:100%;border-collapse:collapse;margin:var(--space-3) 0">
+            <thead>
+              <tr style="text-align:left;font-size:var(--text-sm);color:var(--text-muted)">
+                <th style="padding:var(--space-2) var(--space-3) var(--space-2) 0;font-weight:500">Feature</th>
+                <th style="padding:var(--space-2) var(--space-3);font-weight:500">Est. cost</th>
+                <th style="padding:var(--space-2) var(--space-3);font-weight:500">This month</th>
+                <th style="padding:var(--space-2) 0;font-weight:500">Monthly limit (£, 0 = no limit)</th>
+              </tr>
+            </thead>
+            <tbody id="credit-limits-rows">
+              <tr><td colspan="4" class="empty-hint" style="padding:var(--space-2) 0">Loading…</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="card-actions">
+          <button id="save-credit-limits-btn" class="btn btn-primary">Save limits</button>
+          <span id="credit-limits-status" class="status-message"></span>
+        </div>
       </section>
 
       <section class="card">
@@ -401,5 +429,68 @@ export function initSettings(): void {
   document.querySelector("#check-email-connection-btn")!.addEventListener("click", async () => {
     emailAccountsStatus.textContent = "";
     await renderEmailAccounts();
+  });
+
+  // --- Credit limits ---
+  const CREDIT_FEATURE_LABELS: Record<string, { label: string; cost: string }> = {
+    phone_lookup:    { label: "Phone Lookup",          cost: "~£0.03 / lookup" },
+    sales_intel:     { label: "Sales Intelligence",    cost: "~£0.15 / generation" },
+    win_back:        { label: "Win-back Emails",        cost: "~£0.03 / email" },
+    ai_prospecting:  { label: "AI Prospecting (enrich)", cost: "~£0.15 / lead enriched" },
+  };
+
+  const creditLimitsRows = document.querySelector<HTMLTableSectionElement>("#credit-limits-rows")!;
+  const creditLimitsStatus = document.querySelector<HTMLSpanElement>("#credit-limits-status")!;
+  let _currentLimits: CreditLimits = { limit_phone_lookup: 0, limit_sales_intel: 0, limit_win_back: 0, limit_ai_prospecting: 0 };
+
+  async function renderCreditLimits(): Promise<void> {
+    try {
+      const usage: CreditUsage = await getCreditUsage();
+      _currentLimits = usage.limits;
+      creditLimitsRows.innerHTML = Object.entries(CREDIT_FEATURE_LABELS)
+        .map(([key, { label, cost }]) => {
+          const feat = key as keyof CreditLimits;
+          const spend = (usage.spend[key] ?? 0).toFixed(2);
+          const limit = usage.limits[feat] ?? 0;
+          const limitKey = `limit_${key}` as keyof CreditLimits;
+          const pct = limit > 0 ? Math.min(100, ((usage.spend[key] ?? 0) / limit) * 100) : 0;
+          const overBudget = limit > 0 && (usage.spend[key] ?? 0) >= limit;
+          return `<tr style="border-top:1px solid var(--border)">
+            <td style="padding:var(--space-2) var(--space-3) var(--space-2) 0">${label}</td>
+            <td style="padding:var(--space-2) var(--space-3);color:var(--text-muted);font-size:var(--text-sm)">${cost}</td>
+            <td style="padding:var(--space-2) var(--space-3)">
+              <span style="color:${overBudget ? "var(--danger)" : "var(--accent)"}">£${spend}</span>
+              ${limit > 0 ? `<div style="margin-top:3px;height:4px;width:80px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${overBudget ? "var(--danger)" : "var(--accent)"};border-radius:2px"></div></div>` : ""}
+            </td>
+            <td style="padding:var(--space-2) 0">
+              <input type="number" class="search-input credit-limit-input" data-feature="${key}" min="0" step="1" value="${limit || ""}" placeholder="No limit" style="width:110px" />
+            </td>
+          </tr>`;
+        })
+        .join("");
+    } catch {
+      creditLimitsRows.innerHTML = `<tr><td colspan="4" class="empty-hint">Could not load — backend offline.</td></tr>`;
+    }
+  }
+
+  void renderCreditLimits();
+
+  document.querySelector("#save-credit-limits-btn")!.addEventListener("click", async () => {
+    const inputs = document.querySelectorAll<HTMLInputElement>(".credit-limit-input");
+    const newLimits: CreditLimits = { ..._currentLimits };
+    inputs.forEach((input) => {
+      const feat = input.dataset.feature as string;
+      const val = parseFloat(input.value) || 0;
+      (newLimits as unknown as Record<string, number>)[`limit_${feat}`] = val;
+    });
+    creditLimitsStatus.textContent = "Saving…";
+    try {
+      await saveCreditLimits(newLimits);
+      _currentLimits = newLimits;
+      creditLimitsStatus.textContent = "Saved";
+      setTimeout(() => { creditLimitsStatus.textContent = ""; }, 1500);
+    } catch (err) {
+      creditLimitsStatus.textContent = `Failed: ${err}`;
+    }
   });
 }

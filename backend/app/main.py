@@ -17,6 +17,7 @@ from app.routers import (
     brand_voice,
     calendar,
     call_logs,
+    credit_settings,
     email_oauth,
     email_templates,
     email_writer,
@@ -57,6 +58,7 @@ app.include_router(sequences.router)
 app.include_router(ai_prospecting.router)
 app.include_router(activity.router)
 app.include_router(win_back.router)
+app.include_router(credit_settings.router)
 
 
 async def _sequence_scheduler_loop() -> None:

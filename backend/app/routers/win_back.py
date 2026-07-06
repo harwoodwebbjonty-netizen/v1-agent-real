@@ -129,11 +129,19 @@ async def _generate_campaign(campaign_id: str, lead_ids: list, user_id: str, dep
                         ctx["ch_data"] = _format_ch_data(lead)
 
                     try:
-                        email_result = await generate_win_back_email(ctx)
-                        db.upsert_win_back_email(
-                            campaign_id, lead_id, new_id(),
-                            email_result["subject"], email_result["body"], now_iso(),
-                        )
+                        allowed, spent, limit = db.check_credit_limit(user_id, "win_back")
+                        if not allowed:
+                            logger.warning(
+                                "Win-back: credit limit £%.2f reached (spent £%.2f) — skipping %s",
+                                limit, spent, lead_id,
+                            )
+                        else:
+                            email_result = await generate_win_back_email(ctx)
+                            db.upsert_win_back_email(
+                                campaign_id, lead_id, new_id(),
+                                email_result["subject"], email_result["body"], now_iso(),
+                            )
+                            db.record_credit_spend(new_id(), user_id, "win_back", db.CREDIT_COST["win_back"], now_iso())
                     except Exception:
                         logger.exception("Win-back: email generation failed for %s", lead_id)
 

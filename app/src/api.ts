@@ -463,6 +463,32 @@ export async function updateBrandVoice(brandVoice: BrandVoice): Promise<BrandVoi
   return invoke<BrandVoice>("update_brand_voice", { brandVoice });
 }
 
+// --- Credit limits & usage ---
+
+export interface CreditLimits {
+  limit_phone_lookup: number;
+  limit_sales_intel: number;
+  limit_win_back: number;
+  limit_ai_prospecting: number;
+}
+
+export interface CreditUsage {
+  spend: Record<string, number>;
+  limits: CreditLimits;
+}
+
+export async function getCreditLimits(): Promise<CreditLimits> {
+  return invoke<CreditLimits>("get_credit_limits");
+}
+
+export async function saveCreditLimits(limits: CreditLimits): Promise<void> {
+  return invoke("save_credit_limits", { limits });
+}
+
+export async function getCreditUsage(): Promise<CreditUsage> {
+  return invoke<CreditUsage>("get_credit_usage");
+}
+
 // --- AI Email Writer: templates (private per creator) ---
 
 export interface EmailTemplate {

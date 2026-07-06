@@ -894,6 +894,60 @@ pub async fn create_call_log(
     handle_response(response).await
 }
 
+// --- Credit settings ---
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CreditLimits {
+    pub limit_phone_lookup: f64,
+    pub limit_sales_intel: f64,
+    pub limit_win_back: f64,
+    pub limit_ai_prospecting: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct CreditUsage {
+    pub spend: std::collections::HashMap<String, f64>,
+    pub limits: CreditLimits,
+}
+
+pub async fn get_credit_limits(base_url: &str, token: &str) -> Result<CreditLimits, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/credit-settings/limits", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn save_credit_limits(base_url: &str, token: &str, limits: &CreditLimits) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/credit-settings/limits", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(limits)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+pub async fn get_credit_usage(base_url: &str, token: &str) -> Result<CreditUsage, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/credit-settings/usage", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
 // --- AI Email Writer: brand voice ---
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]

@@ -295,6 +295,7 @@ async def run_prospecting(
                         created_at,
                     )
                     cumulative_cost_gbp += AI_COST_PER_LEAD_GBP
+                    db.record_credit_spend(new_id(), owner_user_id, "ai_prospecting", AI_COST_PER_LEAD_GBP, now_iso())
                 except Exception as exc:
                     logger.warning("AI enrichment failed for %s: %s", company_name, exc)
 
