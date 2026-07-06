@@ -105,6 +105,7 @@ export function initColdCallLists(): void {
           <div class="card-header-row">
             <h2 class="card-title">Leads</h2>
             <div class="card-header-actions">
+              <button id="find-phones-btn" class="btn btn-secondary btn-sm">Find phone numbers</button>
               <input id="list-search-input" type="search" class="search-input" placeholder="Search leads..." />
             </div>
           </div>
@@ -185,6 +186,7 @@ export function initColdCallLists(): void {
   const deleteListBtn = container.querySelector<HTMLButtonElement>("#delete-list-btn")!;
   const enrichFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-enrich-btn");
   const scopeFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-scope-btn");
+  const findPhonesBtn = container.querySelector<HTMLButtonElement>("#find-phones-btn")!;
 
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
@@ -495,6 +497,33 @@ export function initColdCallLists(): void {
       alert(`Failed to add leads: ${err}`);
     }
     bulkAddBtn.disabled = false;
+  });
+
+  findPhonesBtn.addEventListener("click", async () => {
+    if (!currentListId) return;
+    const missing = currentListLeads.filter(
+      (l) => l.list_id === currentListId && (!l.phone_number || l.phone_number === "not_found")
+    );
+    if (missing.length === 0) {
+      listDetailStatus.textContent = "All leads in this list already have phone numbers.";
+      setTimeout(() => { listDetailStatus.textContent = ""; }, 3000);
+      return;
+    }
+    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number? This uses phone lookup credits.`)) return;
+    findPhonesBtn.disabled = true;
+    for (let i = 0; i < missing.length; i++) {
+      const lead = missing[i];
+      listDetailStatus.textContent = `Looking up ${lead.company} (${i + 1}/${missing.length})...`;
+      try {
+        await lookupCompanyPhone(lead.company, currentListId);
+        await refreshCurrentList();
+      } catch {
+        // continue on error
+      }
+    }
+    listDetailStatus.textContent = "";
+    findPhonesBtn.disabled = false;
+    await refreshLeadLists();
   });
 
   scopeFilterBtns.forEach((btn) => {

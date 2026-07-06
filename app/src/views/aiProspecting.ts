@@ -946,6 +946,7 @@ export function initAiProspecting(): void {
     const dropdown = container.querySelector<HTMLDivElement>(`#ms-dropdown-${id}`);
     if (!trigger || !search || !dropdown) return;
 
+    const placeholder = search.getAttribute("placeholder") || "";
     const openDropdown = () => { dropdown.style.display = "block"; };
     const closeDropdown = () => { dropdown.style.display = "none"; search.value = ""; filterOptions(""); };
 
@@ -975,24 +976,39 @@ export function initAiProspecting(): void {
     search.addEventListener("input", () => filterOptions(search.value));
     search.addEventListener("focus", openDropdown);
 
-    // Chip removal
-    trigger.querySelectorAll<HTMLSpanElement>(".p-chip-x").forEach((x) => {
-      x.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const chip = x.closest<HTMLSpanElement>(".p-chip");
-        const val = chip?.dataset.msVal;
-        if (val) {
-          const newVals = selected.filter((v) => v !== val);
-          selected.length = 0;
-          selected.push(...newVals);
+    // Chip removal is handled by rebuildChips() which attaches fresh listeners each time
+
+    const rebuildChips = () => {
+      // Re-render chips in trigger without closing the dropdown or full re-render
+      const allOptions = Array.from(dropdown.querySelectorAll<HTMLDivElement>(".p-ms-option"))
+        .map(o => ({ value: o.dataset.msVal ?? "", label: o.querySelector("span")?.textContent ?? o.dataset.msVal ?? "" }));
+      const existingChips = trigger.querySelectorAll(".p-chip");
+      existingChips.forEach(c => c.remove());
+      const searchInput = trigger.querySelector(".p-multiselect-search")!;
+      selected.forEach(v => {
+        const lbl = allOptions.find(o => o.value === v)?.label ?? v;
+        const chip = document.createElement("span");
+        chip.className = "p-chip";
+        chip.dataset.msId = id;
+        chip.dataset.msVal = v;
+        const short = lbl.length > 28 ? lbl.slice(0, 27) + "…" : lbl;
+        chip.innerHTML = `<span>${escapeHtml(short)}</span><span class="p-chip-x" title="Remove">✕</span>`;
+        chip.querySelector(".p-chip-x")!.addEventListener("click", (e) => {
+          e.stopPropagation();
+          const idx = selected.indexOf(v);
+          if (idx !== -1) selected.splice(idx, 1);
           onChange([...selected]);
+          rebuildChips();
           void render();
-        }
+        });
+        trigger.insertBefore(chip, searchInput);
       });
-    });
+      searchInput.setAttribute("placeholder", selected.length === 0 ? placeholder : "Search…");
+    };
 
     dropdown.querySelectorAll<HTMLDivElement>(".p-ms-option").forEach((opt) => {
-      opt.addEventListener("click", () => {
+      opt.addEventListener("click", (e) => {
+        e.stopPropagation();
         const val = opt.dataset.msVal ?? "";
         const idx = selected.indexOf(val);
         if (idx === -1) selected.push(val);
@@ -1000,15 +1016,20 @@ export function initAiProspecting(): void {
         onChange([...selected]);
         opt.classList.toggle("selected");
         const cb = opt.querySelector<HTMLInputElement>("input[type=checkbox]");
-        if (cb) cb.checked = !cb.checked;
-        // Update chips in trigger
-        void render();
+        if (cb) cb.checked = idx === -1;
+        rebuildChips();
+        // Don't call render() — keep dropdown open
       });
     });
 
-    // Close on outside click
+    // Close on outside click — only then trigger full re-render for filter chips etc.
     document.addEventListener("click", (e) => {
-      if (!trigger.closest(`#ms-${id}`)?.contains(e.target as Node)) closeDropdown();
+      if (!trigger.closest(`#ms-${id}`)?.contains(e.target as Node)) {
+        if (dropdown.style.display !== "none") {
+          closeDropdown();
+          void render();
+        }
+      }
     }, { capture: false });
   }
 

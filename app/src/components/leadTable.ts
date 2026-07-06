@@ -12,6 +12,13 @@ function compareLeads(a: Lead, b: Lead, col: SortColumn): number {
   if (col === "contact_status") {
     return CONTACT_STATUS_ORDER.indexOf(a.contact_status) - CONTACT_STATUS_ORDER.indexOf(b.contact_status);
   }
+  if (col === "phone_number") {
+    // Leads WITH a phone number sort first (asc = has phone, desc = no phone first)
+    const aHas = !!(a.phone_number && a.phone_number !== "not_found") ? 1 : 0;
+    const bHas = !!(b.phone_number && b.phone_number !== "not_found") ? 1 : 0;
+    if (aHas !== bHas) return bHas - aHas; // has-phone first
+    return a.phone_number.localeCompare(b.phone_number);
+  }
   return String(a[col]).localeCompare(String(b[col]));
 }
 
