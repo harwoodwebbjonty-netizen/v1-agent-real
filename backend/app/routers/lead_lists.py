@@ -40,7 +40,8 @@ def _require_list_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
 @router.post("", response_model=LeadListOut)
 def create_lead_list(body: CreateLeadListRequest, current_user: CurrentUser = Depends(get_current_user)) -> LeadListOut:
     list_id = new_id()
-    db.create_lead_list(id=list_id, name=body.name, owner_user_id=current_user.id, created_at=now_iso())
+    owner_id = body.for_user_id if (body.for_user_id and current_user.role == "admin") else current_user.id
+    db.create_lead_list(id=list_id, name=body.name, owner_user_id=owner_id, created_at=now_iso())
     return _to_lead_list_out(db.get_lead_list(list_id), _user_name_map())
 
 

@@ -364,15 +364,17 @@ pub struct LeadList {
 #[derive(Serialize)]
 struct CreateLeadListRequest<'a> {
     name: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    for_user_id: Option<&'a str>,
 }
 
-pub async fn create_lead_list(base_url: &str, token: &str, name: &str) -> Result<LeadList, String> {
+pub async fn create_lead_list(base_url: &str, token: &str, name: &str, for_user_id: Option<&str>) -> Result<LeadList, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/lead-lists", base_url);
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", token))
-        .json(&CreateLeadListRequest { name })
+        .json(&CreateLeadListRequest { name, for_user_id })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;

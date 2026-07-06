@@ -79,6 +79,7 @@ class MigrateResponse(BaseModel):
 
 class CreateLeadListRequest(BaseModel):
     name: str
+    for_user_id: str | None = None
 
 
 class LeadListOut(BaseModel):

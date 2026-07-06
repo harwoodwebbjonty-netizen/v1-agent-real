@@ -13,6 +13,7 @@ import {
   generateLeadIntelligence,
   getLogEntries,
   importLeadsCsv,
+  listTeamMembers,
   lookupCompanyPhone,
   scrapeLeadEmail,
   toggleListLeadCalled,
@@ -20,6 +21,7 @@ import {
   updateLeadEmail,
   updateLeadPhone,
 } from "../api";
+import { CHARGE_TYPES, bindMultiSelect, buildMultiSelectHtml } from "../components/multiSelect";
 import { getCurrentUser, isAdmin, subscribeAuth } from "../auth";
 import {
   type SortColumn,
@@ -88,6 +90,12 @@ export function initColdCallLists(): void {
           <label class="form-label" for="list-name-input-screen">Name your list</label>
           <input id="list-name-input-screen" type="text" class="search-input ccl-name-input"
             placeholder="e.g. London Construction Q3" autocomplete="off" />
+          <div id="list-for-wrap" class="hidden">
+            <label class="form-label" for="list-for-select">Create list for</label>
+            <select id="list-for-select" class="ccl-filter-select">
+              <option value="">Myself</option>
+            </select>
+          </div>
           <p class="ccl-name-hint">You'll select which leads to include on the next step.</p>
           <button id="name-next-btn" class="btn btn-primary ccl-name-next-btn">Next: Select leads →</button>
         </div>
@@ -118,7 +126,6 @@ export function initColdCallLists(): void {
             <button class="sel-status-btn" data-status="unverified">Unverified</button>
             <button class="sel-status-btn" data-status="not_found">Not Found</button>
           </div>
-          <button id="sel-charges-btn" class="sel-filter-toggle" data-active="false">Has Charges</button>
         </div>
         <div class="call-sheet-filter-row">
           <select id="sel-contact-status-select" class="ccl-filter-select">
@@ -128,9 +135,8 @@ export function initColdCallLists(): void {
             <option value="Replied">Replied</option>
             <option value="Converted">Converted</option>
           </select>
-          <select id="sel-industry-select" class="ccl-filter-select">
-            <option value="">All Industries</option>
-          </select>
+          <div id="sel-industry-wrap" class="sel-ms-wrap"></div>
+          <div id="sel-charge-wrap" class="sel-ms-wrap"></div>
           <div class="ccl-sort-select">
             <label for="sel-sort-select">Sort</label>
             <select id="sel-sort-select">
@@ -284,6 +290,8 @@ export function initColdCallLists(): void {
   const nameBackBtn = container.querySelector<HTMLButtonElement>("#name-back-btn")!;
   const listNameInputScreen = container.querySelector<HTMLInputElement>("#list-name-input-screen")!;
   const nameNextBtn = container.querySelector<HTMLButtonElement>("#name-next-btn")!;
+  const listForWrap = container.querySelector<HTMLDivElement>("#list-for-wrap")!;
+  const listForSelect = container.querySelector<HTMLSelectElement>("#list-for-select")!;
 
   // Selector
   const selectorBackBtn = container.querySelector<HTMLButtonElement>("#selector-back-btn")!;
@@ -297,8 +305,8 @@ export function initColdCallLists(): void {
   const selectorCreateBtn = container.querySelector<HTMLButtonElement>("#selector-create-btn")!;
   const selectorCountLabel = container.querySelector<HTMLSpanElement>("#selector-count-label")!;
   const selContactStatusSelect = container.querySelector<HTMLSelectElement>("#sel-contact-status-select")!;
-  const selIndustrySelect = container.querySelector<HTMLSelectElement>("#sel-industry-select")!;
-  const selChargesBtn = container.querySelector<HTMLButtonElement>("#sel-charges-btn")!;
+  const selIndustryWrap = container.querySelector<HTMLDivElement>("#sel-industry-wrap")!;
+  const selChargeWrap = container.querySelector<HTMLDivElement>("#sel-charge-wrap")!;
 
   // Call sheet
   const listDetailTitle = container.querySelector<HTMLHeadingElement>("#list-detail-title")!;
@@ -330,6 +338,7 @@ export function initColdCallLists(): void {
 
   // ── State ─────────────────────────────────────────────────────────────────
   let pendingListName = "";
+  let pendingForUserId = "";
 
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
@@ -348,8 +357,8 @@ export function initColdCallLists(): void {
   let selectorPhone: "all" | "has-phone" | "no-phone" = "all";
   let selectorStatus: Lead["status"] | "" = "";
   let selectorContactStatus = "";
-  let selectorIndustry = "";
-  let selectorHasCharges = false;
+  let selectorIndustries: string[] = [];
+  let selectorChargeTypes: string[] = [];
   let selectorSort: SortColumn = null;
   let selectorSortDir: SortDirection = "asc";
   let selectorSelected = new Set<string>();
@@ -381,6 +390,22 @@ export function initColdCallLists(): void {
     detailEl.classList.add("hidden");
     listNameInputScreen.value = "";
     pendingListName = "";
+    pendingForUserId = "";
+    listForSelect.innerHTML = '<option value="">Myself</option>';
+    if (isAdmin()) {
+      void listTeamMembers().then((members) => {
+        const current = getCurrentUser();
+        const others = members.filter((m) => m.id !== current?.id);
+        if (others.length > 0) {
+          listForSelect.innerHTML =
+            '<option value="">Myself</option>' +
+            others.map((m) => `<option value="${escapeHtml(m.id)}">${escapeHtml(m.name)}</option>`).join("");
+          listForWrap.classList.remove("hidden");
+        }
+      });
+    } else {
+      listForWrap.classList.add("hidden");
+    }
     setTimeout(() => listNameInputScreen.focus(), 50);
   }
 
@@ -452,20 +477,27 @@ export function initColdCallLists(): void {
   listNameInputScreen.addEventListener("keydown", (e) => {
     if (e.key === "Enter") proceedToSelector();
   });
+  listForSelect.addEventListener("change", () => { pendingForUserId = listForSelect.value; });
 
   // ── Selector ──────────────────────────────────────────────────────────────
-  function populateIndustryDropdown(): void {
+  function renderIndustryMultiSelect(): void {
     const leads = getLeads();
     const industries = [...new Set(leads.map((l) => l.industry || "Uncategorized").filter(Boolean))].sort();
-    selIndustrySelect.innerHTML =
-      '<option value="">All Industries</option>' +
-      industries.map((ind) => `<option value="${escapeHtml(ind)}">${escapeHtml(ind)}</option>`).join("");
+    const opts = industries.map((ind) => ({ value: ind, label: ind }));
+    selIndustryWrap.innerHTML = buildMultiSelectHtml("sel-industry", opts, selectorIndustries, "Filter by industry…");
+    bindMultiSelect(selIndustryWrap, "sel-industry", selectorIndustries, () => renderSelector());
+  }
+
+  function renderChargeTypeMultiSelect(): void {
+    const opts = CHARGE_TYPES.map((t) => ({ value: t, label: t }));
+    selChargeWrap.innerHTML = buildMultiSelectHtml("sel-charge", opts, selectorChargeTypes, "Filter by charge type…");
+    bindMultiSelect(selChargeWrap, "sel-charge", selectorChargeTypes, () => renderSelector());
   }
 
   function applySelFilters(leads: Lead[]): Lead[] {
     const statusArg = selectorStatus || null;
-    const industries = selectorIndustry ? new Set([selectorIndustry]) : new Set<string>();
-    let filtered = filterLeads(leads, selectorSearch, industries, statusArg as Lead["status"] | null, null, selectorHasCharges);
+    const hasCharges = selectorChargeTypes.length > 0;
+    let filtered = filterLeads(leads, selectorSearch, new Set(selectorIndustries), statusArg as Lead["status"] | null, null, hasCharges, new Set(selectorChargeTypes));
     if (selectorContactStatus) filtered = filtered.filter((l) => l.contact_status === selectorContactStatus);
     if (selectorPhone === "has-phone") filtered = filtered.filter(hasPhone);
     else if (selectorPhone === "no-phone") filtered = filtered.filter((l) => !hasPhone(l));
@@ -547,8 +579,8 @@ export function initColdCallLists(): void {
     selectorPhone = "all";
     selectorStatus = "";
     selectorContactStatus = "";
-    selectorIndustry = "";
-    selectorHasCharges = false;
+    selectorIndustries = [];
+    selectorChargeTypes = [];
     selectorSort = null;
     selectorSortDir = "asc";
     selectorSelected.clear();
@@ -556,13 +588,12 @@ export function initColdCallLists(): void {
     selectorSearchInput.value = "";
     selectorSortSelect.value = "";
     selContactStatusSelect.value = "";
-    selChargesBtn.dataset.active = "false";
-    selChargesBtn.classList.remove("active");
     selectorPhoneBtns.forEach((b) => b.classList.toggle("active", b.dataset.phone === "all"));
     selectorStatusBtns.forEach((b) => b.classList.toggle("active", b.dataset.status === ""));
     showSelector();
-    populateIndustryDropdown();
-    void refreshLeads().then(() => { populateIndustryDropdown(); renderSelector(); });
+    renderIndustryMultiSelect();
+    renderChargeTypeMultiSelect();
+    void refreshLeads().then(() => { renderIndustryMultiSelect(); renderSelector(); });
   }
 
   selectorBackBtn.addEventListener("click", showNameScreen);
@@ -595,18 +626,6 @@ export function initColdCallLists(): void {
     renderSelector();
   });
 
-  selIndustrySelect.addEventListener("change", () => {
-    selectorIndustry = selIndustrySelect.value;
-    renderSelector();
-  });
-
-  selChargesBtn.addEventListener("click", () => {
-    selectorHasCharges = !selectorHasCharges;
-    selChargesBtn.dataset.active = String(selectorHasCharges);
-    selChargesBtn.classList.toggle("active", selectorHasCharges);
-    renderSelector();
-  });
-
   selectorSortSelect.addEventListener("change", () => {
     const val = selectorSortSelect.value;
     if (!val) { selectorSort = null; selectorSortDir = "asc"; }
@@ -634,7 +653,7 @@ export function initColdCallLists(): void {
     selectorCreateBtn.disabled = true;
     selectorCreateBtn.textContent = "Creating…";
     try {
-      const list = await createLeadList(pendingListName);
+      const list = await createLeadList(pendingListName, pendingForUserId || undefined);
       await addLeadsToList(list.id, ids);
       await refreshLeadLists();
       await openListDetail(list.id);

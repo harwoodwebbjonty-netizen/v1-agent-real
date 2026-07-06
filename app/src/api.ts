@@ -266,8 +266,8 @@ export async function migrateLocalLeadsToTeam(): Promise<number> {
 
 // --- Cold call lists (private per-user lead lists; admins reach all of them) ---
 
-export async function createLeadList(name: string): Promise<LeadList> {
-  return invoke<LeadList>("create_lead_list", { name });
+export async function createLeadList(name: string, forUserId?: string): Promise<LeadList> {
+  return invoke<LeadList>("create_lead_list", { name, forUserId });
 }
 
 export async function listLeadLists(): Promise<LeadList[]> {

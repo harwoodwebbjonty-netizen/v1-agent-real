@@ -370,10 +370,10 @@ async fn create_call_log(
 // --- Cold call lists (private per-user lead lists; admins reach all of them) ---
 
 #[tauri::command]
-async fn create_lead_list(app_handle: tauri::AppHandle, name: String) -> Result<backend_client::LeadList, String> {
+async fn create_lead_list(app_handle: tauri::AppHandle, name: String, for_user_id: Option<String>) -> Result<backend_client::LeadList, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_lead_list(&base_url, &session.token, &name).await
+    backend_client::create_lead_list(&base_url, &session.token, &name, for_user_id.as_deref()).await
 }
 
 #[tauri::command]
