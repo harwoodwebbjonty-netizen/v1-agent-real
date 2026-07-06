@@ -954,6 +954,12 @@ tbody tr:hover {
   cursor: pointer;
 }
 
+.lead-directors {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+}
+
 a {
   color: var(--accent-text);
   text-decoration: none;

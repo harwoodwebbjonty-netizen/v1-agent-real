@@ -4,13 +4,16 @@ import { copyToClipboard } from "../contact";
 import { normalizeSicIndustry } from "../sic";
 import { escapeHtml } from "../utils";
 
-export type SortColumn = "company" | "phone_number" | "status" | "industry" | "contact_status" | null;
+export type SortColumn = "company" | "phone_number" | "status" | "industry" | "contact_status" | "lead_score" | null;
 export type SortDirection = "asc" | "desc";
 
 function compareLeads(a: Lead, b: Lead, col: SortColumn): number {
   if (!col) return 0;
   if (col === "contact_status") {
     return CONTACT_STATUS_ORDER.indexOf(a.contact_status) - CONTACT_STATUS_ORDER.indexOf(b.contact_status);
+  }
+  if (col === "lead_score") {
+    return (b.intelligence?.lead_score ?? 0) - (a.intelligence?.lead_score ?? 0);
   }
   if (col === "phone_number") {
     // Leads WITH a phone number sort first (asc = has phone, desc = no phone first)
@@ -138,7 +141,15 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
              </td>`
           : ""
       }
-      <td>${escapeHtml(lead.company)}</td>
+      <td>
+        <div>${escapeHtml(lead.company)}</div>
+        ${(() => {
+          try {
+            const dirs: string[] = JSON.parse(lead.ch_data || "{}").directors || [];
+            return dirs.length > 0 ? `<div class="lead-directors">${escapeHtml(dirs.slice(0, 3).join(", "))}</div>` : "";
+          } catch { return ""; }
+        })()}
+      </td>
       <td>
         <div class="contact-cell">
           ${

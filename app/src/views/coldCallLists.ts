@@ -139,6 +139,8 @@ export function initColdCallLists(): void {
               <label for="ccl-sort-select">Sort by</label>
               <select id="ccl-sort-select">
                 <option value="">Default</option>
+                <option value="lead_score:asc">Score (high–low)</option>
+                <option value="lead_score:desc">Score (low–high)</option>
                 <option value="company:asc">Company A–Z</option>
                 <option value="company:desc">Company Z–A</option>
                 <option value="phone_number:asc">Phone first</option>
