@@ -1867,6 +1867,11 @@ body.compact-rows td {
   display: none;
 }
 
+.call-sheet-view.hidden,
+#ccl-overview-wrapper.hidden {
+  display: none !important;
+}
+
 .chart-wrap {
   position: relative;
   height: 260px;
