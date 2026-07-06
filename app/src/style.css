@@ -3018,6 +3018,213 @@ body.compact-rows td {
   background: color-mix(in srgb, var(--primary) 8%, transparent);
 }
 
+/* ─────────────────────────────────────────────────────
+   Call-sheet (enter-list) full-screen view
+   ───────────────────────────────────────────────────── */
+
+#view-cold-call-lists {
+  display: flex;
+  flex-direction: column;
+}
+
+.call-sheet-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg);
+}
+
+.call-sheet-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--border);
+  background: var(--surface);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+}
+
+.call-sheet-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 300px;
+}
+
+.call-sheet-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+}
+
+.call-sheet-header-spacer {
+  flex: 1;
+  min-width: var(--space-3);
+}
+
+.call-sheet-search {
+  width: 200px;
+  flex-shrink: 0;
+}
+
+/* Collapsible add-companies panel */
+.add-companies-panel {
+  flex-shrink: 0;
+  padding: var(--space-3) var(--space-5);
+  background: var(--panel);
+  border-bottom: 1px solid var(--border);
+}
+
+.add-companies-row {
+  display: flex;
+  gap: var(--space-3);
+  align-items: flex-start;
+}
+
+.add-companies-row textarea {
+  flex: 1;
+  max-width: 600px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg);
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  resize: vertical;
+}
+
+.add-companies-btns {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+/* Filter bar */
+.call-sheet-filter-bar {
+  flex-shrink: 0;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-2) var(--space-5);
+}
+
+.call-sheet-filter-row {
+  display: flex;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+  align-items: center;
+  padding-bottom: var(--space-1);
+}
+
+/* Override enrich-filter margins when embedded in the filter row */
+.ccl-enrich-inline {
+  padding: 0 !important;
+  border: none !important;
+  margin: 0 !important;
+}
+
+/* Bulk bar inside the filter bar */
+.ccl-bulk-bar-inline {
+  border-top: 1px solid var(--border);
+  border-bottom: none !important;
+  margin: 0 !important;
+  padding: var(--space-1) 0 0 !important;
+}
+
+/* Phone filter buttons */
+.ccl-phone-filter {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.ccl-phone-btn {
+  background: none;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--space-1) var(--space-3);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+
+.ccl-phone-btn:hover { border-color: var(--primary); color: var(--text); }
+.ccl-phone-btn.active { background: var(--primary); border-color: var(--primary); color: #fff; }
+
+/* Scrollable table area */
+.call-sheet-table-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+}
+
+.call-sheet-table {
+  width: 100%;
+  min-width: max-content;
+  border-collapse: collapse;
+  font-size: var(--text-sm);
+}
+
+/* Sticky header for call-sheet table */
+.call-sheet-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  background: var(--panel);
+}
+
+/* Notes column */
+.notes-header-col {
+  min-width: 200px;
+}
+
+.notes-cell {
+  min-width: 200px;
+  max-width: 300px;
+  padding: 4px var(--space-3) !important;
+  vertical-align: top !important;
+}
+
+.notes-textarea {
+  display: block;
+  width: 100%;
+  height: 28px;
+  min-width: 160px;
+  border: 1px solid transparent;
+  border-radius: var(--radius);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: var(--text-sm);
+  line-height: 1.4;
+  padding: 4px 6px;
+  resize: none;
+  overflow: hidden;
+  transition: border-color 0.1s, background 0.1s;
+}
+
+.notes-textarea::placeholder {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.notes-textarea:hover {
+  border-color: var(--border);
+  background: var(--bg);
+}
+
+.notes-textarea:focus {
+  border-color: var(--accent-core, var(--primary));
+  background: var(--bg);
+  outline: none;
+}
+
 /* List column badge */
 .list-badge {
   background: var(--surface-2);

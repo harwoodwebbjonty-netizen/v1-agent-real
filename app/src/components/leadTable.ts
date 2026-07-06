@@ -100,6 +100,8 @@ export interface RowHandlers {
   onToggleSelect?: (lead: Lead, selected: boolean, shiftKey: boolean) => void;
   /** Set to false in contexts (cold call lists) where the List column is redundant. Default true. */
   showListColumn?: boolean;
+  /** Call-sheet mode: inline editable notes column. Saves on blur/Enter without re-rendering the table. */
+  onSaveNotes?: (lead: Lead, notes: string) => Promise<void>;
 }
 
 const COLUMN_COUNT = 8;
@@ -186,6 +188,9 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
         </div>
       </td>
       ${handlers.showListColumn !== false ? `<td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>` : ""}
+      ${handlers.onSaveNotes !== undefined
+        ? `<td class="notes-cell"><textarea class="notes-textarea" rows="1" placeholder="Add note…">${escapeHtml(lead.notes || "")}</textarea></td>`
+        : ""}
     `;
     row.addEventListener("click", (event) => {
       if ((event.target as HTMLElement).closest(".inline-edit, .icon-btn")) return;
@@ -245,6 +250,28 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
       event.stopPropagation();
       handlers.onActivityClick!(lead);
     });
+
+    const notesTextarea = row.querySelector<HTMLTextAreaElement>(".notes-textarea");
+    if (notesTextarea && handlers.onSaveNotes) {
+      const originalNotes = lead.notes || "";
+      notesTextarea.addEventListener("click", (e) => e.stopPropagation());
+      notesTextarea.addEventListener("focus", () => {
+        notesTextarea.style.height = "auto";
+        notesTextarea.style.height = Math.max(notesTextarea.scrollHeight, 60) + "px";
+        notesTextarea.style.overflow = "auto";
+      });
+      notesTextarea.addEventListener("blur", () => {
+        notesTextarea.style.height = "28px";
+        notesTextarea.style.overflow = "hidden";
+        const val = notesTextarea.value;
+        if (val !== originalNotes) void handlers.onSaveNotes!(lead, val);
+      });
+      notesTextarea.addEventListener("keydown", (e) => {
+        e.stopPropagation();
+        if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); notesTextarea.blur(); }
+        if (e.key === "Escape") { notesTextarea.value = originalNotes; notesTextarea.blur(); }
+      });
+    }
 
     tbody.appendChild(row);
   }
