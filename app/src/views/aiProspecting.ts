@@ -450,7 +450,7 @@ function buildMultiSelectHtml(
             </div>`
         )
         .join("");
-      return `<div class="p-ms-group">${escapeHtml(grp)}</div>${rows}`;
+      return `<div class="p-ms-group" data-ms-group="${escapeHtml(grp)}">${escapeHtml(grp)}<button class="p-ms-group-btn" data-ms-group="${escapeHtml(grp)}" type="button">Select all</button></div>${rows}`;
     })
     .join("");
 
@@ -978,6 +978,18 @@ export function initAiProspecting(): void {
 
     // Chip removal is handled by rebuildChips() which attaches fresh listeners each time
 
+    const updateGroupBtns = () => {
+      dropdown.querySelectorAll<HTMLButtonElement>(".p-ms-group-btn").forEach((btn) => {
+        const grpName = btn.dataset.msGroup ?? "";
+        const groupVals = Array.from(dropdown.querySelectorAll<HTMLDivElement>(".p-ms-option")).filter((opt) => {
+          let el: Element | null = opt.previousElementSibling;
+          while (el && !el.classList.contains("p-ms-group")) el = el.previousElementSibling;
+          return el?.getAttribute("data-ms-group") === grpName;
+        }).map((o) => o.dataset.msVal ?? "");
+        btn.textContent = groupVals.every((v) => selected.includes(v)) ? "Deselect all" : "Select all";
+      });
+    };
+
     const rebuildChips = () => {
       // Re-render chips in trigger without closing the dropdown or full re-render
       const allOptions = Array.from(dropdown.querySelectorAll<HTMLDivElement>(".p-ms-option"))
@@ -1004,6 +1016,7 @@ export function initAiProspecting(): void {
         trigger.insertBefore(chip, searchInput);
       });
       searchInput.setAttribute("placeholder", selected.length === 0 ? placeholder : "Search…");
+      updateGroupBtns();
     };
 
     dropdown.querySelectorAll<HTMLDivElement>(".p-ms-option").forEach((opt) => {
@@ -1019,6 +1032,42 @@ export function initAiProspecting(): void {
         if (cb) cb.checked = idx === -1;
         rebuildChips();
         // Don't call render() — keep dropdown open
+      });
+    });
+
+    dropdown.querySelectorAll<HTMLButtonElement>(".p-ms-group-btn").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const grpName = btn.dataset.msGroup ?? "";
+        // Find all options in this group
+        const groupOpts = Array.from(dropdown.querySelectorAll<HTMLDivElement>(".p-ms-option")).filter((opt) => {
+          // Group options follow the group header; find options until the next group header
+          let el: Element | null = opt.previousElementSibling;
+          while (el && !el.classList.contains("p-ms-group")) el = el.previousElementSibling;
+          return el?.getAttribute("data-ms-group") === grpName;
+        });
+        const groupVals = groupOpts.map((o) => o.dataset.msVal ?? "");
+        const allSelected = groupVals.every((v) => selected.includes(v));
+        if (allSelected) {
+          // Deselect all in group
+          groupVals.forEach((v) => {
+            const i = selected.indexOf(v);
+            if (i !== -1) selected.splice(i, 1);
+          });
+          btn.textContent = "Select all";
+        } else {
+          // Select all in group
+          groupVals.forEach((v) => { if (!selected.includes(v)) selected.push(v); });
+          btn.textContent = "Deselect all";
+        }
+        onChange([...selected]);
+        groupOpts.forEach((opt) => {
+          const isNowSelected = selected.includes(opt.dataset.msVal ?? "");
+          opt.classList.toggle("selected", isNowSelected);
+          const cb = opt.querySelector<HTMLInputElement>("input[type=checkbox]");
+          if (cb) cb.checked = isNowSelected;
+        });
+        rebuildChips();
       });
     });
 
