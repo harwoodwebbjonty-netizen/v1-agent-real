@@ -259,13 +259,15 @@ It should be direct and low-friction — a specific ask, not a vague suggestion.
 
 Examples
 
-If you have 10 minutes this week, I can run through what might work for you.
+If you have 10 minutes this week, I am happy to run through the options on a call.
 
-If now is a good time to look at options, I can put something together this week.
+Happy to jump on a quick call this week and talk through what is available.
 
-If it is relevant, I can have options ready for a call this week.
+If you can spare 10 minutes, a call this week would give me a clear picture of what might work.
 
-Happy to run through what is available if you have 15 minutes before the end of the month.
+I have availability this week if a quick call makes sense.
+
+The CTA must always be about booking or suggesting a call.
 
 Never write a wishy-washy CTA like "would it be worth a quick chat?" or "would you be open to a call?"
 
