@@ -8,8 +8,8 @@ import {
   assignLead,
   createLeadList,
   deleteLeadEmail,
-  deleteLeadPhone,
   deleteLeadList,
+  deleteLeadPhone,
   generateLeadIntelligence,
   getLogEntries,
   importLeadsCsv,
@@ -59,13 +59,12 @@ export function initColdCallLists(): void {
           <div class="card-header-row">
             <div>
               <h2 class="card-title">Cold Call Lists</h2>
-              <p class="card-subtitle">Private lead lists. Create one by selecting leads below.</p>
+              <p class="card-subtitle">Private lead lists for the sales team to call from.</p>
             </div>
             <div class="card-header-actions">
-              <button id="new-list-btn" class="btn btn-primary">New list</button>
+              <button id="new-list-btn" class="btn btn-primary">+ New list</button>
             </div>
           </div>
-          <span id="new-list-error" class="status-message"></span>
           <ul id="my-lists" class="history-list"></ul>
           <p id="my-lists-empty" class="empty-state hidden">No lists yet — click "New list" to create your first call list.</p>
         </section>
@@ -78,19 +77,32 @@ export function initColdCallLists(): void {
       </div>
     </main>
 
-    <!-- ── Screen 2: Lead selector (pick leads → name → create list) ── -->
+    <!-- ── Screen 2: Name your list ── -->
+    <div id="ccl-name-screen" class="call-sheet-view hidden">
+      <div class="call-sheet-header">
+        <button id="name-back-btn" class="btn btn-ghost btn-sm">← Back</button>
+        <h2 class="call-sheet-title">Create a new call list</h2>
+      </div>
+      <div class="ccl-name-body">
+        <div class="ccl-name-form">
+          <label class="form-label" for="list-name-input-screen">Name your list</label>
+          <input id="list-name-input-screen" type="text" class="search-input ccl-name-input"
+            placeholder="e.g. London Construction Q3" autocomplete="off" />
+          <p class="ccl-name-hint">You'll select which leads to include on the next step.</p>
+          <button id="name-next-btn" class="btn btn-primary ccl-name-next-btn">Next: Select leads →</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ── Screen 3: Lead selector ── -->
     <div id="ccl-lead-selector" class="call-sheet-view hidden">
       <div class="call-sheet-header">
         <button id="selector-back-btn" class="btn btn-ghost btn-sm">← Back</button>
-        <h2 class="call-sheet-title">Select leads for your call list</h2>
+        <h2 class="call-sheet-title" id="selector-list-name-display"></h2>
         <div class="call-sheet-header-spacer"></div>
         <input id="selector-search-input" type="search" class="search-input call-sheet-search" placeholder="Search leads..." />
-        <div id="selector-create-trigger" class="hidden" style="display:flex;align-items:center;gap:var(--space-2)">
-          <span id="selector-count-label" class="status-message"></span>
-          <input id="selector-list-name-input" type="text" class="search-input" placeholder="List name…" style="width:180px" />
-          <button id="selector-confirm-btn" class="btn btn-primary btn-sm">Create list</button>
-        </div>
-        <button id="selector-create-open-btn" class="btn btn-primary btn-sm hidden">Create list (0 selected)</button>
+        <span id="selector-count-label" class="status-message"></span>
+        <button id="selector-create-btn" class="btn btn-primary btn-sm hidden">Create list</button>
       </div>
 
       <div class="call-sheet-filter-bar">
@@ -100,12 +112,25 @@ export function initColdCallLists(): void {
             <button class="sel-phone-btn" data-phone="has-phone">Has Phone</button>
             <button class="sel-phone-btn" data-phone="no-phone">No Phone</button>
           </div>
-          <div class="ccl-enrich-filter ccl-enrich-inline">
-            <button class="sel-enrich-btn active" data-enrich="all">All</button>
-            <button class="sel-enrich-btn" data-enrich="has-charges">Has Charges</button>
-            <button class="sel-enrich-btn" data-enrich="enriched">Enriched</button>
-            <button class="sel-enrich-btn" data-enrich="not-enriched">Not Enriched</button>
+          <div class="ccl-status-filter">
+            <button class="sel-status-btn active" data-status="">All Status</button>
+            <button class="sel-status-btn" data-status="verified">Verified</button>
+            <button class="sel-status-btn" data-status="unverified">Unverified</button>
+            <button class="sel-status-btn" data-status="not_found">Not Found</button>
           </div>
+          <button id="sel-charges-btn" class="sel-filter-toggle" data-active="false">Has Charges</button>
+        </div>
+        <div class="call-sheet-filter-row">
+          <select id="sel-contact-status-select" class="ccl-filter-select">
+            <option value="">All Contact Status</option>
+            <option value="New">New</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Replied">Replied</option>
+            <option value="Converted">Converted</option>
+          </select>
+          <select id="sel-industry-select" class="ccl-filter-select">
+            <option value="">All Industries</option>
+          </select>
           <div class="ccl-sort-select">
             <label for="sel-sort-select">Sort</label>
             <select id="sel-sort-select">
@@ -114,6 +139,7 @@ export function initColdCallLists(): void {
               <option value="company:asc">Company A–Z</option>
               <option value="phone_number:asc">Phone first</option>
               <option value="industry:asc">Industry A–Z</option>
+              <option value="contact_status:asc">Contact Status</option>
             </select>
           </div>
           <label class="selector-select-all-label">
@@ -139,7 +165,7 @@ export function initColdCallLists(): void {
       </div>
     </div>
 
-    <!-- ── Screen 3: Call sheet (the working list) ── -->
+    <!-- ── Screen 4: Call sheet (the working list) ── -->
     <div id="cold-call-list-detail" class="call-sheet-view hidden">
       <div class="call-sheet-header">
         <button id="back-to-lists-btn" class="btn btn-ghost btn-sm">← Back</button>
@@ -155,7 +181,7 @@ export function initColdCallLists(): void {
       </div>
 
       <div id="add-companies-panel" class="add-companies-panel hidden">
-        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 var(--space-2)">Enter one company name per line — AI phone lookup, scoped to this list. Or upload a CSV.</p>
+        <p style="font-size:0.85rem;color:var(--text-muted);margin:0 0 var(--space-2)">Enter one company name per line, or upload a CSV.</p>
         <div class="add-companies-row">
           <textarea id="list-companies-input" rows="3" placeholder="Acme Ltd&#10;Example Widgets Inc"></textarea>
           <div class="add-companies-btns">
@@ -244,6 +270,7 @@ export function initColdCallLists(): void {
 
   // ── DOM refs ──────────────────────────────────────────────────────────────
   const overviewWrapper = container.querySelector<HTMLElement>("#ccl-overview-wrapper")!;
+  const nameScreen = container.querySelector<HTMLDivElement>("#ccl-name-screen")!;
   const selectorEl = container.querySelector<HTMLDivElement>("#ccl-lead-selector")!;
   const detailEl = container.querySelector<HTMLDivElement>("#cold-call-list-detail")!;
 
@@ -252,19 +279,26 @@ export function initColdCallLists(): void {
   const myListsEmptyEl = container.querySelector<HTMLParagraphElement>("#my-lists-empty")!;
   const adminListsCard = container.querySelector<HTMLDivElement>("#admin-lists-card")!;
   const adminListsEl = container.querySelector<HTMLUListElement>("#admin-lists")!;
+
+  // Name screen
+  const nameBackBtn = container.querySelector<HTMLButtonElement>("#name-back-btn")!;
+  const listNameInputScreen = container.querySelector<HTMLInputElement>("#list-name-input-screen")!;
+  const nameNextBtn = container.querySelector<HTMLButtonElement>("#name-next-btn")!;
+
   // Selector
   const selectorBackBtn = container.querySelector<HTMLButtonElement>("#selector-back-btn")!;
+  const selectorListNameDisplay = container.querySelector<HTMLElement>("#selector-list-name-display")!;
   const selectorSearchInput = container.querySelector<HTMLInputElement>("#selector-search-input")!;
   const selectorBody = container.querySelector<HTMLTableSectionElement>("#selector-body")!;
   const selectorAllCb = container.querySelector<HTMLInputElement>("#selector-all-cb")!;
   const selectorPhoneBtns = container.querySelectorAll<HTMLButtonElement>(".sel-phone-btn");
-  const selectorEnrichBtns = container.querySelectorAll<HTMLButtonElement>(".sel-enrich-btn");
+  const selectorStatusBtns = container.querySelectorAll<HTMLButtonElement>(".sel-status-btn");
   const selectorSortSelect = container.querySelector<HTMLSelectElement>("#sel-sort-select")!;
-  const selectorCreateOpenBtn = container.querySelector<HTMLButtonElement>("#selector-create-open-btn")!;
-  const selectorCreateTrigger = container.querySelector<HTMLDivElement>("#selector-create-trigger")!;
-  const selectorListNameInput = container.querySelector<HTMLInputElement>("#selector-list-name-input")!;
-  const selectorConfirmBtn = container.querySelector<HTMLButtonElement>("#selector-confirm-btn")!;
+  const selectorCreateBtn = container.querySelector<HTMLButtonElement>("#selector-create-btn")!;
   const selectorCountLabel = container.querySelector<HTMLSpanElement>("#selector-count-label")!;
+  const selContactStatusSelect = container.querySelector<HTMLSelectElement>("#sel-contact-status-select")!;
+  const selIndustrySelect = container.querySelector<HTMLSelectElement>("#sel-industry-select")!;
+  const selChargesBtn = container.querySelector<HTMLButtonElement>("#sel-charges-btn")!;
 
   // Call sheet
   const listDetailTitle = container.querySelector<HTMLHeadingElement>("#list-detail-title")!;
@@ -295,6 +329,8 @@ export function initColdCallLists(): void {
   const phoneFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-phone-btn");
 
   // ── State ─────────────────────────────────────────────────────────────────
+  let pendingListName = "";
+
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
   let sortColumn: SortColumn = null;
@@ -310,24 +346,48 @@ export function initColdCallLists(): void {
   // Selector state
   let selectorSearch = "";
   let selectorPhone: "all" | "has-phone" | "no-phone" = "all";
-  let selectorEnrich: "all" | "has-charges" | "enriched" | "not-enriched" = "all";
+  let selectorStatus: Lead["status"] | "" = "";
+  let selectorContactStatus = "";
+  let selectorIndustry = "";
+  let selectorHasCharges = false;
   let selectorSort: SortColumn = null;
   let selectorSortDir: SortDirection = "asc";
   let selectorSelected = new Set<string>();
   let selectorLastIndex = -1;
 
+  // ── Helpers ───────────────────────────────────────────────────────────────
+  function hasPhone(lead: Lead): boolean {
+    return !!(lead.phone_number && lead.phone_number !== "not_found");
+  }
+  function hasCharges(lead: Lead): boolean {
+    try { return JSON.parse(lead.ch_data || "{}").charges?.length > 0; } catch { return false; }
+  }
+
   // ── Screen switching ──────────────────────────────────────────────────────
   function showOverview(): void {
     container.classList.remove("ccl-fullscreen");
     overviewWrapper.classList.remove("hidden");
+    nameScreen.classList.add("hidden");
     selectorEl.classList.add("hidden");
     detailEl.classList.add("hidden");
     closeSidePanel();
   }
 
+  function showNameScreen(): void {
+    container.classList.add("ccl-fullscreen");
+    overviewWrapper.classList.add("hidden");
+    nameScreen.classList.remove("hidden");
+    selectorEl.classList.add("hidden");
+    detailEl.classList.add("hidden");
+    listNameInputScreen.value = "";
+    pendingListName = "";
+    setTimeout(() => listNameInputScreen.focus(), 50);
+  }
+
   function showSelector(): void {
     container.classList.add("ccl-fullscreen");
     overviewWrapper.classList.add("hidden");
+    nameScreen.classList.add("hidden");
     selectorEl.classList.remove("hidden");
     detailEl.classList.add("hidden");
   }
@@ -335,6 +395,7 @@ export function initColdCallLists(): void {
   function showDetail(): void {
     container.classList.add("ccl-fullscreen");
     overviewWrapper.classList.add("hidden");
+    nameScreen.classList.add("hidden");
     selectorEl.classList.add("hidden");
     detailEl.classList.remove("hidden");
   }
@@ -376,63 +437,72 @@ export function initColdCallLists(): void {
     wireListRows(adminListsEl);
   }
 
+  // ── Name screen ───────────────────────────────────────────────────────────
+  nameBackBtn.addEventListener("click", showOverview);
+
+  function proceedToSelector(): void {
+    const name = listNameInputScreen.value.trim();
+    if (!name) { listNameInputScreen.focus(); return; }
+    pendingListName = name;
+    selectorListNameDisplay.textContent = `"${name}"`;
+    openSelectorScreen();
+  }
+
+  nameNextBtn.addEventListener("click", proceedToSelector);
+  listNameInputScreen.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") proceedToSelector();
+  });
+
   // ── Selector ──────────────────────────────────────────────────────────────
-  function hasPhone(lead: Lead): boolean {
-    return !!(lead.phone_number && lead.phone_number !== "not_found");
-  }
-  function hasCharges(lead: Lead): boolean {
-    try { return JSON.parse(lead.ch_data || "{}").charges?.length > 0; } catch { return false; }
-  }
-  function isEnriched(lead: Lead): boolean {
-    try { const d = JSON.parse(lead.ch_data || "{}"); return !!d.company_number && !d.not_found; } catch { return false; }
+  function populateIndustryDropdown(): void {
+    const leads = getLeads();
+    const industries = [...new Set(leads.map((l) => l.industry || "Uncategorized").filter(Boolean))].sort();
+    selIndustrySelect.innerHTML =
+      '<option value="">All Industries</option>' +
+      industries.map((ind) => `<option value="${escapeHtml(ind)}">${escapeHtml(ind)}</option>`).join("");
   }
 
-  function renderSelectorRow(lead: Lead): string {
-    const isSelected = selectorSelected.has(lead.id);
-    let dirs: string[] = [];
-    try { dirs = JSON.parse(lead.ch_data || "{}").directors || []; } catch { /* ignore */ }
-    return `
-      <tr class="lead-row selector-row${isSelected ? " lead-row-selected" : ""}" data-lead-id="${lead.id}">
-        <td class="select-cell"><input type="checkbox" class="select-cb" ${isSelected ? "checked" : ""} /></td>
-        <td>
-          <div>${escapeHtml(lead.company)}</div>
-          ${dirs.length > 0 ? `<div class="lead-directors">${escapeHtml(dirs.slice(0, 3).join(", "))}</div>` : ""}
-        </td>
-        <td>${hasPhone(lead) ? escapeHtml(lead.phone_number) : '<span class="empty-hint">—</span>'}</td>
-        <td>${escapeHtml(lead.industry || "—")}</td>
-        <td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : '<span class="empty-hint">—</span>'}</td>
-      </tr>
-    `;
+  function applySelFilters(leads: Lead[]): Lead[] {
+    const statusArg = selectorStatus || null;
+    const industries = selectorIndustry ? new Set([selectorIndustry]) : new Set<string>();
+    let filtered = filterLeads(leads, selectorSearch, industries, statusArg as Lead["status"] | null, null, selectorHasCharges);
+    if (selectorContactStatus) filtered = filtered.filter((l) => l.contact_status === selectorContactStatus);
+    if (selectorPhone === "has-phone") filtered = filtered.filter(hasPhone);
+    else if (selectorPhone === "no-phone") filtered = filtered.filter((l) => !hasPhone(l));
+    return sortLeadsStable(filtered, selectorSort, selectorSortDir);
   }
 
-  function updateSelectorCreateBtn(): void {
+  function updateSelectorBtn(): void {
     const count = selectorSelected.size;
-    if (count === 0) {
-      selectorCreateOpenBtn.classList.add("hidden");
-      selectorCreateTrigger.style.display = "none";
-    } else {
-      selectorCreateOpenBtn.textContent = `Create list (${count} selected)`;
-      selectorCreateOpenBtn.classList.remove("hidden");
-    }
-    selectorCountLabel.textContent = `${count} lead${count === 1 ? "" : "s"} selected`;
+    selectorCountLabel.textContent = count > 0 ? `${count} selected` : "";
+    selectorCreateBtn.classList.toggle("hidden", count === 0);
   }
 
   function renderSelector(): void {
-    let leads = getLeads();
-    const q = selectorSearch.trim().toLowerCase();
-    if (q) leads = leads.filter((l) => l.company.toLowerCase().includes(q) || (l.industry || "").toLowerCase().includes(q) || l.phone_number.toLowerCase().includes(q));
-    if (selectorPhone === "has-phone") leads = leads.filter(hasPhone);
-    else if (selectorPhone === "no-phone") leads = leads.filter((l) => !hasPhone(l));
-    if (selectorEnrich === "has-charges") leads = leads.filter(hasCharges);
-    else if (selectorEnrich === "enriched") leads = leads.filter(isEnriched);
-    else if (selectorEnrich === "not-enriched") leads = leads.filter((l) => !isEnriched(l));
-    const sorted = sortLeadsStable(leads, selectorSort, selectorSortDir);
-
+    const sorted = applySelFilters(getLeads());
     if (sorted.length === 0) {
       selectorBody.innerHTML = `<tr><td colspan="${SELECTOR_COL_COUNT}" class="empty-state">No leads match your filters.</td></tr>`;
+      updateSelectorBtn();
       return;
     }
-    selectorBody.innerHTML = sorted.map(renderSelectorRow).join("");
+
+    selectorBody.innerHTML = sorted.map((lead) => {
+      const isSelected = selectorSelected.has(lead.id);
+      let dirs: string[] = [];
+      try { dirs = JSON.parse(lead.ch_data || "{}").directors || []; } catch { /* ignore */ }
+      return `
+        <tr class="lead-row selector-row${isSelected ? " lead-row-selected" : ""}" data-lead-id="${lead.id}">
+          <td class="select-cell"><input type="checkbox" class="select-cb" ${isSelected ? "checked" : ""} /></td>
+          <td>
+            <div>${escapeHtml(lead.company)}</div>
+            ${dirs.length > 0 ? `<div class="lead-directors">${escapeHtml(dirs.slice(0, 3).join(", "))}</div>` : ""}
+          </td>
+          <td>${hasPhone(lead) ? escapeHtml(lead.phone_number) : '<span class="empty-hint">—</span>'}</td>
+          <td>${escapeHtml(lead.industry || "—")}</td>
+          <td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : '<span class="empty-hint">—</span>'}</td>
+        </tr>
+      `;
+    }).join("");
 
     selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row").forEach((row, idx) => {
       const leadId = row.dataset.leadId!;
@@ -440,27 +510,23 @@ export function initColdCallLists(): void {
       cb.addEventListener("click", (e) => {
         e.stopPropagation();
         const selected = cb.checked;
-        const shiftKey = (e as MouseEvent).shiftKey;
-        if (shiftKey && selectorLastIndex >= 0) {
+        if ((e as MouseEvent).shiftKey && selectorLastIndex >= 0) {
+          const allRows = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"));
           const lo = Math.min(selectorLastIndex, idx);
           const hi = Math.max(selectorLastIndex, idx);
-          const allRows = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"));
           for (let i = lo; i <= hi; i++) {
             const rid = allRows[i].dataset.leadId!;
-            if (selected) selectorSelected.add(rid);
-            else selectorSelected.delete(rid);
+            if (selected) selectorSelected.add(rid); else selectorSelected.delete(rid);
             allRows[i].classList.toggle("lead-row-selected", selected);
             const rcb = allRows[i].querySelector<HTMLInputElement>(".select-cb");
             if (rcb) rcb.checked = selected;
           }
         } else {
-          if (selected) selectorSelected.add(leadId);
-          else selectorSelected.delete(leadId);
+          if (selected) selectorSelected.add(leadId); else selectorSelected.delete(leadId);
           row.classList.toggle("lead-row-selected", selected);
         }
         selectorLastIndex = idx;
-        updateSelectorCreateBtn();
-        // update select-all state
+        updateSelectorBtn();
         const total = selectorBody.querySelectorAll(".selector-row").length;
         const selCount = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"))
           .filter((r) => selectorSelected.has(r.dataset.leadId!)).length;
@@ -469,35 +535,37 @@ export function initColdCallLists(): void {
       });
     });
 
-    // Sync select-all checkbox
     const total = sorted.length;
     const selCount = sorted.filter((l) => selectorSelected.has(l.id)).length;
-    selectorAllCb.checked = selCount === total;
+    selectorAllCb.checked = selCount === total && total > 0;
     selectorAllCb.indeterminate = selCount > 0 && selCount < total;
+    updateSelectorBtn();
   }
 
   function openSelectorScreen(): void {
     selectorSearch = "";
     selectorPhone = "all";
-    selectorEnrich = "all";
+    selectorStatus = "";
+    selectorContactStatus = "";
+    selectorIndustry = "";
+    selectorHasCharges = false;
     selectorSort = null;
     selectorSortDir = "asc";
     selectorSelected.clear();
     selectorLastIndex = -1;
     selectorSearchInput.value = "";
     selectorSortSelect.value = "";
+    selContactStatusSelect.value = "";
+    selChargesBtn.dataset.active = "false";
+    selChargesBtn.classList.remove("active");
     selectorPhoneBtns.forEach((b) => b.classList.toggle("active", b.dataset.phone === "all"));
-    selectorEnrichBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === "all"));
-    selectorCreateOpenBtn.classList.add("hidden");
-    selectorCreateTrigger.style.display = "none";
-    selectorListNameInput.value = "";
+    selectorStatusBtns.forEach((b) => b.classList.toggle("active", b.dataset.status === ""));
     showSelector();
-    void refreshLeads().then(() => renderSelector());
+    populateIndustryDropdown();
+    void refreshLeads().then(() => { populateIndustryDropdown(); renderSelector(); });
   }
 
-  selectorBackBtn.addEventListener("click", () => {
-    showOverview();
-  });
+  selectorBackBtn.addEventListener("click", showNameScreen);
 
   selectorSearchInput.addEventListener("input", () => {
     selectorSearch = selectorSearchInput.value;
@@ -513,13 +581,30 @@ export function initColdCallLists(): void {
     });
   });
 
-  selectorEnrichBtns.forEach((btn) => {
+  selectorStatusBtns.forEach((btn) => {
     btn.addEventListener("click", () => {
-      selectorEnrich = btn.dataset.enrich as "all" | "has-charges" | "enriched" | "not-enriched";
-      selectorEnrichBtns.forEach((b) => b.classList.remove("active"));
+      selectorStatus = btn.dataset.status as Lead["status"] | "";
+      selectorStatusBtns.forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
       renderSelector();
     });
+  });
+
+  selContactStatusSelect.addEventListener("change", () => {
+    selectorContactStatus = selContactStatusSelect.value;
+    renderSelector();
+  });
+
+  selIndustrySelect.addEventListener("change", () => {
+    selectorIndustry = selIndustrySelect.value;
+    renderSelector();
+  });
+
+  selChargesBtn.addEventListener("click", () => {
+    selectorHasCharges = !selectorHasCharges;
+    selChargesBtn.dataset.active = String(selectorHasCharges);
+    selChargesBtn.classList.toggle("active", selectorHasCharges);
+    renderSelector();
   });
 
   selectorSortSelect.addEventListener("change", () => {
@@ -533,48 +618,32 @@ export function initColdCallLists(): void {
     const allRows = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"));
     allRows.forEach((row) => {
       const rid = row.dataset.leadId!;
-      if (selectorAllCb.checked) selectorSelected.add(rid);
-      else selectorSelected.delete(rid);
+      if (selectorAllCb.checked) selectorSelected.add(rid); else selectorSelected.delete(rid);
       row.classList.toggle("lead-row-selected", selectorAllCb.checked);
       const cb = row.querySelector<HTMLInputElement>(".select-cb");
       if (cb) cb.checked = selectorAllCb.checked;
     });
-    updateSelectorCreateBtn();
+    updateSelectorBtn();
   });
 
-  selectorCreateOpenBtn.addEventListener("click", () => {
-    selectorCreateOpenBtn.classList.add("hidden");
-    selectorCreateTrigger.style.display = "flex";
-    selectorListNameInput.focus();
-  });
+  selectorCreateBtn.addEventListener("click", () => void confirmCreateList());
 
   async function confirmCreateList(): Promise<void> {
-    const name = selectorListNameInput.value.trim();
-    if (!name) { selectorListNameInput.focus(); return; }
     const ids = Array.from(selectorSelected);
-    if (ids.length === 0) return;
-    selectorConfirmBtn.disabled = true;
-    selectorConfirmBtn.textContent = "Creating…";
+    if (ids.length === 0 || !pendingListName) return;
+    selectorCreateBtn.disabled = true;
+    selectorCreateBtn.textContent = "Creating…";
     try {
-      const list = await createLeadList(name);
+      const list = await createLeadList(pendingListName);
       await addLeadsToList(list.id, ids);
       await refreshLeadLists();
       await openListDetail(list.id);
     } catch (err) {
       alert(`Failed to create list: ${err}`);
-      selectorConfirmBtn.disabled = false;
-      selectorConfirmBtn.textContent = "Create list";
+      selectorCreateBtn.disabled = false;
+      selectorCreateBtn.textContent = "Create list";
     }
   }
-
-  selectorConfirmBtn.addEventListener("click", () => void confirmCreateList());
-  selectorListNameInput.addEventListener("keydown", (e) => {
-    if (e.key === "Enter") void confirmCreateList();
-    if (e.key === "Escape") {
-      selectorCreateTrigger.style.display = "none";
-      selectorCreateOpenBtn.classList.remove("hidden");
-    }
-  });
 
   // ── Call sheet ────────────────────────────────────────────────────────────
   function updateSortIndicators(): void {
@@ -595,6 +664,10 @@ export function initColdCallLists(): void {
       selectAllCb.checked = allVisible;
       selectAllCb.indeterminate = !allVisible && count > 0;
     }
+  }
+
+  function isEnriched(lead: Lead): boolean {
+    try { const d = JSON.parse(lead.ch_data || "{}"); return !!d.company_number && !d.not_found; } catch { return false; }
   }
 
   function renderListTable(): void {
@@ -653,8 +726,7 @@ export function initColdCallLists(): void {
             if (r) { r.classList.toggle("lead-row-selected", selected); const cb = r.querySelector<HTMLInputElement>(".select-cb"); if (cb) cb.checked = selected; }
           }
         } else {
-          if (selected) selectedLeadIds.add(lead.id);
-          else selectedLeadIds.delete(lead.id);
+          if (selected) selectedLeadIds.add(lead.id); else selectedLeadIds.delete(lead.id);
           const row = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${lead.id}"]`);
           if (row) row.classList.toggle("lead-row-selected", selected);
         }
@@ -781,7 +853,7 @@ export function initColdCallLists(): void {
     const missing = currentListLeads.filter((l) => l.list_id === currentListId && (!l.phone_number || l.phone_number === "not_found"));
     if (missing.length === 0) { listDetailStatus.textContent = "All leads already have phone numbers."; setTimeout(() => { listDetailStatus.textContent = ""; }, 3000); return; }
     const estimatedCost = (missing.length * 0.03).toFixed(2);
-    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number?\n\nEstimated cost: ~£${estimatedCost}\n\nThis uses phone lookup credits.`)) return;
+    if (!confirm(`Find phone numbers for ${missing.length} lead${missing.length === 1 ? "" : "s"} without a number?\n\nEstimated cost: ~£${estimatedCost}`)) return;
     findPhonesBtn.disabled = true;
     for (let i = 0; i < missing.length; i++) {
       listDetailStatus.textContent = `Looking up ${missing[i].company} (${i + 1}/${missing.length})...`;
@@ -853,7 +925,7 @@ export function initColdCallLists(): void {
   subscribeLeadLists(renderOverview);
   subscribeAuth(() => { if (!getCurrentUser()) return; void refreshLeadLists(); });
 
-  container.querySelector("#new-list-btn")!.addEventListener("click", openSelectorScreen);
+  container.querySelector("#new-list-btn")!.addEventListener("click", showNameScreen);
 
   listSearchInput.addEventListener("input", () => { searchText = listSearchInput.value; renderListTable(); });
 
@@ -889,7 +961,7 @@ export function initColdCallLists(): void {
     for (const company of companies) {
       listDetailStatus.textContent = `Looking up ${company}...`;
       try { await lookupCompanyPhone(company, currentListId); await refreshCurrentList(); }
-      catch (err) { listDetailStatus.textContent = `Error looking up ${company}: ${err}`; }
+      catch (err) { listDetailStatus.textContent = `Error: ${err}`; }
     }
     listDetailStatus.textContent = ""; listLookupBtn.disabled = false; await refreshLeadLists();
   }
