@@ -70,12 +70,12 @@ def _passes_charge_filters(charges: list, criteria: ProspectingCriteria) -> bool
             return False
 
     # Charge type filter — match on classification description (case-insensitive substring)
+    # Normalise "&" → "and" so "Fixed & Floating Charge" matches "Fixed and floating charge"
     if criteria.charge_types:
-        descriptions = [
-            c.get("classification", {}).get("description", "").lower()
-            for c in relevant
-        ]
-        wanted = [ct.lower() for ct in criteria.charge_types]
+        def _norm(s: str) -> str:
+            return s.lower().replace("&", "and").replace("  ", " ").strip()
+        descriptions = [_norm(c.get("classification", {}).get("description", "")) for c in relevant]
+        wanted = [_norm(ct) for ct in criteria.charge_types]
         matched = any(
             any(w in desc or desc in w for desc in descriptions)
             for w in wanted
@@ -167,6 +167,7 @@ async def run_prospecting(
 
     AI_COST_PER_LEAD_GBP = 0.15
     found = created = skipped = 0
+    skipped_crm = skipped_charge = skipped_score = 0
     cumulative_cost_gbp = 0.0
     credit_limit = criteria.credit_limit_gbp  # 0 = no limit
     credit_limit_hit = False
@@ -186,6 +187,7 @@ async def run_prospecting(
             # Dedup: already in CRM?
             if company_number and db.get_lead_by_company_number(company_number):
                 skipped += 1
+                skipped_crm += 1
                 db.update_prospecting_run(run_id, {"skipped": skipped})
                 continue
 
@@ -206,12 +208,14 @@ async def run_prospecting(
             ch_score = compute_ch_score(profile or {}, charges)
             if criteria.min_ch_score > 0 and ch_score < criteria.min_ch_score:
                 skipped += 1
+                skipped_score += 1
                 db.update_prospecting_run(run_id, {"skipped": skipped})
                 continue
 
             # Apply charge-related post-search filters
             if not _passes_charge_filters(charges, criteria):
                 skipped += 1
+                skipped_charge += 1
                 db.update_prospecting_run(run_id, {"skipped": skipped})
                 continue
 
@@ -299,7 +303,16 @@ async def run_prospecting(
                 except Exception as exc:
                     logger.warning("AI enrichment failed for %s: %s", company_name, exc)
 
-        completion_note = f"Credit limit £{credit_limit:.2f} reached" if credit_limit_hit else None
+        skip_parts = []
+        if skipped_crm: skip_parts.append(f"{skipped_crm} already in CRM")
+        if skipped_charge: skip_parts.append(f"{skipped_charge} failed charge filter")
+        if skipped_score: skip_parts.append(f"{skipped_score} below CH score")
+        skip_note = ("; ".join(skip_parts)) if skip_parts else None
+        if credit_limit_hit:
+            credit_note = f"Credit limit £{credit_limit:.2f} reached"
+            completion_note = f"{credit_note}. {skip_note}" if skip_note else credit_note
+        else:
+            completion_note = skip_note
         db.update_prospecting_run(
             run_id,
             {

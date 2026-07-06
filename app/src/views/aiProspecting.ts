@@ -710,7 +710,7 @@ export function initAiProspecting(): void {
                       <div class="p-run-filters">${escapeHtml(buildRunSummary(run))}</div>
                     </div>
                     <span class="empty-hint" style="white-space:nowrap">${escapeHtml(formatDate(run.started_at))}</span>
-                    ${run.error ? `<span class="empty-hint" style="color:var(--danger);max-width:220px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(run.error)}">${escapeHtml(run.error)}</span>` : ""}
+                    ${run.error ? `<span class="empty-hint" style="color:${run.status === "error" ? "var(--danger)" : "var(--text-muted)"};max-width:280px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${escapeHtml(run.error)}">${escapeHtml(run.error)}</span>` : ""}
                     <button type="button" class="btn btn-ghost btn-sm run-again-btn" data-criteria="${escapeHtml(run.criteria)}">Run again</button>
                   </div>`).join("")}
               </div>`
