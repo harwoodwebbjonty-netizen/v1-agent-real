@@ -92,67 +92,76 @@ _CH_MAX_SCAN = 10_000  # Maximum CH companies to examine in a single run
 
 
 async def _iter_companies(api_key: str, criteria: ProspectingCriteria, run_meta: dict):
-    """Async generator: yields CH companies across all locations, deduplicating by
-    company_number. Sets run_meta['ch_total'] on the first page (sum across locations).
+    """Async generator: yields CH companies, deduplicating by company_number.
+    Searches each SIC code individually to work around the CH Advanced Search
+    200-result cap per combined-SIC query. Sets run_meta['ch_total'] to the
+    accumulated total available across all sub-searches.
     Stops after _CH_MAX_SCAN companies to prevent runaway runs."""
     effective_locations = criteria.locations or ([criteria.location] if criteria.location else [""])
+    # Search each SIC code individually — CH caps combined-SIC queries at ~200 results,
+    # but per-SIC queries can paginate deeper. With no SIC codes use a single None pass.
+    sic_list: list = criteria.sic_codes if criteria.sic_codes else [None]
+
     seen: set[str] = set()
     total_yielded = 0
     ch_total = 0
 
-    for loc in effective_locations:
+    for sic in sic_list:
         if total_yielded >= _CH_MAX_SCAN:
             break
-        start_index = 0
-        consecutive_errors = 0
-        loc_total_captured = False
+        for loc in effective_locations:
+            if total_yielded >= _CH_MAX_SCAN:
+                break
+            start_index = 0
+            consecutive_errors = 0
+            slice_total_captured = False
 
-        while total_yielded < _CH_MAX_SCAN:
-            try:
-                raw = await search_companies_raw(
-                    api_key,
-                    location=loc,
-                    sic_codes=criteria.sic_codes or None,
-                    company_type=criteria.company_type,
-                    incorporated_from=criteria.incorporated_from,
-                    incorporated_to=criteria.incorporated_to,
-                    size=_CH_PAGE_SIZE,
-                    start_index=start_index,
-                )
-                consecutive_errors = 0
-            except CHRateLimitError:
-                logger.warning("CH rate limit on search for %r at index %d — sleeping 3s and skipping page", loc, start_index)
-                await asyncio.sleep(3)
-                start_index += _CH_PAGE_SIZE
-                consecutive_errors += 1
-                if consecutive_errors >= 3:
+            while total_yielded < _CH_MAX_SCAN:
+                try:
+                    raw = await search_companies_raw(
+                        api_key,
+                        location=loc,
+                        sic_codes=[sic] if sic else None,
+                        company_type=criteria.company_type,
+                        incorporated_from=criteria.incorporated_from,
+                        incorporated_to=criteria.incorporated_to,
+                        size=_CH_PAGE_SIZE,
+                        start_index=start_index,
+                    )
+                    consecutive_errors = 0
+                except CHRateLimitError:
+                    logger.warning("CH rate limit — sic=%r loc=%r idx=%d — sleeping 3s", sic, loc, start_index)
+                    await asyncio.sleep(3)
+                    start_index += _CH_PAGE_SIZE
+                    consecutive_errors += 1
+                    if consecutive_errors >= 3:
+                        break
+                    continue
+                except Exception as exc:
+                    logger.warning("CH search failed — sic=%r loc=%r idx=%d: %s", sic, loc, start_index, exc)
                     break
-                continue
-            except Exception as exc:
-                logger.warning("CH search failed for location %r at index %d: %s", loc, start_index, exc)
-                break
 
-            if not loc_total_captured:
-                ch_total += raw.get("hits", 0)
-                run_meta["ch_total"] = ch_total
-                loc_total_captured = True
+                if not slice_total_captured:
+                    ch_total += raw.get("hits", 0)
+                    run_meta["ch_total"] = ch_total
+                    slice_total_captured = True
 
-            items = raw.get("items", [])
-            if not items:
-                break
+                items = raw.get("items", [])
+                if not items:
+                    break
 
-            for item in items:
-                num = item.get("company_number", "")
-                if num not in seen:
-                    seen.add(num)
-                    total_yielded += 1
-                    yield item
+                for item in items:
+                    num = item.get("company_number", "")
+                    if num not in seen:
+                        seen.add(num)
+                        total_yielded += 1
+                        yield item
 
-            if len(items) < _CH_PAGE_SIZE:
-                break
+                if len(items) < _CH_PAGE_SIZE:
+                    break
 
-            start_index += len(items)
-            await asyncio.sleep(0.3)
+                start_index += len(items)
+                await asyncio.sleep(0.3)
 
 
 async def run_prospecting(
