@@ -135,6 +135,18 @@ export function initColdCallLists(): void {
             <button class="ccl-enrich-btn" data-enrich="has-charges">Has Charges</button>
             <button class="ccl-enrich-btn" data-enrich="enriched">Enriched</button>
             <button class="ccl-enrich-btn" data-enrich="not-enriched">Not Enriched</button>
+            <div class="ccl-sort-select">
+              <label for="ccl-sort-select">Sort by</label>
+              <select id="ccl-sort-select">
+                <option value="">Default</option>
+                <option value="company:asc">Company A–Z</option>
+                <option value="company:desc">Company Z–A</option>
+                <option value="phone_number:asc">Phone first</option>
+                <option value="status:asc">Status</option>
+                <option value="industry:asc">Industry A–Z</option>
+                <option value="contact_status:asc">Contact Status</option>
+              </select>
+            </div>
           </div>
 
           <div class="table-wrap">
@@ -187,6 +199,7 @@ export function initColdCallLists(): void {
   const enrichFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-enrich-btn");
   const scopeFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-scope-btn");
   const findPhonesBtn = container.querySelector<HTMLButtonElement>("#find-phones-btn")!;
+  const sortSelect = container.querySelector<HTMLSelectElement>("#ccl-sort-select")!;
 
   let currentListId: string | null = null;
   let currentListLeads: Lead[] = [];
@@ -432,6 +445,19 @@ export function initColdCallLists(): void {
     });
   });
 
+  sortSelect.addEventListener("change", () => {
+    const val = sortSelect.value;
+    if (!val) {
+      sortColumn = null;
+      sortDirection = "asc";
+    } else {
+      const [col, dir] = val.split(":") as [SortColumn, SortDirection];
+      sortColumn = col;
+      sortDirection = dir;
+    }
+    renderListTable();
+  });
+
   deleteListBtn.addEventListener("click", async () => {
     if (!currentListId) return;
     const listName = listDetailTitle.textContent || "this list";
@@ -550,6 +576,7 @@ export function initColdCallLists(): void {
     calledFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.called === "all"));
     enrichFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === "all"));
     scopeFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.scope === "all"));
+    sortSelect.value = "";
     listSearchInput.value = "";
     listDetailStatus.textContent = "";
     listDetailTitle.textContent = getLeadLists().find((l) => l.id === listId)?.name ?? "List";
