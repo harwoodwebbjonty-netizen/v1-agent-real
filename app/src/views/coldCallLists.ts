@@ -114,6 +114,12 @@ export function initColdCallLists(): void {
             <span id="ccl-bulk-count"></span>
             <button id="ccl-bulk-called-btn" class="btn btn-secondary btn-sm">Mark as Called</button>
             <button id="ccl-bulk-add-btn" class="btn btn-secondary btn-sm">Add to This List</button>
+            <button id="ccl-bulk-generate-btn" class="btn btn-primary btn-sm">Generate call list</button>
+            <div id="ccl-generate-form" class="ccl-generate-form hidden">
+              <input id="ccl-generate-name-input" type="text" class="search-input" placeholder="List name…" />
+              <button id="ccl-generate-confirm-btn" class="btn btn-primary btn-sm">Create</button>
+              <button id="ccl-generate-cancel-btn" class="btn btn-ghost btn-sm">Cancel</button>
+            </div>
             <button id="ccl-bulk-clear-btn" class="btn btn-ghost btn-sm">Clear</button>
           </div>
 
@@ -195,6 +201,11 @@ export function initColdCallLists(): void {
   const bulkCount = container.querySelector<HTMLSpanElement>("#ccl-bulk-count")!;
   const bulkCalledBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-called-btn")!;
   const bulkAddBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-add-btn")!;
+  const bulkGenerateBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-generate-btn")!;
+  const generateForm = container.querySelector<HTMLDivElement>("#ccl-generate-form")!;
+  const generateNameInput = container.querySelector<HTMLInputElement>("#ccl-generate-name-input")!;
+  const generateConfirmBtn = container.querySelector<HTMLButtonElement>("#ccl-generate-confirm-btn")!;
+  const generateCancelBtn = container.querySelector<HTMLButtonElement>("#ccl-generate-cancel-btn")!;
   const bulkClearBtn = container.querySelector<HTMLButtonElement>("#ccl-bulk-clear-btn")!;
   const selectAllCb = container.querySelector<HTMLInputElement>("#ccl-select-all-cb")!;
   const deleteListBtn = container.querySelector<HTMLButtonElement>("#delete-list-btn")!;
@@ -490,6 +501,7 @@ export function initColdCallLists(): void {
   bulkClearBtn.addEventListener("click", () => {
     selectedLeadIds.clear();
     lastToggledIndex = -1;
+    closeGenerateForm();
     listResultsBody.querySelectorAll<HTMLTableRowElement>("[data-lead-id]").forEach((r) => {
       r.classList.remove("lead-row-selected");
       const cb = r.querySelector<HTMLInputElement>(".select-cb");
@@ -552,6 +564,47 @@ export function initColdCallLists(): void {
     listDetailStatus.textContent = "";
     findPhonesBtn.disabled = false;
     await refreshLeadLists();
+  });
+
+  function openGenerateForm(): void {
+    generateForm.classList.remove("hidden");
+    bulkGenerateBtn.classList.add("hidden");
+    generateNameInput.value = "";
+    generateNameInput.focus();
+  }
+
+  function closeGenerateForm(): void {
+    generateForm.classList.add("hidden");
+    bulkGenerateBtn.classList.remove("hidden");
+  }
+
+  async function submitGenerateList(): Promise<void> {
+    const name = generateNameInput.value.trim();
+    if (!name) return;
+    generateConfirmBtn.disabled = true;
+    generateConfirmBtn.textContent = "Creating...";
+    const ids = Array.from(selectedLeadIds);
+    try {
+      const list = await createLeadList(name);
+      await addLeadsToList(list.id, ids);
+      await refreshLeadLists();
+      selectedLeadIds.clear();
+      lastToggledIndex = -1;
+      closeGenerateForm();
+      await openListDetail(list.id);
+    } catch (err) {
+      alert(`Failed to create call list: ${err}`);
+    }
+    generateConfirmBtn.disabled = false;
+    generateConfirmBtn.textContent = "Create";
+  }
+
+  bulkGenerateBtn.addEventListener("click", openGenerateForm);
+  generateCancelBtn.addEventListener("click", closeGenerateForm);
+  generateConfirmBtn.addEventListener("click", () => void submitGenerateList());
+  generateNameInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") void submitGenerateList();
+    if (e.key === "Escape") closeGenerateForm();
   });
 
   scopeFilterBtns.forEach((btn) => {
