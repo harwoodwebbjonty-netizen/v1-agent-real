@@ -886,3 +886,22 @@ export async function sendAllWinBackEmails(campaignId: string, provider = "gmail
 export async function exportWinBackMailchimp(campaignId: string, provider = "gmail"): Promise<string> {
   return invoke<string>("export_win_back_mailchimp", { campaignId, provider });
 }
+
+export interface WinBackCsvRow {
+  company: string;
+  contact_name: string;
+  email: string;
+  phone: string;
+  website: string;
+  linkedin: string;
+  notes: string;
+  industry: string;
+}
+
+export async function parseWinBackCsv(path: string): Promise<WinBackCsvRow[]> {
+  return invoke<WinBackCsvRow[]>("parse_win_back_csv", { path });
+}
+
+export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[]): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows });
+}

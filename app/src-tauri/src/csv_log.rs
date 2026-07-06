@@ -371,16 +371,50 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
         let source_col = find_col(&["source_url", "website", "url", "site", "web"]);
         let notes_col = find_col(&["notes", "note", "comments", "comment"]);
 
+        // Win-back / CRM export fields
+        let contact_name_col = find_col(&[
+            "contact_name", "contact name", "full name", "fullname",
+            "first name", "firstname", "first_name",
+        ]);
+        let email_col = find_col(&[
+            "email", "contact_email", "contact email", "email_address",
+            "e-mail", "e_mail",
+        ]);
+        let linkedin_col = find_col(&[
+            "linkedin", "linkedin_url", "linkedin url", "linkedin profile",
+            "linkedin_profile", "li_url",
+        ]);
+        let industry_col = find_col(&["industry", "sector", "sic", "vertical"]);
+
+        // last-name column — used alongside first_name if contact_name not found
+        let last_name_col = find_col(&["last name", "lastname", "last_name", "surname"]);
+
         for result in reader.records() {
             let record = result.map_err(|e| format!("Could not parse CSV row: {}", e))?;
             let company = get(&record, Some(company_col));
             if company.is_empty() { continue; }
+
+            // Combine first + last name when a dedicated contact_name column is absent
+            let contact_name = if contact_name_col.is_some() {
+                get(&record, contact_name_col)
+            } else if last_name_col.is_some() {
+                let first = get(&record, find_col(&["first name", "firstname", "first_name"]));
+                let last = get(&record, last_name_col);
+                format!("{} {}", first, last).trim().to_string()
+            } else {
+                String::new()
+            };
+
             rows.push(serde_json::json!({
                 "company": company,
                 "phone_number": get(&record, phone_col),
                 "source_url": get(&record, source_col),
                 "notes": get(&record, notes_col),
                 "company_number": get(&record, company_number_col),
+                "contact_name": contact_name,
+                "email": get(&record, email_col),
+                "linkedin": get(&record, linkedin_col),
+                "industry": get(&record, industry_col),
             }));
         }
     }

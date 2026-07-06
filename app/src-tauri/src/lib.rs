@@ -1001,6 +1001,22 @@ async fn export_win_back_mailchimp(app_handle: tauri::AppHandle, campaign_id: St
     backend_client::export_win_back_mailchimp(&base_url, &session.token, &campaign_id, &provider).await
 }
 
+#[tauri::command]
+fn parse_win_back_csv(path: String) -> Result<Vec<serde_json::Value>, String> {
+    csv_log::parse_uploaded_csv(&path)
+}
+
+#[tauri::command]
+async fn create_win_back_campaign_from_csv(
+    app_handle: tauri::AppHandle,
+    name: String,
+    rows: Vec<backend_client::WinBackCsvRow>,
+) -> Result<WinBackCampaign, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -1113,7 +1129,9 @@ pub fn run() {
       get_win_back_campaign,
       send_win_back_email,
       send_all_win_back_emails,
-      export_win_back_mailchimp
+      export_win_back_mailchimp,
+      parse_win_back_csv,
+      create_win_back_campaign_from_csv
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

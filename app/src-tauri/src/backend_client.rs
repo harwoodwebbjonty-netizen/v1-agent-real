@@ -1953,6 +1953,31 @@ struct CreateWinBackCampaignRequest {
     lead_ids: Vec<String>,
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct WinBackCsvRow {
+    pub company: String,
+    #[serde(default)]
+    pub contact_name: String,
+    #[serde(default)]
+    pub email: String,
+    #[serde(default)]
+    pub phone: String,
+    #[serde(default)]
+    pub website: String,
+    #[serde(default)]
+    pub linkedin: String,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default)]
+    pub industry: String,
+}
+
+#[derive(Serialize)]
+struct CreateCampaignFromCsvRequest {
+    name: String,
+    rows: Vec<WinBackCsvRow>,
+}
+
 #[derive(Serialize)]
 struct WinBackSendRequest {
     provider: String,
@@ -2035,4 +2060,17 @@ pub async fn export_win_back_mailchimp(base_url: &str, token: &str, campaign_id:
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     let val: serde_json::Value = handle_response(response).await?;
     Ok(val["mailchimp_url"].as_str().unwrap_or("").to_string())
+}
+
+pub async fn create_win_back_campaign_from_csv(base_url: &str, token: &str, name: &str, rows: Vec<WinBackCsvRow>) -> Result<WinBackCampaign, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns/from-csv", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateCampaignFromCsvRequest { name: name.to_string(), rows })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
 }

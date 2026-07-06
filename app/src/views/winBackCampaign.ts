@@ -1,16 +1,17 @@
 import {
-  type Lead,
   type WinBackCampaign,
   type WinBackCampaignDetail,
+  type WinBackCsvRow,
   type WinBackEmail,
-  createWinBackCampaign,
+  createWinBackCampaignFromCsv,
   exportWinBackMailchimp,
-  getLogEntries,
   getWinBackCampaign,
   getWinBackCampaigns,
+  parseWinBackCsv,
   sendAllWinBackEmails,
   sendWinBackEmail,
 } from "../api";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentUser, subscribeAuth } from "../auth";
 import { escapeHtml } from "../utils";
 
@@ -75,138 +76,133 @@ function renderCampaignList(container: HTMLElement, campaigns: WinBackCampaign[]
   });
 }
 
-// --- Lead picker sub-view ---
+// --- Lead picker sub-view (source selection) ---
 
-async function showLeadPicker(container: HTMLElement): Promise<void> {
-  let leads: Lead[] = [];
-  try {
-    leads = await getLogEntries();
-  } catch {
-    leads = [];
-  }
-
-  const selectedIds = new Set<string>();
-
+function showLeadPicker(container: HTMLElement): void {
   container.innerHTML = `
     <main class="container">
       <section class="card">
         <div class="card-header-row">
           <div>
             <h2 class="card-title">New Win-back Campaign</h2>
-            <p class="card-subtitle">Select leads to include, then generate personalised emails.</p>
+            <p class="card-subtitle">Import leads from a CSV file or your CRM to generate personalised re-engagement emails.</p>
+          </div>
+          <div class="card-header-actions">
+            <button id="wb-back-btn" class="btn btn-ghost">Back</button>
+          </div>
+        </div>
+        <div class="wb-source-grid">
+          <button id="wb-csv-btn" class="wb-source-card">
+            <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+            </svg>
+            <strong>Upload CSV</strong>
+            <span>Import a spreadsheet of leads with names, emails and company info</span>
+          </button>
+          <button id="wb-zoho-btn" class="wb-source-card wb-source-card--disabled">
+            <svg width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z" />
+            </svg>
+            <strong>Import from Zoho</strong>
+            <span>Coming soon — connect your Zoho CRM to pull lost or dormant leads directly</span>
+          </button>
+        </div>
+        <p id="wb-source-msg" class="status-message" style="margin-top:8px"></p>
+      </section>
+    </main>`;
+
+  container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", async () => {
+    await loadCampaignList(container);
+  });
+
+  container.querySelector<HTMLButtonElement>("#wb-zoho-btn")!.addEventListener("click", () => {
+    const msg = container.querySelector<HTMLParagraphElement>("#wb-source-msg")!;
+    msg.textContent = "Zoho integration coming soon. Use CSV upload for now.";
+  });
+
+  container.querySelector<HTMLButtonElement>("#wb-csv-btn")!.addEventListener("click", async () => {
+    const path = await openDialog({
+      multiple: false,
+      filters: [{ name: "CSV files", extensions: ["csv"] }],
+    });
+    if (!path || typeof path !== "string") return;
+    await showCsvPreview(container, path);
+  });
+}
+
+// --- CSV preview sub-view ---
+
+async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<void> {
+  let rows: WinBackCsvRow[] = [];
+  try {
+    rows = await parseWinBackCsv(csvPath);
+  } catch (err) {
+    container.innerHTML = `<main class="container"><p class="status-error">Could not parse CSV: ${escapeHtml(String(err))}</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
+    container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
+    return;
+  }
+
+  container.innerHTML = `
+    <main class="container">
+      <section class="card">
+        <div class="card-header-row">
+          <div>
+            <h2 class="card-title">Review imported leads</h2>
+            <p class="card-subtitle">${rows.length} lead${rows.length !== 1 ? "s" : ""} found in CSV. Review before generating.</p>
           </div>
           <div class="card-header-actions">
             <button id="wb-back-btn" class="btn btn-ghost">Back</button>
           </div>
         </div>
         <div class="wb-picker-bar">
-          <input id="wb-name-input" class="search-input" type="text" placeholder="Campaign name (e.g. Q3 Win-back)" style="width:260px" />
-          <input id="wb-search-input" class="search-input" type="text" placeholder="Search leads..." style="width:200px" />
-          <select id="wb-stage-filter" class="search-input" style="width:160px">
-            <option value="">All stages</option>
-            <option value="lost">Lost</option>
-            <option value="none">No stage</option>
-            <option value="engaged">Engaged</option>
-            <option value="opportunity">Opportunity</option>
-          </select>
+          <input id="wb-name-input" class="search-input" type="text"
+            placeholder="Campaign name (e.g. Q3 Win-back)" style="width:280px" />
+          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length})</button>
         </div>
-        <div id="wb-bulk-bar" class="wb-bulk-bar hidden">
-          <span id="wb-bulk-count"></span>
-          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign</button>
-        </div>
-        <table class="data-table wb-picker-table">
+        <table class="data-table">
           <thead><tr>
-            <th><input type="checkbox" id="wb-select-all" /></th>
-            <th>Company</th><th>Contact</th><th>Industry</th><th>Stage</th>
+            <th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Website</th><th>LinkedIn</th>
           </tr></thead>
-          <tbody id="wb-picker-tbody"></tbody>
+          <tbody>
+            ${rows
+              .map(
+                (r) => `
+              <tr>
+                <td>${escapeHtml(r.company)}</td>
+                <td>${escapeHtml(r.contact_name || "—")}</td>
+                <td>${escapeHtml(r.email || "—")}</td>
+                <td>${escapeHtml(r.phone || "—")}</td>
+                <td class="wb-subject-cell">${escapeHtml(r.website || "—")}</td>
+                <td class="wb-subject-cell">${escapeHtml(r.linkedin || "—")}</td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
         </table>
       </section>
     </main>`;
 
-  const tbody = container.querySelector<HTMLTableSectionElement>("#wb-picker-tbody")!;
-  const searchInput = container.querySelector<HTMLInputElement>("#wb-search-input")!;
-  const stageFilter = container.querySelector<HTMLSelectElement>("#wb-stage-filter")!;
-  const bulkBar = container.querySelector<HTMLDivElement>("#wb-bulk-bar")!;
-  const bulkCount = container.querySelector<HTMLSpanElement>("#wb-bulk-count")!;
-  const selectAll = container.querySelector<HTMLInputElement>("#wb-select-all")!;
-
-  function getVisible(): Lead[] {
-    const q = searchInput.value.toLowerCase();
-    const stage = stageFilter.value;
-    return leads.filter(
-      (l) =>
-        (!q || l.company.toLowerCase().includes(q) || (l.contact_name || "").toLowerCase().includes(q)) &&
-        (!stage || l.opportunity_stage === stage)
-    );
-  }
-
-  function renderRows(): void {
-    const visible = getVisible();
-    tbody.innerHTML = visible
-      .map(
-        (l) => `
-      <tr class="${selectedIds.has(l.id) ? "lead-row-selected" : ""}">
-        <td><input type="checkbox" class="select-cb" data-id="${escapeHtml(l.id)}" ${selectedIds.has(l.id) ? "checked" : ""} /></td>
-        <td>${escapeHtml(l.company)}</td>
-        <td>${escapeHtml(l.contact_name || "—")}</td>
-        <td>${escapeHtml(l.industry || "—")}</td>
-        <td>${escapeHtml(l.opportunity_stage || "none")}</td>
-      </tr>`
-      )
-      .join("");
-
-    tbody.querySelectorAll<HTMLInputElement>(".select-cb").forEach((cb) => {
-      cb.addEventListener("change", () => {
-        const id = cb.dataset.id!;
-        if (cb.checked) selectedIds.add(id);
-        else selectedIds.delete(id);
-        const row = cb.closest("tr")!;
-        row.classList.toggle("lead-row-selected", cb.checked);
-        updateBulk();
-      });
-    });
-  }
-
-  function updateBulk(): void {
-    if (selectedIds.size > 0) {
-      bulkBar.classList.remove("hidden");
-      bulkCount.textContent = `${selectedIds.size} selected`;
-    } else {
-      bulkBar.classList.add("hidden");
-    }
-  }
-
-  selectAll.addEventListener("change", () => {
-    const visible = getVisible();
-    visible.forEach((l) => {
-      if (selectAll.checked) selectedIds.add(l.id);
-      else selectedIds.delete(l.id);
-    });
-    renderRows();
-    updateBulk();
-  });
-
-  searchInput.addEventListener("input", renderRows);
-  stageFilter.addEventListener("change", renderRows);
-
-  container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", async () => {
-    await loadCampaignList(container);
+  container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", () => {
+    showLeadPicker(container);
   });
 
   container.querySelector<HTMLButtonElement>("#wb-generate-btn")!.addEventListener("click", async () => {
     const nameInput = container.querySelector<HTMLInputElement>("#wb-name-input")!;
     const name = nameInput.value.trim() || `Win-back ${new Date().toLocaleDateString()}`;
-    if (selectedIds.size === 0) return;
+    const btn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
+    btn.disabled = true;
+    btn.textContent = "Creating...";
     try {
-      const campaign = await createWinBackCampaign(name, [...selectedIds]);
+      const campaign = await createWinBackCampaignFromCsv(name, rows);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
+      btn.disabled = false;
+      btn.textContent = `Generate Campaign (${rows.length})`;
       alert(`Failed to create campaign: ${err}`);
     }
   });
-
-  renderRows();
 }
 
 // --- Campaign detail sub-view ---

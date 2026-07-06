@@ -33,6 +33,22 @@ class CreateCampaignRequest(BaseModel):
     lead_ids: List[str]
 
 
+class CsvLeadRow(BaseModel):
+    company: str
+    contact_name: str = ""
+    email: str = ""
+    phone: str = ""
+    website: str = ""
+    linkedin: str = ""
+    notes: str = ""
+    industry: str = ""
+
+
+class CreateCampaignFromCsvRequest(BaseModel):
+    name: str
+    rows: List[CsvLeadRow]
+
+
 class SendEmailRequest(BaseModel):
     provider: str = "gmail"
 
@@ -194,6 +210,53 @@ async def create_campaign(
 def list_campaigns(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     rows = db.get_win_back_campaigns(current_user.id)
     return {"campaigns": [_campaign_dict(r) for r in rows]}
+
+
+@router.post("/campaigns/from-csv")
+async def create_campaign_from_csv(
+    body: CreateCampaignFromCsvRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    if not body.rows:
+        raise HTTPException(status_code=400, detail="At least one row is required.")
+
+    lead_ids: list[str] = []
+    ts = now_iso()
+    for row in body.rows:
+        lead_id = db.create_lead(
+            id=new_id(),
+            timestamp=ts,
+            company=row.company,
+            phone_number=row.phone,
+            source_url=row.website,
+            status="New",
+            notes=row.notes,
+            owner_user_id=current_user.id,
+            created_at=ts,
+        )
+        extra = {k: v for k, v in {
+            "contact_name": row.contact_name,
+            "website": row.website,
+            "linkedin": row.linkedin,
+            "industry": row.industry,
+        }.items() if v}
+        if extra:
+            db.update_lead_fields(lead_id, extra, ts)
+        if row.email:
+            db.add_email_ignore_duplicate(new_id(), lead_id, row.email, "csv_import", ts)
+        lead_ids.append(lead_id)
+
+    campaign_id = new_id()
+    db.create_win_back_campaign(
+        id=campaign_id,
+        name=body.name,
+        created_by=current_user.id,
+        total=len(lead_ids),
+        created_at=ts,
+    )
+    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id))
+    campaign = db.get_win_back_campaign(campaign_id)
+    return _campaign_dict(campaign)
 
 
 @router.get("/campaigns/{campaign_id}")
