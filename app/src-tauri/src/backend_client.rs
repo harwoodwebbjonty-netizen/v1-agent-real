@@ -465,7 +465,7 @@ pub async fn delete_lead_list(base_url: &str, token: &str, list_id: &str) -> Res
     Ok(())
 }
 
-pub async fn add_leads_to_list(base_url: &str, token: &str, list_id: &str, lead_ids: Vec<String>) -> Result<(), String> {
+pub async fn add_leads_to_list(base_url: &str, token: &str, list_id: &str, lead_ids: Vec<String>) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/lead-lists/{}/add-leads", base_url, list_id);
     let body = serde_json::json!({ "lead_ids": lead_ids });
@@ -476,8 +476,7 @@ pub async fn add_leads_to_list(base_url: &str, token: &str, list_id: &str, lead_
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend: {}", e))?;
-    let _: serde_json::Value = handle_response(response).await?;
-    Ok(())
+    handle_response(response).await
 }
 
 pub async fn set_lead_follow_up(base_url: &str, token: &str, lead_id: &str, follow_up_at: Option<String>) -> Result<LeadRecord, String> {

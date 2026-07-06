@@ -10,6 +10,7 @@ interface SavedView {
 
 let selected = new Set<string>();
 let hasChargesFilter = false;
+let selectedChargeTypes = new Set<string>();
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -22,6 +23,10 @@ export function getSelectedIndustries(): Set<string> {
 
 export function getHasChargesFilter(): boolean {
   return hasChargesFilter;
+}
+
+export function getSelectedChargeTypes(): Set<string> {
+  return selectedChargeTypes;
 }
 
 /** External setter — used by Analytics' industry chart click-through to
@@ -44,7 +49,7 @@ export function initFiltersToggle(): void {
   const badge = document.querySelector<HTMLSpanElement>("#filters-count-badge")!;
 
   function updateBadge(): void {
-    const count = selected.size + (hasChargesFilter ? 1 : 0);
+    const count = selected.size + (hasChargesFilter ? 1 : 0) + selectedChargeTypes.size;
     badge.textContent = String(count);
     badge.classList.toggle("hidden", count === 0);
   }
@@ -108,17 +113,50 @@ function deleteView(name: string): void {
   notify();
 }
 
+function extractChargeTypes(leads: Lead[]): string[] {
+  const types = new Set<string>();
+  for (const lead of leads) {
+    try {
+      const chData = JSON.parse(lead.ch_data || "{}");
+      for (const charge of chData.charges || []) {
+        const classification = (charge.classification || "").trim();
+        if (classification) types.add(classification);
+      }
+    } catch {
+      // ignore malformed ch_data
+    }
+  }
+  return Array.from(types).sort();
+}
+
 export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): void {
   const industries = Array.from(new Set(leads.map((l) => l.industry || "Uncategorized"))).sort();
+  const chargeTypes = extractChargeTypes(leads);
   const views = loadSavedViews();
 
   container.innerHTML = `
     <div class="sidebar-section">
-      <div class="sidebar-section-header"><span>Companies House</span></div>
+      <div class="sidebar-section-header">
+        <span>Charges (Companies House)</span>
+        ${selectedChargeTypes.size > 0 ? '<button id="clear-charge-filter-btn" class="btn btn-ghost btn-sm">Clear</button>' : ""}
+      </div>
       <label class="checkbox-row">
         <input type="checkbox" id="charges-filter-cb" ${hasChargesFilter ? "checked" : ""} />
-        Has active charges
+        Any charge registered
       </label>
+      ${
+        chargeTypes.length === 0
+          ? '<p class="empty-hint" style="margin-top:6px">Enrich leads with CH data to filter by type</p>'
+          : chargeTypes
+              .map(
+                (ct) => `
+        <label class="checkbox-row" style="padding-left:20px">
+          <input type="checkbox" data-charge-type="${escapeHtml(ct)}" ${selectedChargeTypes.has(ct) ? "checked" : ""} />
+          ${escapeHtml(ct)}
+        </label>`
+              )
+              .join("")
+      }
     </div>
     <div class="sidebar-section">
       <div class="sidebar-section-header">
@@ -156,6 +194,26 @@ export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): vo
 
   container.querySelector<HTMLInputElement>("#charges-filter-cb")?.addEventListener("change", (e) => {
     hasChargesFilter = (e.target as HTMLInputElement).checked;
+    if (hasChargesFilter) selectedChargeTypes.clear();
+    notify();
+  });
+
+  container.querySelectorAll<HTMLInputElement>("[data-charge-type]").forEach((cb) => {
+    cb.addEventListener("change", () => {
+      const ct = cb.dataset.chargeType!;
+      if (cb.checked) {
+        selectedChargeTypes.add(ct);
+        hasChargesFilter = false;
+      } else {
+        selectedChargeTypes.delete(ct);
+      }
+      notify();
+    });
+  });
+
+  container.querySelector("#clear-charge-filter-btn")?.addEventListener("click", () => {
+    selectedChargeTypes.clear();
+    hasChargesFilter = false;
     notify();
   });
 

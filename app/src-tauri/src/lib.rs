@@ -415,7 +415,7 @@ async fn toggle_list_lead_called(app_handle: tauri::AppHandle, list_id: String, 
 }
 
 #[tauri::command]
-async fn add_leads_to_list(app_handle: tauri::AppHandle, list_id: String, lead_ids: Vec<String>) -> Result<(), String> {
+async fn add_leads_to_list(app_handle: tauri::AppHandle, list_id: String, lead_ids: Vec<String>) -> Result<serde_json::Value, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
     backend_client::add_leads_to_list(&base_url, &session.token, &list_id, lead_ids).await

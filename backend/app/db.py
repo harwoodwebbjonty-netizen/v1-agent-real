@@ -951,17 +951,38 @@ def delete_lead_list(list_id: str) -> None:
         conn.execute("DELETE FROM lead_lists WHERE id = ?", (list_id,))
 
 
-def add_leads_to_list(lead_ids: list[str], list_id: str) -> int:
-    """Move existing leads into a list (sets their list_id). Returns count updated."""
+def add_leads_to_list(lead_ids: list[str], list_id: str) -> dict:
+    """Move existing leads into a list. Leads already in a DIFFERENT list are skipped.
+    Returns {added, skipped, skipped_details}."""
     if not lead_ids:
-        return 0
+        return {"added": 0, "skipped": 0, "skipped_details": []}
     placeholders = ",".join("?" * len(lead_ids))
     with get_connection() as conn:
-        conn.execute(
-            f"UPDATE leads SET list_id = ? WHERE id IN ({placeholders})",
-            [list_id, *lead_ids],
-        )
-        return len(lead_ids)
+        conflicts = conn.execute(
+            f"""SELECT l.id, l.company, ll.name AS list_name
+                FROM leads l
+                LEFT JOIN lead_lists ll ON l.list_id = ll.id
+                WHERE l.id IN ({placeholders})
+                  AND l.list_id IS NOT NULL
+                  AND l.list_id != ?""",
+            [*lead_ids, list_id],
+        ).fetchall()
+        conflict_ids = {r["id"] for r in conflicts}
+        to_add = [lid for lid in lead_ids if lid not in conflict_ids]
+        if to_add:
+            add_ph = ",".join("?" * len(to_add))
+            conn.execute(
+                f"UPDATE leads SET list_id = ? WHERE id IN ({add_ph})",
+                [list_id, *to_add],
+            )
+        return {
+            "added": len(to_add),
+            "skipped": len(conflict_ids),
+            "skipped_details": [
+                {"id": r["id"], "company": r["company"], "list_name": r["list_name"] or "another list"}
+                for r in conflicts
+            ],
+        }
 
 
 def set_lead_follow_up(lead_id: str, follow_up_at: Optional[str]) -> None:

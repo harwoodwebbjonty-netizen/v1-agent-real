@@ -35,6 +35,7 @@ import {
 } from "../components/leadTable";
 import {
   getHasChargesFilter,
+  getSelectedChargeTypes,
   getSelectedIndustries,
   initFiltersToggle,
   renderIndustrySidebar,
@@ -151,7 +152,7 @@ export function initDashboard(): void {
       return;
     }
     const visible = sortLeadsStable(
-      filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank, getHasChargesFilter()),
+      filterLeads(leads, searchText, getSelectedIndustries(), statusFilter, contactStatusMinRank, getHasChargesFilter(), getSelectedChargeTypes()),
       sortColumn,
       sortDirection
     );

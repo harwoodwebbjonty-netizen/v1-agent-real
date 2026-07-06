@@ -480,10 +480,14 @@ export function initColdCallLists(): void {
     bulkAddBtn.disabled = true;
     const ids = Array.from(selectedLeadIds);
     try {
-      await addLeadsToList(currentListId, ids);
+      const result = await addLeadsToList(currentListId, ids);
       selectedLeadIds.clear();
       lastToggledIndex = -1;
       await refreshCurrentList();
+      if (result.skipped > 0) {
+        const names = result.skipped_details.map((d) => `${d.company} (already in "${d.list_name}")`).join("\n");
+        alert(`${result.added} lead${result.added !== 1 ? "s" : ""} added.\n\n${result.skipped} skipped — already in another list:\n${names}`);
+      }
     } catch (err) {
       alert(`Failed to add leads: ${err}`);
     }

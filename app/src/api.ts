@@ -290,8 +290,14 @@ export async function toggleListLeadCalled(listId: string, leadId: string): Prom
   return invoke<string | null>("toggle_list_lead_called", { listId, leadId });
 }
 
-export async function addLeadsToList(listId: string, leadIds: string[]): Promise<void> {
-  return invoke<void>("add_leads_to_list", { listId, leadIds });
+export interface AddLeadsResult {
+  added: number;
+  skipped: number;
+  skipped_details: Array<{ id: string; company: string; list_name: string }>;
+}
+
+export async function addLeadsToList(listId: string, leadIds: string[]): Promise<AddLeadsResult> {
+  return invoke<AddLeadsResult>("add_leads_to_list", { listId, leadIds });
 }
 
 export async function setLeadFollowUp(leadId: string, followUpAt: string | null): Promise<Lead> {

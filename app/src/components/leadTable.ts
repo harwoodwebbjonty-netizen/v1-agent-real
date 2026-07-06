@@ -27,14 +27,16 @@ export function sortLeadsStable(leads: Lead[], col: SortColumn, dir: SortDirecti
 
 /** Industry filter (OR within selection) AND search (substring across company/phone/notes/industry),
  * plus an optional exact status filter (dashboard stat cards), an optional
- * minimum contact-status rank (Analytics funnel), and an optional CH charges filter. */
+ * minimum contact-status rank (Analytics funnel), an optional CH charges filter,
+ * and an optional charge-type filter (OR within selection). */
 export function filterLeads(
   leads: Lead[],
   search: string,
   selectedIndustries: Set<string>,
   statusFilter: Lead["status"] | null = null,
   contactStatusMinRank: number | null = null,
-  hasChargesFilter = false
+  hasChargesFilter = false,
+  selectedChargeTypes: Set<string> = new Set()
 ): Lead[] {
   const q = search.trim().toLowerCase();
   return leads.filter((lead) => {
@@ -46,10 +48,16 @@ export function filterLeads(
       const industry = lead.industry || "Uncategorized";
       if (!selectedIndustries.has(industry)) return false;
     }
-    if (hasChargesFilter) {
+    if (hasChargesFilter || selectedChargeTypes.size > 0) {
       try {
         const chData = JSON.parse(lead.ch_data || "{}");
-        if ((chData.charges_total ?? 0) === 0) return false;
+        const charges: Array<{ classification?: string }> = chData.charges || [];
+        if (selectedChargeTypes.size > 0) {
+          const hasMatch = charges.some((c) => selectedChargeTypes.has((c.classification || "").trim()));
+          if (!hasMatch) return false;
+        } else if ((chData.charges_total ?? 0) === 0) {
+          return false;
+        }
       } catch {
         return false;
       }

@@ -133,5 +133,4 @@ def add_leads_to_list(
     if lead_list is None:
         raise HTTPException(status_code=404, detail="List not found")
     _require_list_access(lead_list, current_user)
-    count = db.add_leads_to_list(body.lead_ids, list_id)
-    return {"added": count}
+    return db.add_leads_to_list(body.lead_ids, list_id)
