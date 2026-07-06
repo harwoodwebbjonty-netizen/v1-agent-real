@@ -90,14 +90,32 @@ def _passes_charge_filters(charges: list, criteria: ProspectingCriteria) -> bool
 _CH_PAGE_SIZE = 100  # CH API max per request
 _CH_MAX_SCAN = 10_000  # Maximum CH companies to examine in a single run
 
+# When no location is specified, sweep these UK regions so each SIC code search
+# returns a different geographic slice (CH caps at ~200 per query). This gives
+# up to len(_UK_LOCATIONS) × len(sic_codes) × 200 unique companies before dedup.
+_UK_LOCATIONS = [
+    "",  # nationwide baseline (no location filter)
+    "London", "Manchester", "Birmingham", "Leeds", "Liverpool",
+    "Sheffield", "Bristol", "Edinburgh", "Glasgow", "Cardiff",
+    "Newcastle", "Nottingham", "Leicester", "Southampton", "Brighton",
+    "Oxford", "Cambridge", "Norwich", "Reading", "Coventry",
+    "Exeter", "Derby", "Portsmouth", "Stoke-on-Trent", "Belfast",
+]
+
 
 async def _iter_companies(api_key: str, criteria: ProspectingCriteria, run_meta: dict):
     """Async generator: yields CH companies, deduplicating by company_number.
-    Searches each SIC code individually to work around the CH Advanced Search
-    200-result cap per combined-SIC query. Sets run_meta['ch_total'] to the
-    accumulated total available across all sub-searches.
+    Searches each SIC code × location individually to maximise coverage:
+    - CH caps combined-SIC queries at ~200 results; per-SIC searches go deeper
+    - When no location specified, sweeps all UK regions for different result slices
+    Sets run_meta['ch_total'] on the first page of each sub-search (accumulated).
     Stops after _CH_MAX_SCAN companies to prevent runaway runs."""
-    effective_locations = criteria.locations or ([criteria.location] if criteria.location else [""])
+    if criteria.locations:
+        effective_locations = criteria.locations
+    elif criteria.location:
+        effective_locations = [criteria.location]
+    else:
+        effective_locations = _UK_LOCATIONS  # full UK sweep for maximum coverage
     # Search each SIC code individually — CH caps combined-SIC queries at ~200 results,
     # but per-SIC queries can paginate deeper. With no SIC codes use a single None pass.
     sic_list: list = criteria.sic_codes if criteria.sic_codes else [None]
@@ -207,31 +225,45 @@ async def run_prospecting(
                 db.update_prospecting_run(run_id, {"skipped": skipped})
                 continue
 
+            # Fetch charges first — 98% of companies fail this filter, so check it
+            # before spending API calls on profile + officers (saves ~2 calls per reject).
             try:
-                profile = await get_company_profile(api_key, company_number) or {}
                 charges, charges_total = await get_company_charges(api_key, company_number)
-                officers = await get_company_officers(api_key, company_number)
             except CHRateLimitError:
-                logger.warning("CH rate limit hit for %s — sleeping 5s and skipping (leaving gap)", company_number)
+                logger.warning("CH rate limit (charges) for %s — sleeping 5s and skipping", company_number)
                 await asyncio.sleep(5)
                 skipped += 1
                 db.update_prospecting_run(run_id, {"skipped": skipped})
                 continue
             except Exception as exc:
-                logger.warning("CH fetch failed for %s: %s", company_number, exc)
-                profile, charges, charges_total, officers = {}, [], 0, []
+                logger.warning("CH charges failed for %s: %s", company_number, exc)
+                charges, charges_total = [], 0
+
+            # Apply charge filter immediately — skip before fetching profile/officers
+            if not _passes_charge_filters(charges, criteria):
+                skipped += 1
+                skipped_charge += 1
+                db.update_prospecting_run(run_id, {"skipped": skipped})
+                continue
+
+            # Charges passed — now fetch profile + officers for the lead record
+            try:
+                profile = await get_company_profile(api_key, company_number) or {}
+                officers = await get_company_officers(api_key, company_number)
+            except CHRateLimitError:
+                logger.warning("CH rate limit (profile/officers) for %s — sleeping 5s and skipping", company_number)
+                await asyncio.sleep(5)
+                skipped += 1
+                db.update_prospecting_run(run_id, {"skipped": skipped})
+                continue
+            except Exception as exc:
+                logger.warning("CH profile/officers failed for %s: %s", company_number, exc)
+                profile, officers = {}, []
 
             ch_score = compute_ch_score(profile or {}, charges)
             if criteria.min_ch_score > 0 and ch_score < criteria.min_ch_score:
                 skipped += 1
                 skipped_score += 1
-                db.update_prospecting_run(run_id, {"skipped": skipped})
-                continue
-
-            # Apply charge-related post-search filters
-            if not _passes_charge_filters(charges, criteria):
-                skipped += 1
-                skipped_charge += 1
                 db.update_prospecting_run(run_id, {"skipped": skipped})
                 continue
 
