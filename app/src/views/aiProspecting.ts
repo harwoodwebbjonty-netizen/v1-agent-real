@@ -299,6 +299,7 @@ interface FormState {
   maxResults: number;
   minChScore: number;
   runAiEnrichment: boolean;
+  creditLimitGbp: number;
   chargeTypes: string[];
   activeChargesOnly: boolean;
   includeSatisfied: boolean;
@@ -319,6 +320,7 @@ const DEFAULT_STATE: FormState = {
   maxResults: 50,
   minChScore: 0,
   runAiEnrichment: false,
+  creditLimitGbp: 0,
   chargeTypes: [],
   activeChargesOnly: false,
   includeSatisfied: true,
@@ -597,13 +599,26 @@ export function initAiProspecting(): void {
                   ${buildRangeSliderHtml("min-score", 0, 100, state.minChScore, "Min CH score (0 = all)", "Free pre-filter score from Companies House data — new charges, sector fit, company age. No AI cost. Set to 30+ to focus on companies with recent borrowing activity.")}
                 </div>
 
-                <!-- AI toggle -->
+                <!-- AI toggle + cost estimate -->
                 <div class="prospecting-field">
                   <label class="checkbox-row">
                     <input type="checkbox" id="ai-enrichment-toggle" ${state.runAiEnrichment ? "checked" : ""} />
                     Run full AI Sales Intelligence on new leads
-                    <span class="empty-hint" style="margin-left:6px">(uses Anthropic credits ~£0.10–0.20 per lead)</span>
+                    <span class="empty-hint" style="margin-left:6px">(~£0.15 per lead)</span>
                   </label>
+                  ${state.runAiEnrichment ? `
+                  <div class="p-cost-row" style="margin-top:var(--space-3);display:flex;align-items:center;gap:var(--space-4);flex-wrap:wrap">
+                    <span class="stat-label">
+                      Est. total cost:
+                      <strong style="color:var(--accent)">£${(state.maxResults * 0.15).toFixed(2)}</strong>
+                      <span class="empty-hint">(if all ${state.maxResults} leads pass filters)</span>
+                    </span>
+                    <label class="stat-label" style="display:flex;align-items:center;gap:var(--space-2);white-space:nowrap">
+                      Credit limit (£)
+                      <span class="p-tip"><span class="p-tip-icon">?</span><span class="p-tip-content">Stop AI enrichment once this amount is spent. 0 = no limit. Leads are still added without AI intelligence once the limit is hit.</span></span>
+                      <input type="number" id="credit-limit-input" class="search-input" min="0" step="1" value="${state.creditLimitGbp || ""}" placeholder="No limit" style="width:90px" />
+                    </label>
+                  </div>` : ""}
                 </div>
 
                 <!-- Charge Filters -->
@@ -680,6 +695,17 @@ export function initAiProspecting(): void {
                       <div class="action-row-title" style="margin-bottom:2px">
                         ${run.name ? `<strong>${escapeHtml(run.name)}</strong> · ` : ""}
                         Found <strong>${run.found}</strong> · Added <strong>${run.created}</strong> · Skipped <strong>${run.skipped}</strong>
+                        ${(() => {
+                          try {
+                            const c = JSON.parse(run.criteria) as Partial<ProspectingCriteria>;
+                            if (c.run_ai_enrichment && run.created > 0) {
+                              const cost = (run.created * 0.15).toFixed(2);
+                              const limit = c.credit_limit_gbp ? ` / £${c.credit_limit_gbp.toFixed(2)} limit` : "";
+                              return ` · <span style="color:var(--accent)">£${cost} spent${limit}</span>`;
+                            }
+                          } catch { /* ignore */ }
+                          return "";
+                        })()}
                       </div>
                       <div class="p-run-filters">${escapeHtml(buildRunSummary(run))}</div>
                     </div>
@@ -755,6 +781,11 @@ export function initAiProspecting(): void {
     // Checkboxes
     container.querySelector<HTMLInputElement>("#ai-enrichment-toggle")?.addEventListener("change", (e) => {
       state.runAiEnrichment = (e.target as HTMLInputElement).checked;
+      void render(); // re-render to show/hide cost estimate + credit limit field
+    });
+    container.querySelector<HTMLInputElement>("#credit-limit-input")?.addEventListener("input", (e) => {
+      const val = parseFloat((e.target as HTMLInputElement).value);
+      state.creditLimitGbp = isNaN(val) ? 0 : val;
     });
     container.querySelector<HTMLInputElement>("#active-charges-toggle")?.addEventListener("change", (e) => {
       state.activeChargesOnly = (e.target as HTMLInputElement).checked;
@@ -817,6 +848,7 @@ export function initAiProspecting(): void {
             maxResults: c.max_results ?? 50,
             minChScore: c.min_ch_score ?? 0,
             runAiEnrichment: c.run_ai_enrichment ?? false,
+            creditLimitGbp: c.credit_limit_gbp ?? 0,
             chargeTypes: c.charge_types ?? [],
             activeChargesOnly: c.active_charges_only ?? false,
             includeSatisfied: c.include_satisfied ?? true,
@@ -879,6 +911,7 @@ export function initAiProspecting(): void {
         max_results: state.maxResults,
         min_ch_score: state.minChScore,
         run_ai_enrichment: state.runAiEnrichment,
+        credit_limit_gbp: state.creditLimitGbp,
         charge_types: state.chargeTypes,
         active_charges_only: state.activeChargesOnly,
         include_satisfied: state.includeSatisfied,

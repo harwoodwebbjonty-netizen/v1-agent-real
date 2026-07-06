@@ -735,6 +735,7 @@ export interface ProspectingCriteria {
   max_results: number;
   min_ch_score: number;
   run_ai_enrichment: boolean;
+  credit_limit_gbp: number;
   charge_types: string[];
   active_charges_only: boolean;
   include_satisfied: boolean;

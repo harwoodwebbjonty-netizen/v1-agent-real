@@ -23,6 +23,7 @@ class ProspectingCriteria(BaseModel):
     charge_registered_to: str = ""
     min_charges: int = 0
     max_charges: int = 0
+    credit_limit_gbp: float = 0.0  # 0 = no limit
 
 
 class StartProspectingResponse(BaseModel):

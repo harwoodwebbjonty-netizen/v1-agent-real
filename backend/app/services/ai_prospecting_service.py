@@ -165,13 +165,21 @@ async def run_prospecting(
         )
         return
 
+    AI_COST_PER_LEAD_GBP = 0.15
     found = created = skipped = 0
+    cumulative_cost_gbp = 0.0
+    credit_limit = criteria.credit_limit_gbp  # 0 = no limit
+    credit_limit_hit = False
+
     try:
         companies = await _search_all_locations(api_key, criteria)
         found = len(companies)
         db.update_prospecting_run(run_id, {"found": found})
 
         for item in companies:
+            if credit_limit_hit:
+                break
+
             company_number = item.get("company_number", "")
             company_name = item.get("company_name") or item.get("title", "Unknown")
 
@@ -254,6 +262,15 @@ async def run_prospecting(
             db.update_prospecting_run(run_id, {"created": created})
 
             if criteria.run_ai_enrichment and ch_score >= max(criteria.min_ch_score, 20):
+                # Check credit limit before incurring AI cost
+                if credit_limit > 0 and cumulative_cost_gbp + AI_COST_PER_LEAD_GBP > credit_limit:
+                    logger.info(
+                        "Credit limit £%.2f reached (spent £%.2f) — stopping AI enrichment",
+                        credit_limit, cumulative_cost_gbp,
+                    )
+                    credit_limit_hit = True
+                    break
+
                 try:
                     from app.services.sales_intelligence_service import generate_sales_intelligence
                     import json as json_mod
@@ -277,12 +294,21 @@ async def run_prospecting(
                         },
                         created_at,
                     )
+                    cumulative_cost_gbp += AI_COST_PER_LEAD_GBP
                 except Exception as exc:
                     logger.warning("AI enrichment failed for %s: %s", company_name, exc)
 
+        completion_note = f"Credit limit £{credit_limit:.2f} reached" if credit_limit_hit else None
         db.update_prospecting_run(
             run_id,
-            {"status": "complete", "found": found, "created": created, "skipped": skipped, "completed_at": now_iso()},
+            {
+                "status": "complete",
+                "found": found,
+                "created": created,
+                "skipped": skipped,
+                "completed_at": now_iso(),
+                **({"error": completion_note} if completion_note else {}),
+            },
         )
     except Exception as exc:
         logger.exception("Prospecting run %s failed", run_id)
