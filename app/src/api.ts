@@ -784,6 +784,7 @@ export interface ProspectingRun {
   found: number;
   created: number;
   skipped: number;
+  total_available: number;
   error: string | null;
   started_at: string;
   completed_at: string | null;

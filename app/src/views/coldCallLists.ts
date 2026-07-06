@@ -346,6 +346,9 @@ export function initColdCallLists(): void {
         setPendingEmailWriterLead(lead.id);
         openTab("outreach", "Outreach");
       },
+      onLookupPhone: (lead) => {
+        void lookupCompanyPhone(lead.company, currentListId ?? undefined).then(() => refreshCurrentList());
+      },
       showListColumn: false,
     }, selectedLeadIds);
     updateBulkBar(visible);

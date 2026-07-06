@@ -39,6 +39,7 @@ class ProspectingRunOut(BaseModel):
     found: int
     created: int
     skipped: int
+    total_available: int = 0
     error: Optional[str]
     started_at: str
     completed_at: Optional[str]

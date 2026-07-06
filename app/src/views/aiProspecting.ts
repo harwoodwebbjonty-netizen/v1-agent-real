@@ -694,7 +694,7 @@ export function initAiProspecting(): void {
                     <div style="flex:1;min-width:0">
                       <div class="action-row-title" style="margin-bottom:2px">
                         ${run.name ? `<strong>${escapeHtml(run.name)}</strong> · ` : ""}
-                        Found <strong>${run.found}</strong> · Added <strong>${run.created}</strong> · Skipped <strong>${run.skipped}</strong>
+                        Scanned <strong>${run.found}</strong>${run.total_available > 0 ? ` <span class="empty-hint">of ${run.total_available.toLocaleString()} in CH</span>` : ""} · Added <strong>${run.created}</strong> · Skipped <strong>${run.skipped}</strong>
                         ${(() => {
                           try {
                             const c = JSON.parse(run.criteria) as Partial<ProspectingCriteria>;
@@ -1083,7 +1083,8 @@ export function initAiProspecting(): void {
         const run = await getProspectingRun(runId);
         const msg = container.querySelector<HTMLSpanElement>("#run-status-msg");
         if (msg) {
-          const parts = [`Running — found ${run.found} · added ${run.created} · skipped ${run.skipped}`];
+          const total = run.total_available > 0 ? ` of ${run.total_available.toLocaleString()} in CH` : "";
+          const parts = [`Running — scanned ${run.found}${total} · added ${run.created} · skipped ${run.skipped}`];
           const eta = _formatRunEta(run);
           const cost = _formatRunCost(run);
           if (eta) parts.push(eta);

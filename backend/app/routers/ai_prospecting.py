@@ -27,6 +27,7 @@ def _to_run_out(row) -> ProspectingRunOut:
         found=row["found"],
         created=row["created"],
         skipped=row["skipped"],
+        total_available=row["total_available"] or 0,
         error=row["error"],
         started_at=row["started_at"],
         completed_at=row["completed_at"],

@@ -82,6 +82,8 @@ export interface RowHandlers {
   onToggleCalled?: (lead: Lead) => void;
   /** Reduce-clicks: jump straight to drafting an email for this lead without opening the side panel first. */
   onGenerateEmail?: (lead: Lead) => void;
+  /** Look up phone number for a lead that doesn't have one yet. */
+  onLookupPhone?: (lead: Lead) => void;
   /** Dashboard only: opens the activity modal for this lead. Renders a pulsing dot column on the left. */
   onActivityClick?: (lead: Lead) => void;
   /** Bulk selection: toggling a row's checkbox. Caller owns the selectedIds set. shiftKey enables range select. */
@@ -137,7 +139,9 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
               ? `<span>${escapeHtml(lead.phone_number)}</span>
                  <a class="icon-btn" href="tel:${escapeHtml(lead.phone_number)}" title="Call">📞</a>
                  <button class="icon-btn copy-phone-btn" type="button" title="Copy">⧉</button>`
-              : `<span class="empty-hint">—</span>`
+              : handlers.onLookupPhone
+                ? `<button class="icon-btn lookup-phone-btn" type="button" title="Look up phone number">🔍</button>`
+                : `<span class="empty-hint">—</span>`
           }
         </div>
       </td>
@@ -184,6 +188,14 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     copyBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       void copyToClipboard(lead.phone_number);
+    });
+
+    const lookupPhoneBtn = row.querySelector<HTMLButtonElement>(".lookup-phone-btn");
+    lookupPhoneBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      lookupPhoneBtn.textContent = "⏳";
+      lookupPhoneBtn.disabled = true;
+      handlers.onLookupPhone!(lead);
     });
 
     const selectCb = row.querySelector<HTMLInputElement>(".select-cb");

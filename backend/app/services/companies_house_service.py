@@ -23,7 +23,7 @@ def _client(api_key: str) -> httpx.AsyncClient:
     return httpx.AsyncClient(auth=(api_key, ""), base_url=CH_BASE_URL, timeout=15.0)
 
 
-async def search_companies(
+async def search_companies_raw(
     api_key: str,
     *,
     location: str = "",
@@ -33,9 +33,8 @@ async def search_companies(
     incorporated_to: str = "",
     size: int = 20,
     start_index: int = 0,
-) -> list[dict]:
-    """Advanced Company Search — returns companies matching the given criteria.
-    Results are NOT already-in-CRM-checked; dedup is the caller's responsibility."""
+) -> dict:
+    """Advanced Company Search — returns the raw response dict including 'hits' (total) and 'items'."""
     params: dict = {"company_status": "active", "company_type": company_type, "size": size}
     if start_index > 0:
         params["start_index"] = start_index
@@ -54,9 +53,28 @@ async def search_companies(
             raise CHRateLimitError("CH search rate limited")
         if r.status_code != 200:
             logger.warning("CH search returned %d: %s", r.status_code, r.text[:200])
-            return []
-        data = r.json()
-        return data.get("items", [])
+            return {"items": [], "hits": 0}
+        return r.json()
+
+
+async def search_companies(
+    api_key: str,
+    *,
+    location: str = "",
+    sic_codes: Optional[List[str]] = None,
+    company_type: str = "ltd",
+    incorporated_from: str = "",
+    incorporated_to: str = "",
+    size: int = 20,
+    start_index: int = 0,
+) -> list[dict]:
+    """Advanced Company Search — returns items only. Use search_companies_raw for total count."""
+    raw = await search_companies_raw(
+        api_key, location=location, sic_codes=sic_codes, company_type=company_type,
+        incorporated_from=incorporated_from, incorporated_to=incorporated_to,
+        size=size, start_index=start_index,
+    )
+    return raw.get("items", [])
 
 
 _LEGAL_SUFFIXES = re.compile(

@@ -24,6 +24,7 @@ from app.services.companies_house_service import (
     get_company_officers,
     get_company_profile,
     search_companies,
+    search_companies_raw,
 )
 
 logger = logging.getLogger("app.ai_prospecting")
@@ -90,22 +91,25 @@ _CH_PAGE_SIZE = 100  # CH API max per request
 _CH_MAX_SCAN = 10_000  # Maximum CH companies to examine in a single run
 
 
-async def _iter_companies(api_key: str, criteria: ProspectingCriteria):
+async def _iter_companies(api_key: str, criteria: ProspectingCriteria, run_meta: dict):
     """Async generator: yields CH companies across all locations, deduplicating by
-    company_number. Skips pages gracefully on rate limit (leaves gap). Stops after
-    _CH_MAX_SCAN companies to prevent runaway runs."""
+    company_number. Sets run_meta['ch_total'] on the first page (sum across locations).
+    Stops after _CH_MAX_SCAN companies to prevent runaway runs."""
     effective_locations = criteria.locations or ([criteria.location] if criteria.location else [""])
     seen: set[str] = set()
     total_yielded = 0
+    ch_total = 0
 
     for loc in effective_locations:
         if total_yielded >= _CH_MAX_SCAN:
             break
         start_index = 0
         consecutive_errors = 0
+        loc_total_captured = False
+
         while total_yielded < _CH_MAX_SCAN:
             try:
-                items = await search_companies(
+                raw = await search_companies_raw(
                     api_key,
                     location=loc,
                     sic_codes=criteria.sic_codes or None,
@@ -128,6 +132,12 @@ async def _iter_companies(api_key: str, criteria: ProspectingCriteria):
                 logger.warning("CH search failed for location %r at index %d: %s", loc, start_index, exc)
                 break
 
+            if not loc_total_captured:
+                ch_total += raw.get("hits", 0)
+                run_meta["ch_total"] = ch_total
+                loc_total_captured = True
+
+            items = raw.get("items", [])
             if not items:
                 break
 
@@ -139,7 +149,7 @@ async def _iter_companies(api_key: str, criteria: ProspectingCriteria):
                     yield item
 
             if len(items) < _CH_PAGE_SIZE:
-                break  # last page — no more results for this location
+                break
 
             start_index += len(items)
             await asyncio.sleep(0.3)
@@ -166,9 +176,12 @@ async def run_prospecting(
     cumulative_cost_gbp = 0.0
     credit_limit = criteria.credit_limit_gbp  # 0 = no limit
     credit_limit_hit = False
+    run_meta: dict = {}  # filled in by _iter_companies (ch_total)
 
     try:
-        async for item in _iter_companies(api_key, criteria):
+        async for item in _iter_companies(api_key, criteria, run_meta):
+            if "ch_total" in run_meta:
+                db.update_prospecting_run(run_id, {"total_available": run_meta.pop("ch_total")})
             if created >= target or credit_limit_hit:
                 break
 

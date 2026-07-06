@@ -424,6 +424,13 @@ def _migration_012_credit_tracking(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_013_prospecting_total_available(conn: sqlite3.Connection) -> None:
+    """Add total_available to prospecting_runs (total CH companies matching the query)."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(prospecting_runs)")}
+    if "total_available" not in cols:
+        conn.execute("ALTER TABLE prospecting_runs ADD COLUMN total_available INTEGER NOT NULL DEFAULT 0")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -439,8 +446,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (10, _migration_010_follow_up),
     (11, _migration_011_win_back),
     (12, _migration_012_credit_tracking),
+    (13, _migration_013_prospecting_total_available),
 ]
-CURRENT_SCHEMA_VERSION = 12
+CURRENT_SCHEMA_VERSION = 13
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
