@@ -364,6 +364,11 @@ export function initColdCallLists(): void {
   let selectorSelected = new Set<string>();
   let selectorLastIndex = -1;
 
+  // Drag-select state
+  let isDragging = false;
+  let dragStartIdx = -1;
+  let dragSelectValue = true;
+
   // ── Helpers ───────────────────────────────────────────────────────────────
   function hasPhone(lead: Lead): boolean {
     return !!(lead.phone_number && lead.phone_number !== "not_found");
@@ -539,6 +544,38 @@ export function initColdCallLists(): void {
     selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row").forEach((row, idx) => {
       const leadId = row.dataset.leadId!;
       const cb = row.querySelector<HTMLInputElement>(".select-cb")!;
+
+      // ── Drag-to-select ──────────────────────────────────────────────────
+      row.addEventListener("mousedown", (e) => {
+        if ((e.target as HTMLElement).closest("input[type=checkbox]")) return;
+        e.preventDefault();
+        isDragging = true;
+        dragStartIdx = idx;
+        dragSelectValue = !selectorSelected.has(leadId);
+        selectorEl.classList.add("selector-no-select");
+        if (dragSelectValue) selectorSelected.add(leadId); else selectorSelected.delete(leadId);
+        row.classList.toggle("lead-row-selected", dragSelectValue);
+        cb.checked = dragSelectValue;
+        selectorLastIndex = idx;
+        updateSelectorBtn();
+      });
+
+      row.addEventListener("mouseover", () => {
+        if (!isDragging) return;
+        const allRows = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"));
+        const lo = Math.min(dragStartIdx, idx);
+        const hi = Math.max(dragStartIdx, idx);
+        for (let i = lo; i <= hi; i++) {
+          const rid = allRows[i].dataset.leadId!;
+          if (dragSelectValue) selectorSelected.add(rid); else selectorSelected.delete(rid);
+          allRows[i].classList.toggle("lead-row-selected", dragSelectValue);
+          const rcb = allRows[i].querySelector<HTMLInputElement>(".select-cb");
+          if (rcb) rcb.checked = dragSelectValue;
+        }
+        updateSelectorBtn();
+      });
+
+      // ── Checkbox click (shift-range + normal toggle) ────────────────────
       cb.addEventListener("click", (e) => {
         e.stopPropagation();
         const selected = cb.checked;
@@ -598,6 +635,13 @@ export function initColdCallLists(): void {
 
   selectorBackBtn.addEventListener("click", showNameScreen);
 
+  document.addEventListener("mouseup", () => {
+    if (isDragging) {
+      isDragging = false;
+      selectorEl.classList.remove("selector-no-select");
+    }
+  });
+
   selectorSearchInput.addEventListener("input", () => {
     selectorSearch = selectorSearchInput.value;
     renderSelector();
@@ -647,14 +691,67 @@ export function initColdCallLists(): void {
 
   selectorCreateBtn.addEventListener("click", () => void confirmCreateList());
 
+  function showConflictDialog(conflicted: Lead[]): Promise<"move" | "skip" | "cancel"> {
+    return new Promise((resolve) => {
+      const byList: Record<string, number> = {};
+      for (const l of conflicted) {
+        const name = l.list_name || "Unknown list";
+        byList[name] = (byList[name] || 0) + 1;
+      }
+      const listLines = Object.entries(byList)
+        .map(([name, count]) => `<li>"${escapeHtml(name)}" — ${count} lead${count === 1 ? "" : "s"}</li>`)
+        .join("");
+      const overlay = document.createElement("div");
+      overlay.className = "conflict-modal-overlay";
+      overlay.innerHTML = `
+        <div class="conflict-modal">
+          <h3 class="conflict-modal-title">Some leads are already in a list</h3>
+          <p class="conflict-modal-desc">${conflicted.length} selected lead${conflicted.length === 1 ? " is" : "s are"} already assigned to:</p>
+          <ul class="conflict-modal-list">${listLines}</ul>
+          <p class="conflict-modal-question">What would you like to do?</p>
+          <div class="conflict-modal-actions">
+            <button id="conflict-move-btn" class="btn btn-primary btn-sm">Move to new list</button>
+            <button id="conflict-skip-btn" class="btn btn-secondary btn-sm">Skip these leads</button>
+            <button id="conflict-cancel-btn" class="btn btn-ghost btn-sm">Cancel</button>
+          </div>
+          <p class="conflict-modal-hint">
+            <strong>Move</strong> — reassign them to this new list.
+            <strong>Skip</strong> — only add the ${selectorSelected.size - conflicted.length} unassigned leads.
+          </p>
+        </div>
+      `;
+      document.body.appendChild(overlay);
+      const cleanup = (result: "move" | "skip" | "cancel") => {
+        document.body.removeChild(overlay);
+        resolve(result);
+      };
+      overlay.querySelector("#conflict-move-btn")!.addEventListener("click", () => cleanup("move"));
+      overlay.querySelector("#conflict-skip-btn")!.addEventListener("click", () => cleanup("skip"));
+      overlay.querySelector("#conflict-cancel-btn")!.addEventListener("click", () => cleanup("cancel"));
+    });
+  }
+
   async function confirmCreateList(): Promise<void> {
     const ids = Array.from(selectorSelected);
     if (ids.length === 0 || !pendingListName) return;
+
+    const allLeads = getLeads();
+    const conflicted = allLeads.filter((l) => selectorSelected.has(l.id) && l.list_name);
+    if (conflicted.length > 0) {
+      const action = await showConflictDialog(conflicted);
+      if (action === "cancel") return;
+      if (action === "skip") {
+        conflicted.forEach((l) => selectorSelected.delete(l.id));
+        if (selectorSelected.size === 0) return;
+      }
+    }
+
+    const finalIds = Array.from(selectorSelected);
     selectorCreateBtn.disabled = true;
     selectorCreateBtn.textContent = "Creating…";
     try {
       const list = await createLeadList(pendingListName, pendingForUserId || undefined);
-      await addLeadsToList(list.id, ids);
+      await addLeadsToList(list.id, finalIds);
       await refreshLeadLists();
       await openListDetail(list.id);
     } catch (err) {

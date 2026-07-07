@@ -3117,6 +3117,70 @@ body.compact-rows td {
 }
 .ccl-filter-select:focus { outline: none; border-color: var(--primary); }
 
+/* Drag-to-select: prevent text highlight while dragging */
+.selector-no-select { user-select: none; }
+.selector-no-select .selector-row { cursor: default; }
+
+/* Multi-select wrappers in selector filter bar */
+.sel-ms-wrap { min-width: 180px; max-width: 240px; flex-shrink: 0; }
+.sel-ms-wrap .p-multiselect { height: 28px; }
+.sel-ms-wrap .p-multiselect-trigger { min-height: 28px; height: auto; padding: 2px 8px; }
+
+/* Conflict warning modal */
+.conflict-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.conflict-modal {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 10px);
+  padding: var(--space-6);
+  max-width: 480px;
+  width: 92%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+}
+.conflict-modal-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  margin: 0 0 var(--space-2);
+  color: var(--text);
+}
+.conflict-modal-desc {
+  font-size: 0.88rem;
+  color: var(--text-muted);
+  margin: 0 0 var(--space-2);
+}
+.conflict-modal-list {
+  margin: 0 0 var(--space-3);
+  padding-left: 1.3em;
+  font-size: 0.88rem;
+  color: var(--text);
+  line-height: 1.7;
+}
+.conflict-modal-question {
+  font-size: 0.9rem;
+  font-weight: 500;
+  margin: 0 0 var(--space-3);
+}
+.conflict-modal-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+.conflict-modal-hint {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
 /* Status filter group */
 .ccl-status-filter { display: flex; gap: var(--space-1); }
 
