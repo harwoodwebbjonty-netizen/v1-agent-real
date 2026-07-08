@@ -976,6 +976,46 @@ async fn migrate_local_leads_to_team(app_handle: tauri::AppHandle) -> Result<usi
     backend_client::migrate_leads(&base_url, &session.token, payload).await
 }
 
+// --- CH Charge Feed ---
+
+#[tauri::command]
+async fn get_charge_feed_status(app_handle: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_charge_feed_status(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn get_charge_feed(
+    app_handle: tauri::AppHandle,
+    company_name: Option<String>,
+    filing_types: Option<String>,
+    since: Option<String>,
+    not_added: bool,
+    limit: u32,
+    offset: u32,
+) -> Result<Vec<backend_client::ChCharge>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_charge_feed(
+        &base_url,
+        &session.token,
+        company_name.as_deref(),
+        filing_types.as_deref(),
+        since.as_deref(),
+        not_added,
+        limit,
+        offset,
+    ).await
+}
+
+#[tauri::command]
+async fn add_charge_as_lead(app_handle: tauri::AppHandle, charge_id: String) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::add_charge_as_lead(&base_url, &session.token, &charge_id).await
+}
+
 // --- Win-back campaigns ---
 
 #[derive(Serialize)]
@@ -1152,6 +1192,9 @@ pub fn run() {
       get_global_activity_feed,
       get_batch_activity_summaries,
       get_activity_status,
+      get_charge_feed_status,
+      get_charge_feed,
+      add_charge_as_lead,
       export_log_csv,
       migrate_local_leads_to_team,
       create_win_back_campaign,

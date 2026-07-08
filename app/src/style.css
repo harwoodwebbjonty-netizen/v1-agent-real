@@ -3675,3 +3675,129 @@ body.compact-rows td {
   flex: 1;
   color: var(--text);
 }
+
+/* ============================================================
+   Charge Feed
+   ============================================================ */
+.charge-feed-filters {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.charge-filter-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.charge-type-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.charge-feed-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-2) 0;
+}
+
+.charge-feed-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--border);
+  min-height: 44px;
+  transition: background 0.1s;
+}
+
+.charge-feed-row:hover {
+  background: var(--surface-alt);
+}
+
+.charge-feed-row-main {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  flex-wrap: wrap;
+}
+
+.charge-company {
+  font-weight: 600;
+  font-size: 0.9rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 260px;
+}
+
+.charge-desc {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+}
+
+.charge-feed-row-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+
+.charge-reg-date {
+  color: var(--text-muted);
+}
+
+.charge-detected {
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.charge-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 7px;
+  border-radius: 99px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.charge-badge-new {
+  background: color-mix(in srgb, var(--accent) 15%, transparent);
+  color: var(--accent);
+}
+
+.charge-badge-satisfied {
+  background: color-mix(in srgb, var(--text-muted) 15%, transparent);
+  color: var(--text-muted);
+}
+
+.charge-added-label {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.cf-timepoint-label {
+  font-size: 0.7rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-left: var(--space-2);
+  vertical-align: middle;
+}
+
+.cf-load-more-wrap {
+  display: flex;
+  justify-content: center;
+  padding: var(--space-3);
+}

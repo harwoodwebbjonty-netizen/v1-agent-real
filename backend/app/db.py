@@ -341,6 +341,26 @@ def _migration_008_activity_feed(conn: sqlite3.Connection) -> None:
         CREATE INDEX IF NOT EXISTS idx_activity_company ON activity_events(company_number);
         CREATE INDEX IF NOT EXISTS idx_activity_lead ON activity_events(lead_id);
         CREATE INDEX IF NOT EXISTS idx_activity_detected ON activity_events(detected_at);
+
+        CREATE TABLE IF NOT EXISTS ch_charge_feed (
+            id TEXT PRIMARY KEY,
+            company_number TEXT NOT NULL,
+            company_name TEXT,
+            filing_type TEXT NOT NULL,
+            charge_description TEXT,
+            filing_date TEXT,
+            transaction_id TEXT UNIQUE,
+            event_data TEXT,
+            detected_at TEXT NOT NULL,
+            lead_id TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_ch_charge_detected ON ch_charge_feed(detected_at);
+        CREATE INDEX IF NOT EXISTS idx_ch_charge_company ON ch_charge_feed(company_number);
+
+        CREATE TABLE IF NOT EXISTS ch_stream_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         """
     )
     lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
@@ -1811,3 +1831,87 @@ def check_credit_limit(user_id: str, feature: str) -> tuple[bool, float, float]:
     cost = CREDIT_COST.get(feature, 0.0)
     allowed = (spend + cost) <= limit
     return allowed, spend, limit
+
+
+# ---------------------------------------------------------------------------
+# CH Charge Feed
+# ---------------------------------------------------------------------------
+
+def get_stream_state(key: str) -> Optional[str]:
+    with get_connection() as conn:
+        row = conn.execute("SELECT value FROM ch_stream_state WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+
+def set_stream_state(key: str, value: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO ch_stream_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+            (key, value),
+        )
+
+
+def save_ch_charge(event: dict) -> bool:
+    """Insert a charge feed event. Returns True if inserted (False if duplicate)."""
+    with get_connection() as conn:
+        try:
+            conn.execute(
+                """INSERT INTO ch_charge_feed
+                   (id, company_number, company_name, filing_type, charge_description,
+                    filing_date, transaction_id, event_data, detected_at, lead_id)
+                   VALUES (:id, :company_number, :company_name, :filing_type, :charge_description,
+                           :filing_date, :transaction_id, :event_data, :detected_at, NULL)""",
+                event,
+            )
+            return True
+        except sqlite3.IntegrityError:
+            return False
+
+
+def list_ch_charges(
+    company_name: Optional[str] = None,
+    filing_types: Optional[list] = None,
+    since: Optional[str] = None,
+    not_added: bool = False,
+    limit: int = 200,
+    offset: int = 0,
+) -> list:
+    clauses = []
+    params: list = []
+    if company_name:
+        clauses.append("(company_name LIKE ? OR company_number LIKE ?)")
+        q = f"%{company_name}%"
+        params.extend([q, q])
+    if filing_types:
+        placeholders = ",".join("?" * len(filing_types))
+        clauses.append(f"filing_type IN ({placeholders})")
+        params.extend(filing_types)
+    if since:
+        clauses.append("detected_at >= ?")
+        params.append(since)
+    if not_added:
+        clauses.append("lead_id IS NULL")
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with get_connection() as conn:
+        return conn.execute(
+            f"SELECT * FROM ch_charge_feed {where} ORDER BY detected_at DESC LIMIT ? OFFSET ?",
+            (*params, limit, offset),
+        ).fetchall()
+
+
+def get_ch_charge(charge_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM ch_charge_feed WHERE id = ?", (charge_id,)).fetchone()
+
+
+def mark_ch_charge_added(charge_id: str, lead_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE ch_charge_feed SET lead_id = ? WHERE id = ?", (lead_id, charge_id))
+
+
+def get_company_name_from_leads(company_number: str) -> Optional[str]:
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT company FROM leads WHERE company_number = ? LIMIT 1", (company_number,)
+        ).fetchone()
+        return row["company"] if row else None

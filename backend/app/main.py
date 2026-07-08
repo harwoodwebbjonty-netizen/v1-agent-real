@@ -17,6 +17,7 @@ from app.routers import (
     brand_voice,
     calendar,
     call_logs,
+    ch_feed,
     credit_settings,
     email_oauth,
     email_templates,
@@ -33,6 +34,7 @@ from app.schemas_enrichment import EnrichLeadRequest, EnrichLeadResult
 from app.services import usage_log
 from app.services.activity_refresh_service import process_due_refreshes
 from app.services.anthropic_service import lookup_company_phone
+from app.services.ch_stream_service import run_filing_stream
 from app.services.chat_service import chat_about_lead
 from app.services.enrichment_service import enrich_lead
 from app.services.sequences_service import process_due_enrollments
@@ -57,6 +59,7 @@ app.include_router(email_oauth.router)
 app.include_router(sequences.router)
 app.include_router(ai_prospecting.router)
 app.include_router(activity.router)
+app.include_router(ch_feed.router)
 app.include_router(win_back.router)
 app.include_router(credit_settings.router)
 
@@ -95,6 +98,9 @@ def on_startup() -> None:
     _backfill_industry_unclassified()
     asyncio.create_task(_sequence_scheduler_loop())
     asyncio.create_task(_activity_refresh_loop())
+    settings = get_settings()
+    if settings.companies_house_api_key:
+        asyncio.create_task(run_filing_stream(settings.companies_house_api_key))
 
 
 def _backfill_industry_unclassified() -> None:

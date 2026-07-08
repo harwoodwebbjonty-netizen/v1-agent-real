@@ -866,6 +866,46 @@ export async function getActivityStatus(): Promise<{ configured: boolean }> {
   return invoke<{ configured: boolean }>("get_activity_status");
 }
 
+// --- CH Charge Feed ---
+
+export interface ChCharge {
+  id: string;
+  company_number: string;
+  company_name: string | null;
+  filing_type: string;
+  charge_description: string | null;
+  filing_date: string | null;
+  transaction_id: string | null;
+  detected_at: string;
+  lead_id: string | null;
+}
+
+export async function getChargeFeedStatus(): Promise<{ configured: boolean; timepoint: string | null }> {
+  return invoke<{ configured: boolean; timepoint: string | null }>("get_charge_feed_status");
+}
+
+export async function getChargeFeed(filters: {
+  companyName?: string;
+  filingTypes?: string;
+  since?: string;
+  notAdded?: boolean;
+  limit?: number;
+  offset?: number;
+} = {}): Promise<ChCharge[]> {
+  return invoke<ChCharge[]>("get_charge_feed", {
+    companyName: filters.companyName,
+    filingTypes: filters.filingTypes,
+    since: filters.since,
+    notAdded: filters.notAdded ?? false,
+    limit: filters.limit ?? 100,
+    offset: filters.offset ?? 0,
+  });
+}
+
+export async function addChargeAsLead(chargeId: string): Promise<{ lead_id: string; created: boolean }> {
+  return invoke<{ lead_id: string; created: boolean }>("add_charge_as_lead", { chargeId });
+}
+
 // --- Win-back campaigns ---
 
 export interface WinBackCampaign {

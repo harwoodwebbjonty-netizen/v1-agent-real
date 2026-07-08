@@ -1963,6 +1963,85 @@ pub async fn get_activity_status(base_url: &str, token: &str) -> Result<serde_js
     handle_response(response).await
 }
 
+// --- CH Charge Feed ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ChCharge {
+    pub id: String,
+    pub company_number: String,
+    pub company_name: Option<String>,
+    pub filing_type: String,
+    pub charge_description: Option<String>,
+    pub filing_date: Option<String>,
+    pub transaction_id: Option<String>,
+    pub detected_at: String,
+    pub lead_id: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ChChargesWrapper {
+    charges: Vec<ChCharge>,
+}
+
+pub async fn get_charge_feed_status(base_url: &str, token: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ch-feed/status", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
+pub async fn get_charge_feed(
+    base_url: &str,
+    token: &str,
+    company_name: Option<&str>,
+    filing_types: Option<&str>,
+    since: Option<&str>,
+    not_added: bool,
+    limit: u32,
+    offset: u32,
+) -> Result<Vec<ChCharge>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ch-feed/charges", base_url);
+    let limit_s = limit.to_string();
+    let offset_s = offset.to_string();
+    let not_added_s = not_added.to_string();
+    let mut params: Vec<(&str, &str)> = vec![
+        ("limit", &limit_s),
+        ("offset", &offset_s),
+        ("not_added", &not_added_s),
+    ];
+    if let Some(cn) = company_name { params.push(("company_name", cn)); }
+    if let Some(ft) = filing_types { params.push(("filing_types", ft)); }
+    if let Some(s) = since { params.push(("since", s)); }
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let wrapper: ChChargesWrapper = handle_response(response).await?;
+    Ok(wrapper.charges)
+}
+
+pub async fn add_charge_as_lead(base_url: &str, token: &str, charge_id: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/ch-feed/charges/{}/add-lead", base_url, charge_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .header("Content-Length", "0")
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
 // --- Win-back campaigns ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
