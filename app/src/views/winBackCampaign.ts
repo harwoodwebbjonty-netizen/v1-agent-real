@@ -19,6 +19,17 @@ import { escapeHtml } from "../utils";
 // Average per win-back email: ~1,500 input tokens + ~350 output tokens
 const WINBACK_COST_PER_EMAIL = 1500 * (0.80 / 1_000_000) + 350 * (4 / 1_000_000);
 
+// Research depth costs (web searches + Claude synthesis per lead)
+const DEPTH_COST: Record<string, number> = {
+  quick: 0.04,
+  standard: 0.10,
+  deep: 0.20,
+};
+
+function totalCostPerEmail(depth: string): number {
+  return WINBACK_COST_PER_EMAIL + (DEPTH_COST[depth] ?? 0.10);
+}
+
 function formatCost(n: number): string {
   if (n < 0.01) return `${(n * 100).toFixed(2)}¢`;
   return `$${n.toFixed(2)}`;
@@ -37,7 +48,7 @@ function showCostConfirm(count: number, totalCost: string): Promise<boolean> {
         </div>
         <div class="conflict-modal-question">
           Estimated cost: <strong>${totalCost}</strong>
-          <span class="cost-confirm-note">(based on ~1,500 input + 350 output tokens per email at Haiku pricing)</span>
+          <span class="cost-confirm-note">(web research + AI email generation via Haiku)</span>
         </div>
         <div class="conflict-modal-actions">
           <button class="btn btn-primary" id="cost-confirm-yes">Generate</button>
@@ -206,7 +217,7 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
             <option value="standard" selected>Standard (5 searches) ~$0.10/lead</option>
             <option value="deep">Deep research (10 searches) ~$0.20/lead</option>
           </select>
-          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * WINBACK_COST_PER_EMAIL)} est.)</button>
+          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail("standard"))} est.)</button>
         </div>
         <table class="data-table">
           <thead><tr>
@@ -235,25 +246,34 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
     showLeadPicker(container);
   });
 
-  container.querySelector<HTMLButtonElement>("#wb-generate-btn")!.addEventListener("click", async () => {
+  const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
+  const generateBtn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
+
+  function updateBtnLabel(): void {
+    const cost = formatCost(rows.length * totalCostPerEmail(depthSelect.value));
+    generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${cost} est.)`;
+  }
+
+  depthSelect.addEventListener("change", updateBtnLabel);
+
+  generateBtn.addEventListener("click", async () => {
     const nameInput = container.querySelector<HTMLInputElement>("#wb-name-input")!;
-    const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
     const name = nameInput.value.trim() || `Win-back ${new Date().toLocaleDateString()}`;
     const depth = depthSelect.value;
-    const btn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
 
-    const totalCost = formatCost(rows.length * WINBACK_COST_PER_EMAIL);
-    const confirmed = await showCostConfirm(rows.length, totalCost);
+    const costEach = totalCostPerEmail(depth);
+    const totalCostStr = formatCost(rows.length * costEach);
+    const confirmed = await showCostConfirm(rows.length, totalCostStr);
     if (!confirmed) return;
 
-    btn.disabled = true;
-    btn.textContent = "Creating...";
+    generateBtn.disabled = true;
+    generateBtn.textContent = "Creating...";
     try {
       const campaign = await createWinBackCampaignFromCsv(name, rows, depth);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
-      btn.disabled = false;
-      btn.textContent = `Generate Campaign (${rows.length} emails · ${totalCost} est.)`;
+      generateBtn.disabled = false;
+      updateBtnLabel();
       alert(`Failed to create campaign: ${err}`);
     }
   });
