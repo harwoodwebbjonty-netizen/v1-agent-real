@@ -1,11 +1,15 @@
 name: 'release'
 
-# Builds installers for macOS and Windows, signs them, and publishes
-# latest.json so already-installed copies can auto-update (see
-# app/src/updater.ts and the "plugins.updater" section of tauri.conf.json).
+# Builds installers for macOS (ARM + x86) and Windows, signs them, and
+# publishes latest.json so already-installed copies can auto-update.
+#
+# Jobs run sequentially (each uses `needs:` to wait for the previous) so they
+# never race on latest.json: ARM writes it first, x86 merges its entry, then
+# Windows merges its entry. Parallel builds would cause a read-modify-write
+# race that makes the last writer fail with "Not Found".
+#
 # Requires two repository secrets: TAURI_SIGNING_PRIVATE_KEY and
-# TAURI_SIGNING_PRIVATE_KEY_PASSWORD — without them this step fails loudly
-# rather than silently shipping unsigned/non-updatable artifacts.
+# TAURI_SIGNING_PRIVATE_KEY_PASSWORD.
 on:
   push:
     tags:
@@ -15,21 +19,11 @@ permissions:
   contents: write
 
 jobs:
-  publish-tauri:
+  # ── 1. macOS Apple Silicon ──────────────────────────────────────────────────
+  build-macos-arm:
     permissions:
       contents: write
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - platform: 'macos-latest'
-            args: '--target aarch64-apple-darwin'
-          - platform: 'macos-latest'
-            args: '--target x86_64-apple-darwin'
-          - platform: 'windows-latest'
-            args: ''
-
-    runs-on: ${{ matrix.platform }}
+    runs-on: macos-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -43,7 +37,7 @@ jobs:
       - name: install Rust stable
         uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -54,10 +48,6 @@ jobs:
         working-directory: ./app
         run: npm ci
 
-      # GitHub's secret text box has repeatedly saved a trailing newline no
-      # matter how carefully it's pasted/typed, which breaks the updater's
-      # base64 key decoding. Strip any stray whitespace/newlines here once,
-      # in code, instead of relying on perfect manual entry every release.
       - name: sanitize signing secrets
         shell: bash
         run: |
@@ -71,8 +61,6 @@ jobs:
       - uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Set this repository variable once a real backend host exists.
-          # Falls back to the localhost default baked into backend_client.rs.
           BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLEAN_SIGNING_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLEAN_SIGNING_KEY_PASSWORD }}
@@ -83,4 +71,112 @@ jobs:
           releaseBody: 'See the assets below to download and install.'
           releaseDraft: false
           prerelease: false
-          args: ${{ matrix.args }}
+          args: '--target aarch64-apple-darwin'
+
+  # ── 2. macOS Intel (waits for ARM to finish writing latest.json) ─────────────
+  build-macos-x86:
+    needs: build-macos-arm
+    permissions:
+      contents: write
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin,x86_64-apple-darwin
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './app/src-tauri -> target'
+
+      - name: install frontend dependencies
+        working-directory: ./app
+        run: npm ci
+
+      - name: sanitize signing secrets
+        shell: bash
+        run: |
+          KEY=$(printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | tr -d '\n\r ')
+          PASS=$(printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" | tr -d '\n\r ')
+          echo "::add-mask::$KEY"
+          echo "::add-mask::$PASS"
+          echo "CLEAN_SIGNING_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "CLEAN_SIGNING_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLEAN_SIGNING_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLEAN_SIGNING_KEY_PASSWORD }}
+        with:
+          projectPath: ./app
+          tagName: v__VERSION__
+          releaseName: 'Company Phone Lookup v__VERSION__'
+          releaseBody: 'See the assets below to download and install.'
+          releaseDraft: false
+          prerelease: false
+          args: '--target x86_64-apple-darwin'
+
+  # ── 3. Windows (waits for Intel macOS to finish updating latest.json) ────────
+  build-windows:
+    needs: build-macos-x86
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: setup node
+        uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: 'npm'
+          cache-dependency-path: app/package-lock.json
+
+      - name: install Rust stable
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './app/src-tauri -> target'
+
+      - name: install frontend dependencies
+        working-directory: ./app
+        run: npm ci
+
+      - name: sanitize signing secrets
+        shell: bash
+        run: |
+          KEY=$(printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}" | tr -d '\n\r ')
+          PASS=$(printf '%s' "${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}" | tr -d '\n\r ')
+          echo "::add-mask::$KEY"
+          echo "::add-mask::$PASS"
+          echo "CLEAN_SIGNING_KEY=$KEY" >> "$GITHUB_ENV"
+          echo "CLEAN_SIGNING_KEY_PASSWORD=$PASS" >> "$GITHUB_ENV"
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_BASE_URL: ${{ vars.BACKEND_BASE_URL }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ env.CLEAN_SIGNING_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ env.CLEAN_SIGNING_KEY_PASSWORD }}
+        with:
+          projectPath: ./app
+          tagName: v__VERSION__
+          releaseName: 'Company Phone Lookup v__VERSION__'
+          releaseBody: 'See the assets below to download and install.'
+          releaseDraft: false
+          prerelease: false
+          args: ''
