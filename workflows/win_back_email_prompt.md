@@ -275,6 +275,12 @@ Never end with a question that sounds uncertain or apologetic.
 
 Be direct. Be specific. Assume they are worth contacting.
 
+After the CTA sentence, always add the Calendly booking link on its own line:
+
+https://calendly.com/hello-dk8/30min
+
+This line appears after the CTA. No label. No "click here". Just the URL on its own line.
+
 --------------------------------------------------
 
 EMAIL LENGTH
