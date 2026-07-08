@@ -661,6 +661,16 @@ export async function sendEmailDraft(draftId: string, provider: EmailProvider): 
   return invoke<EmailDraft>("send_email_draft", { draftId, provider });
 }
 
+export async function exportDraftsToMailchimp(
+  campaignName: string,
+  draftIds?: string[],
+): Promise<{ mailchimp_url: string; exported: number; skipped: number }> {
+  return invoke<{ mailchimp_url: string; exported: number; skipped: number }>(
+    "export_drafts_to_mailchimp",
+    { campaignName, draftIds: draftIds ?? null },
+  );
+}
+
 // --- Sales Sequences — multi-channel automation (email + call/follow-up/reminder tasks) ---
 
 export type SequenceStatus = "draft" | "active" | "paused";

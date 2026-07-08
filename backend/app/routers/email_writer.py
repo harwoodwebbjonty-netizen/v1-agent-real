@@ -13,6 +13,7 @@ from app.schemas_email_writer import (
     EmailDraftOut,
     EmailDraftsResponse,
     GenerateEmailRequest,
+    OutreachMailchimpExportRequest,
     PendingEmailDraftOut,
     PendingEmailDraftsResponse,
     PersonalisationRequest,
@@ -25,6 +26,11 @@ from app.schemas_email_writer import (
 )
 from app.services.auth_service import new_id, now_iso
 from app.services.email_oauth_service import OAuthError, send_email as send_email_via_oauth
+from app.services.mailchimp_service import (
+    MailchimpError,
+    MailchimpNotConfiguredError,
+    export_outreach_campaign,
+)
 from app.services.email_writer_service import (
     generate_cta_suggestions,
     generate_email,
@@ -257,3 +263,59 @@ async def send_draft(
 
     db.mark_email_draft_sent(draft_id, body.provider, now_iso())
     return _to_draft_out(db.get_email_draft(draft_id))
+
+
+@router.post("/email-drafts/export-mailchimp")
+async def export_drafts_to_mailchimp(
+    body: OutreachMailchimpExportRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Export pending email drafts as a personalised Mailchimp campaign.
+
+    Fetches the user's unsent drafts (or the specified subset), looks up each
+    lead's contact email address, upserts all contacts into the Mailchimp
+    audience with their personalised subject + body as merge tags, creates a
+    campaign draft, and returns the Mailchimp edit URL.
+    """
+    if body.draft_ids:
+        rows = [db.get_email_draft(did) for did in body.draft_ids]
+        rows = [r for r in rows if r and r["owner_user_id"] == current_user.id]
+    else:
+        rows = db.list_pending_email_drafts(current_user.id)
+
+    if not rows:
+        raise HTTPException(status_code=400, detail="No unsent drafts found to export.")
+
+    drafts: list[dict] = []
+    for row in rows:
+        lead = db.get_lead(row["lead_id"])
+        if not lead:
+            continue
+        lead_emails = db.list_emails(row["lead_id"])
+        contact_email = lead_emails[0]["email"] if lead_emails else ""
+        drafts.append({
+            "contact_email": contact_email,
+            "contact_name": lead["contact_name"] or "",
+            "company": lead["company"] or "",
+            "subject": row["subject"] or "",
+            "body": row["body"] or "",
+        })
+
+    account = db.get_email_oauth_account(current_user.id, "google") \
+        or db.get_email_oauth_account(current_user.id, "microsoft")
+    from_name = current_user.name
+    from_email = account["email_address"] if account else ""
+
+    try:
+        result = await export_outreach_campaign(
+            campaign_name=body.campaign_name,
+            from_name=from_name,
+            from_email=from_email,
+            drafts=drafts,
+        )
+    except MailchimpNotConfiguredError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except MailchimpError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+
+    return result

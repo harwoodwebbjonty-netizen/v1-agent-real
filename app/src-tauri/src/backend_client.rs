@@ -1484,6 +1484,28 @@ pub async fn send_email_draft(base_url: &str, token: &str, draft_id: &str, provi
     handle_response(response).await
 }
 
+pub async fn export_drafts_to_mailchimp(
+    base_url: &str,
+    token: &str,
+    campaign_name: &str,
+    draft_ids: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/email-drafts/export-mailchimp", base_url);
+    let body = serde_json::json!({
+        "campaign_name": campaign_name,
+        "draft_ids": draft_ids,
+    });
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
 // --- Sales Sequences (multi-channel automation: email + call/follow-up/reminder tasks) ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

@@ -105,3 +105,8 @@ class TimelineResponse(BaseModel):
 
 class SendEmailDraftRequest(BaseModel):
     provider: str
+
+
+class OutreachMailchimpExportRequest(BaseModel):
+    campaign_name: str
+    draft_ids: Optional[list[str]] = None  # None = all pending drafts for this user

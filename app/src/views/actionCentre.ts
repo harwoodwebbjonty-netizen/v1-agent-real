@@ -5,6 +5,7 @@ import {
   assignLead,
   deleteLeadEmail,
   deleteLeadPhone,
+  exportDraftsToMailchimp,
   generateLeadIntelligence,
   listPendingEmailDrafts,
   scrapeLeadEmail,
@@ -89,7 +90,17 @@ export function initActionCentre(): void {
       </section>
 
       <section class="card action-section" data-section="emails">
-        <h3 class="action-section-title">Emails requiring action</h3>
+        <div class="action-section-header">
+          <h3 class="action-section-title">Emails requiring action</h3>
+          <div class="mc-export-panel" id="mc-export-panel">
+            <input type="text" id="mc-campaign-name" class="inline-edit mc-campaign-input"
+              placeholder="Campaign name…" />
+            <button type="button" class="btn btn-secondary btn-sm" id="mc-export-btn">
+              Export to Mailchimp
+            </button>
+            <span id="mc-export-status" class="status-message"></span>
+          </div>
+        </div>
         <div class="action-section-body"></div>
       </section>
 
@@ -285,6 +296,44 @@ export function initActionCentre(): void {
       showToast(`Could not load pending drafts: ${err}`);
     }
     render();
+    bindMailchimpExport();
+  }
+
+  function bindMailchimpExport(): void {
+    const btn = document.getElementById("mc-export-btn") as HTMLButtonElement | null;
+    const nameInput = document.getElementById("mc-campaign-name") as HTMLInputElement | null;
+    const statusEl = document.getElementById("mc-export-status");
+    if (!btn || !nameInput || !statusEl) return;
+
+    btn.addEventListener("click", async () => {
+      const name = nameInput.value.trim();
+      if (!name) { nameInput.focus(); return; }
+      if (pendingDrafts.length === 0) {
+        statusEl.textContent = "No pending drafts to export.";
+        return;
+      }
+      btn.disabled = true;
+      btn.textContent = "Exporting…";
+      statusEl.textContent = "";
+      try {
+        const result = await exportDraftsToMailchimp(name);
+        statusEl.innerHTML =
+          `${result.exported} exported, ${result.skipped} skipped — ` +
+          `<a href="#" id="mc-open-link">Copy Mailchimp link</a>`;
+        document.getElementById("mc-open-link")?.addEventListener("click", (e) => {
+          e.preventDefault();
+          void navigator.clipboard.writeText(result.mailchimp_url).then(() => {
+            if (statusEl) statusEl.textContent = "Mailchimp URL copied to clipboard — paste it in your browser.";
+          });
+        });
+        nameInput.value = "";
+      } catch (err) {
+        statusEl.textContent = `Export failed: ${err}`;
+      } finally {
+        btn.disabled = false;
+        btn.textContent = "Export to Mailchimp";
+      }
+    });
   }
 
   subscribe(render);

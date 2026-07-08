@@ -745,6 +745,17 @@ async fn send_email_draft(
     backend_client::send_email_draft(&base_url, &session.token, &draft_id, &provider).await
 }
 
+#[tauri::command]
+async fn export_drafts_to_mailchimp(
+    app_handle: tauri::AppHandle,
+    campaign_name: String,
+    draft_ids: Option<Vec<String>>,
+) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::export_drafts_to_mailchimp(&base_url, &session.token, &campaign_name, draft_ids).await
+}
+
 // --- Sales Sequences ---
 
 #[tauri::command]
@@ -1172,6 +1183,7 @@ pub fn run() {
       list_email_oauth_accounts,
       disconnect_email_oauth_account,
       send_email_draft,
+      export_drafts_to_mailchimp,
       list_sequences,
       create_sequence,
       update_sequence,

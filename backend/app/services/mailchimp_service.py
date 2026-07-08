@@ -121,6 +121,122 @@ async def create_campaign_draft(
     return f"https://{dc}.admin.mailchimp.com/campaigns/edit?id={campaign_web_id}"
 
 
+def _text_to_html(text: str) -> str:
+    """Convert plain-text email body to basic HTML paragraphs."""
+    import html as _html
+    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
+    return "".join(f"<p>{_html.escape(p).replace(chr(10), '<br>')}</p>" for p in paragraphs)
+
+
+async def _ensure_merge_field(base: str, api_key: str, audience_id: str, tag: str, name: str, field_type: str) -> None:
+    """Create a merge field if it doesn't already exist."""
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        r = await client.get(f"{base}/lists/{audience_id}/merge-fields", auth=("anystring", api_key))
+        existing = {f["tag"]: f for f in r.json().get("merge_fields", [])} if r.status_code == 200 else {}
+        if tag not in existing:
+            await client.post(
+                f"{base}/lists/{audience_id}/merge-fields",
+                json={"tag": tag, "name": name, "type": field_type},
+                auth=("anystring", api_key),
+            )
+
+
+async def export_outreach_campaign(
+    campaign_name: str,
+    from_name: str,
+    from_email: str,
+    drafts: list[dict],
+) -> dict:
+    """Push a batch of personalised outreach drafts to a Mailchimp campaign.
+
+    Each draft must have: contact_email, contact_name, company, subject, body.
+    Returns { mailchimp_url, exported, skipped }.
+
+    Mechanism: upserts each contact with EMAILSUBJ + EMAILBODY merge tags, then
+    creates one campaign whose subject is *|EMAILSUBJ|* and body is *|EMAILBODY|*.
+    Each recipient therefore receives their own fully personalised email.
+    """
+    api_key, audience_id = _require_config()
+    base = _base_url(api_key)
+    dc = _dc_from_key(api_key)
+
+    await _ensure_merge_field(base, api_key, audience_id, "EMAILSUBJ", "Email Subject", "text")
+    await _ensure_merge_field(base, api_key, audience_id, "EMAILBODY", "Email Body", "text")
+
+    exported = 0
+    skipped = 0
+    for draft in drafts:
+        email_addr = (draft.get("contact_email") or "").strip()
+        if not email_addr:
+            skipped += 1
+            continue
+        full_name = (draft.get("contact_name") or "").strip()
+        parts = full_name.split(" ", 1)
+        first = parts[0] if parts else ""
+        last = parts[1] if len(parts) > 1 else ""
+        try:
+            async with httpx.AsyncClient(timeout=15.0) as client:
+                resp = await client.put(
+                    f"{base}/lists/{audience_id}/members/{_email_hash(email_addr)}",
+                    json={
+                        "email_address": email_addr,
+                        "status_if_new": "subscribed",
+                        "merge_fields": {
+                            "FNAME": first,
+                            "LNAME": last,
+                            "COMPANY": draft.get("company") or "",
+                            "EMAILSUBJ": (draft.get("subject") or "")[:255],
+                            "EMAILBODY": draft.get("body") or "",
+                        },
+                    },
+                    auth=("anystring", api_key),
+                )
+            if resp.status_code in (200, 201):
+                exported += 1
+            else:
+                logger.warning("Mailchimp upsert failed for %s: %s", email_addr, resp.text[:120])
+                skipped += 1
+        except Exception:
+            logger.exception("Mailchimp upsert error for %s", email_addr)
+            skipped += 1
+
+    if exported == 0:
+        raise MailchimpError("No contacts could be added — check that leads have email addresses on file.")
+
+    # Campaign: subject uses the EMAILSUBJ merge tag so each recipient sees
+    # their own subject line (requires Mailchimp Essentials plan or higher).
+    campaign_payload = {
+        "type": "regular",
+        "settings": {
+            "subject_line": "*|EMAILSUBJ|*",
+            "from_name": from_name,
+            "reply_to": from_email,
+            "title": campaign_name,
+        },
+        "recipients": {"list_id": audience_id},
+    }
+    async with httpx.AsyncClient(timeout=15.0) as client:
+        r = await client.post(f"{base}/campaigns", json=campaign_payload, auth=("anystring", api_key))
+        if r.status_code not in (200, 201):
+            raise MailchimpError(f"Campaign create failed ({r.status_code}): {r.text[:200]}")
+        campaign_id = r.json()["id"]
+        web_id = r.json().get("web_id", "")
+
+        html_body = (
+            "<html><body style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
+            "*|EMAILBODY|*"
+            "</body></html>"
+        )
+        await client.put(
+            f"{base}/campaigns/{campaign_id}/content",
+            json={"html": html_body},
+            auth=("anystring", api_key),
+        )
+
+    mailchimp_url = f"https://{dc}.admin.mailchimp.com/campaigns/edit?id={web_id}"
+    return {"mailchimp_url": mailchimp_url, "exported": exported, "skipped": skipped}
+
+
 async def export_win_back_campaign(
     campaign_name: str,
     from_name: str,

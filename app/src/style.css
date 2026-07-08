@@ -2232,10 +2232,35 @@ body.compact-rows td {
   margin-bottom: var(--space-4);
 }
 
+.action-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  margin-bottom: var(--space-3);
+}
+
+.action-section-header .action-section-title {
+  margin: 0;
+}
+
 .action-section-title {
   margin: 0 0 var(--space-3);
   font-size: var(--text-base);
   font-weight: 600;
+}
+
+.mc-export-panel {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.mc-campaign-input {
+  width: 200px;
+  font-size: 0.82rem;
 }
 
 .action-section-body {
