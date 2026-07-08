@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     # disable; the export button returns a clear "not configured" error.
     mailchimp_api_key: str = ""
     mailchimp_audience_id: str = ""
+    # Fallback "from" address for Mailchimp campaigns when no OAuth account is
+    # connected. Must be a verified sender domain in your Mailchimp account.
+    mailchimp_from_email: str = ""
 
 
 @lru_cache

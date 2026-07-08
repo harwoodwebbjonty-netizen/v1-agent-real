@@ -304,7 +304,17 @@ async def export_drafts_to_mailchimp(
     account = db.get_email_oauth_account(current_user.id, "google") \
         or db.get_email_oauth_account(current_user.id, "microsoft")
     from_name = current_user.name
-    from_email = account["email_address"] if account else ""
+    settings = get_settings()
+    from_email = (
+        (account["email_address"] if account else "")
+        or settings.mailchimp_from_email
+    )
+    if not from_email:
+        raise HTTPException(
+            status_code=422,
+            detail="No from-email found. Connect a Gmail/Microsoft account in Settings, "
+                   "or set MAILCHIMP_FROM_EMAIL in backend/.env.",
+        )
 
     try:
         result = await export_outreach_campaign(
