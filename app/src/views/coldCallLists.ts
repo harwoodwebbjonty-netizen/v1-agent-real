@@ -46,8 +46,8 @@ import { getLeads, refreshLeads } from "../state";
 import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
 
-// select + called + dot + company + phone + source + status + industry + contact-status + emails + list + notes
-const CALL_SHEET_COL_COUNT = 12;
+// select + called + dot + company + phone + status + industry + contact-status + emails + list + notes
+const CALL_SHEET_COL_COUNT = 11;
 // checkbox + company + phone + industry + list
 const SELECTOR_COL_COUNT = 5;
 
@@ -259,7 +259,6 @@ export function initColdCallLists(): void {
               <th></th>
               <th data-sort="company">Company</th>
               <th data-sort="phone_number">Phone</th>
-              <th>Source</th>
               <th data-sort="status">Status</th>
               <th data-sort="industry">Industry</th>
               <th data-sort="contact_status">Contact Status</th>
