@@ -18,7 +18,7 @@ from typing import Optional
 from app import db
 from app.core.config import get_settings
 from app.services.auth_service import new_id, now_iso
-from app.services.datagardener_service import diff_snapshots, get_company_data
+from app.services.ch_service import diff_snapshots, get_company_data
 
 logger = logging.getLogger("app.activity_refresh")
 
@@ -110,7 +110,7 @@ async def process_due_refreshes() -> int:
     Processes up to 20 leads that are due for a refresh.
     Returns total number of activity events detected across all leads."""
     settings = get_settings()
-    api_key = settings.datagardener_api_key
+    api_key = settings.companies_house_api_key
     if not api_key:
         return 0
 

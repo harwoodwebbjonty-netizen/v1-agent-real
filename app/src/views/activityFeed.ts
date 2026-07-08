@@ -114,8 +114,8 @@ function renderBody(): string {
   if (!state.configured) {
     return `
       <div class="activity-empty-state">
-        <strong>DataGardener API not configured</strong>
-        <p class="text-muted">Add your <code>DATAGARDENER_API_KEY</code> to the backend <code>.env</code> file and restart the backend to enable the activity feed.</p>
+        <strong>Activity feed not configured</strong>
+        <p class="text-muted">Add your <code>COMPANIES_HOUSE_API_KEY</code> to the backend <code>.env</code> file and restart the backend to enable the activity feed.</p>
       </div>
     `;
   }
@@ -132,7 +132,7 @@ function render(): void {
   container.innerHTML = `
     <div class="view-header">
       <h2>Activity Feed</h2>
-      <p class="text-muted" style="margin:0">Live intelligence from DataGardener — charges, directors, risk signals</p>
+      <p class="text-muted" style="margin:0">Live intelligence from Companies House — charges, directors, filings, PSC changes</p>
     </div>
     ${renderFilters()}
     <div id="activity-feed-body" class="activity-feed-body">

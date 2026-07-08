@@ -19,7 +19,7 @@ router = APIRouter(prefix="/activity", tags=["activity"])
 @router.get("/status")
 async def activity_status(current_user: CurrentUser = Depends(get_current_user)) -> dict:
     settings = get_settings()
-    return {"configured": bool(settings.datagardener_api_key)}
+    return {"configured": bool(settings.companies_house_api_key)}
 
 
 @router.get("/lead/{lead_id}")
@@ -58,11 +58,11 @@ async def trigger_lead_refresh(
     if not dict(lead).get("company_number"):
         raise HTTPException(status_code=422, detail="Lead has no Companies House number — cannot refresh from DataGardener")
     settings = get_settings()
-    if not settings.datagardener_api_key:
-        raise HTTPException(status_code=503, detail="DataGardener API key not configured")
+    if not settings.companies_house_api_key:
+        raise HTTPException(status_code=503, detail="Companies House API key not configured")
 
     # Fire-and-forget in background — return immediately
-    asyncio.create_task(_refresh_in_background(lead_id, settings.datagardener_api_key))
+    asyncio.create_task(_refresh_in_background(lead_id, settings.companies_house_api_key))
     return {"status": "refreshing"}
 
 
