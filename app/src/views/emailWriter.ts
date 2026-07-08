@@ -303,6 +303,7 @@ export function initEmailWriter(): void {
           ${EMAIL_LENGTHS.map((l) => `<option value="${l}" ${l === session.length ? "selected" : ""}>${l}</option>`).join("")}
         </select>
         <button id="ew-generate-btn" class="btn btn-primary" type="button">${session.draftId ? "Regenerate" : "Generate"}</button>
+        <span class="ew-cost-hint">~$0.02 per generation</span>
         <span id="ew-generate-status" class="status-message"></span>
       </div>
 

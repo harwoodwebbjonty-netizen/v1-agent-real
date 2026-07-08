@@ -15,6 +15,48 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentUser, subscribeAuth } from "../auth";
 import { escapeHtml } from "../utils";
 
+// Haiku pricing (claude-haiku-4-5): $0.80/MTok input, $4/MTok output
+// Average per win-back email: ~1,500 input tokens + ~350 output tokens
+const WINBACK_COST_PER_EMAIL = 1500 * (0.80 / 1_000_000) + 350 * (4 / 1_000_000);
+
+function formatCost(n: number): string {
+  if (n < 0.01) return `${(n * 100).toFixed(2)}¢`;
+  return `$${n.toFixed(2)}`;
+}
+
+function showCostConfirm(count: number, totalCost: string): Promise<boolean> {
+  return new Promise((resolve) => {
+    const overlay = document.createElement("div");
+    overlay.className = "conflict-modal-overlay";
+    overlay.innerHTML = `
+      <div class="conflict-modal">
+        <div class="conflict-modal-title">Confirm email generation</div>
+        <div class="conflict-modal-desc">
+          You're about to generate <strong>${count} personalised email${count === 1 ? "" : "s"}</strong>
+          using the Anthropic API.
+        </div>
+        <div class="conflict-modal-question">
+          Estimated cost: <strong>${totalCost}</strong>
+          <span class="cost-confirm-note">(based on ~1,500 input + 350 output tokens per email at Haiku pricing)</span>
+        </div>
+        <div class="conflict-modal-actions">
+          <button class="btn btn-primary" id="cost-confirm-yes">Generate</button>
+          <button class="btn btn-secondary" id="cost-confirm-no">Cancel</button>
+        </div>
+      </div>
+    `;
+    document.body.appendChild(overlay);
+    overlay.querySelector("#cost-confirm-yes")!.addEventListener("click", () => {
+      overlay.remove();
+      resolve(true);
+    });
+    overlay.querySelector("#cost-confirm-no")!.addEventListener("click", () => {
+      overlay.remove();
+      resolve(false);
+    });
+  });
+}
+
 let pollInterval: ReturnType<typeof setInterval> | null = null;
 
 function clearPoll(): void {
@@ -164,7 +206,7 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
             <option value="standard" selected>Standard (5 searches) ~$0.10/lead</option>
             <option value="deep">Deep research (10 searches) ~$0.20/lead</option>
           </select>
-          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length})</button>
+          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * WINBACK_COST_PER_EMAIL)} est.)</button>
         </div>
         <table class="data-table">
           <thead><tr>
@@ -199,6 +241,11 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
     const name = nameInput.value.trim() || `Win-back ${new Date().toLocaleDateString()}`;
     const depth = depthSelect.value;
     const btn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
+
+    const totalCost = formatCost(rows.length * WINBACK_COST_PER_EMAIL);
+    const confirmed = await showCostConfirm(rows.length, totalCost);
+    if (!confirmed) return;
+
     btn.disabled = true;
     btn.textContent = "Creating...";
     try {
@@ -206,7 +253,7 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
       btn.disabled = false;
-      btn.textContent = `Generate Campaign (${rows.length})`;
+      btn.textContent = `Generate Campaign (${rows.length} emails · ${totalCost} est.)`;
       alert(`Failed to create campaign: ${err}`);
     }
   });
