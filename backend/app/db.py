@@ -451,6 +451,35 @@ def _migration_013_prospecting_total_available(conn: sqlite3.Connection) -> None
         conn.execute("ALTER TABLE prospecting_runs ADD COLUMN total_available INTEGER NOT NULL DEFAULT 0")
 
 
+def _migration_014_ch_stream_state(conn: sqlite3.Connection) -> None:
+    """CH filing stream state table and charge feed table — added to migration 008
+    after that version had already shipped, so databases already at v8+ need this
+    catch-up migration to get the missing tables."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS ch_charge_feed (
+            id TEXT PRIMARY KEY,
+            company_number TEXT NOT NULL,
+            company_name TEXT,
+            filing_type TEXT NOT NULL,
+            charge_description TEXT,
+            filing_date TEXT,
+            transaction_id TEXT UNIQUE,
+            event_data TEXT,
+            detected_at TEXT NOT NULL,
+            lead_id TEXT
+        );
+        CREATE INDEX IF NOT EXISTS idx_ch_charge_detected ON ch_charge_feed(detected_at);
+        CREATE INDEX IF NOT EXISTS idx_ch_charge_company ON ch_charge_feed(company_number);
+
+        CREATE TABLE IF NOT EXISTS ch_stream_state (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
+        """
+    )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -467,8 +496,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (11, _migration_011_win_back),
     (12, _migration_012_credit_tracking),
     (13, _migration_013_prospecting_total_available),
+    (14, _migration_014_ch_stream_state),
 ]
-CURRENT_SCHEMA_VERSION = 13
+CURRENT_SCHEMA_VERSION = 14
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
