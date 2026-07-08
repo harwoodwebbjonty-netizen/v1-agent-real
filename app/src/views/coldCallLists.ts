@@ -579,8 +579,8 @@ export function initColdCallLists(): void {
       cb.addEventListener("click", (e) => {
         e.stopPropagation();
         const selected = cb.checked;
+        const allRows = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"));
         if ((e as MouseEvent).shiftKey && selectorLastIndex >= 0) {
-          const allRows = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"));
           const lo = Math.min(selectorLastIndex, idx);
           const hi = Math.max(selectorLastIndex, idx);
           for (let i = lo; i <= hi; i++) {
@@ -593,12 +593,16 @@ export function initColdCallLists(): void {
         } else {
           if (selected) selectorSelected.add(leadId); else selectorSelected.delete(leadId);
           row.classList.toggle("lead-row-selected", selected);
+          // Auto-advance: scroll the next row into view when selecting
+          if (selected) {
+            const nextRow = allRows[idx + 1];
+            if (nextRow) nextRow.scrollIntoView({ block: "nearest", behavior: "smooth" });
+          }
         }
         selectorLastIndex = idx;
         updateSelectorBtn();
-        const total = selectorBody.querySelectorAll(".selector-row").length;
-        const selCount = Array.from(selectorBody.querySelectorAll<HTMLTableRowElement>(".selector-row"))
-          .filter((r) => selectorSelected.has(r.dataset.leadId!)).length;
+        const total = allRows.length;
+        const selCount = allRows.filter((r) => selectorSelected.has(r.dataset.leadId!)).length;
         selectorAllCb.checked = selCount === total;
         selectorAllCb.indeterminate = selCount > 0 && selCount < total;
       });

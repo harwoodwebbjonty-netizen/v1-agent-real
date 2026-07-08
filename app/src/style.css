@@ -3108,6 +3108,9 @@ body.compact-rows td {
   align-self: flex-start;
 }
 
+/* ── Call sheet — compact rows ────────────────────────────────────────────── */
+#list-results-table td { padding: 5px var(--space-4); }
+
 /* ── Selector-specific styles ─────────────────────────────────────────────── */
 .selector-row td { padding: var(--space-2) var(--space-3); }
 .lead-directors { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
