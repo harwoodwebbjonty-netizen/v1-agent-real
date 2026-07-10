@@ -1,7 +1,6 @@
 export type ViewName =
   | "action-centre"
   | "activity-feed"
-  | "charge-feed"
   | "ai-prospecting"
   | "dashboard"
   | "call-queue"

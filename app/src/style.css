@@ -3830,6 +3830,45 @@ body.compact-rows td {
   padding: var(--space-3);
 }
 
+/* ── Activity Feed — director badge + combined tab bar ─────────────────── */
+.charge-badge-director {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.charge-badge-default {
+  background: color-mix(in srgb, var(--text) 10%, transparent);
+  color: var(--text-muted);
+}
+
+.af-tab-bar {
+  display: flex;
+  gap: var(--space-1);
+  border-bottom: 1px solid var(--border-subtle);
+  padding: 0 var(--space-4);
+  margin-bottom: var(--space-3);
+}
+
+.af-tab {
+  background: none;
+  border: none;
+  border-bottom: 2px solid transparent;
+  padding: var(--space-2) var(--space-3);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  margin-bottom: -1px;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.af-tab:hover { color: var(--text); }
+
+.af-tab.active {
+  color: var(--text);
+  border-bottom-color: var(--primary);
+}
+
 /* Cost hints */
 .ew-cost-hint {
   font-size: 0.75rem;

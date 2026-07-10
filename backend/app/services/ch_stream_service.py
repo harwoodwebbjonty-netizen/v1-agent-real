@@ -1,16 +1,9 @@
 """Companies House real-time filing stream consumer.
 
-Connects to stream.companieshouse.gov.uk/filings and filters for mortgage
-(charge) events. Runs as a long-lived background asyncio task in main.py.
+Connects to stream.companieshouse.gov.uk/filings and captures ALL filing
+events. Runs as a long-lived background asyncio task in main.py.
 Reconnects automatically with the saved timepoint so no events are missed
 across restarts.
-
-Filing type codes:
-  MR01  Particulars of a charge (new charge created)
-  MR02  Particulars of a charge (company already entitled)
-  MR03  Particulars of a charge (overseas entity)
-  MR04  Statement of satisfaction in full
-  MR05  Statement of satisfaction in part
 """
 
 import asyncio
@@ -28,15 +21,54 @@ logger = logging.getLogger("app.ch_stream")
 STREAM_BASE = "https://stream.companieshouse.gov.uk"
 CH_BASE = "https://api.company-information.service.gov.uk"
 
-_NEW_CHARGE_TYPES = {"MR01", "MR02", "MR03"}
-_ALL_CHARGE_TYPES = {"MR01", "MR02", "MR03", "MR04", "MR05"}
-
-_FILING_TYPE_LABEL = {
-    "MR01": "New Charge",
-    "MR02": "New Charge",
-    "MR03": "New Charge (Overseas)",
-    "MR04": "Charge Satisfied",
-    "MR05": "Charge Part-Satisfied",
+_FILING_TYPE_LABEL: dict[str, str] = {
+    # Accounts
+    "AA":    "Annual Accounts",
+    "AA01":  "Amended Annual Accounts",
+    "AAMD":  "Amended Annual Accounts",
+    # Confirmation statement
+    "CS01":  "Confirmation Statement",
+    # Directors
+    "AP01":  "Director Appointed",
+    "AP02":  "Corporate Director Appointed",
+    "AP03":  "Secretary Appointed",
+    "AP04":  "Corporate Secretary Appointed",
+    "TM01":  "Director Resigned",
+    "TM02":  "Corporate Director Resigned",
+    "TM03":  "Secretary Resigned",
+    "TM04":  "Corporate Secretary Resigned",
+    "CH01":  "Director Details Changed",
+    "CH02":  "Corporate Director Details Changed",
+    "CH03":  "Secretary Details Changed",
+    "CH04":  "Corporate Secretary Details Changed",
+    # PSC (Persons of Significant Control)
+    "PSC01": "PSC Registered",
+    "PSC02": "Corporate PSC Registered",
+    "PSC03": "Legal Entity PSC Registered",
+    "PSC07": "PSC Ceased",
+    "PSC08": "Corporate PSC Ceased",
+    "PSC09": "Legal Entity PSC Ceased",
+    # Charges / mortgages
+    "MR01":  "New Charge",
+    "MR02":  "New Charge",
+    "MR03":  "New Charge (Overseas)",
+    "MR04":  "Charge Satisfied",
+    "MR05":  "Charge Part-Satisfied",
+    # Shares
+    "SH01":  "Shares Allotted",
+    "SH06":  "Shares Cancelled",
+    "SH07":  "Shares Redenominated",
+    "SH08":  "Share Class Changed",
+    # Address & name
+    "AD01":  "Registered Address Changed",
+    "AD02":  "SAIL Address Changed",
+    "NM01":  "Company Name Changed",
+    "NM04":  "Company Name Changed (Court Order)",
+    # Dissolution / strike off
+    "DISS40": "Voluntary Strike Off",
+    "DISS16": "Strike Off Suspended",
+    "GAZ1":   "First Gazette Notice (Strike Off)",
+    "GAZ2":   "Final Gazette Notice (Strike Off)",
 }
 
 
@@ -60,12 +92,10 @@ async def _get_company_name(api_key: str, company_number: str) -> str:
 
 
 async def _process_event(event: dict, api_key: str) -> None:
-    """Filter filing events for charge types and store in DB."""
+    """Store all filing events in DB — no category filter."""
     data = event.get("data") or {}
-    category = str(data.get("category") or "")
     filing_type = str(data.get("type") or "")
-
-    if category != "mortgage" or filing_type not in _ALL_CHARGE_TYPES:
+    if not filing_type:
         return
 
     resource_uri = str(event.get("resource_uri") or "")
@@ -77,9 +107,12 @@ async def _process_event(event: dict, api_key: str) -> None:
         return
 
     company_name = await _get_company_name(api_key, company_number)
-    charge_desc = _FILING_TYPE_LABEL.get(filing_type, filing_type)
 
-    # description_values sometimes has extra context
+    # Use our label map if we recognise the type, otherwise fall back to the
+    # human-readable description CH provides in the event itself.
+    charge_desc = _FILING_TYPE_LABEL.get(filing_type) or str(data.get("description") or filing_type)
+
+    # description_values sometimes has extra context (e.g. charge number)
     desc_vals = data.get("description_values") or {}
     if "charge_number" in desc_vals:
         charge_desc += f" #{desc_vals['charge_number']}"
