@@ -25,10 +25,14 @@ class Settings(BaseSettings):
     microsoft_oauth_client_secret: str = ""
     oauth_redirect_base_url: str = "http://localhost:8000"
 
-    # Companies House API — free official UK government API, register at
-    # https://developer.company-information.service.gov.uk
-    # Required for AI Prospecting; leave empty to disable the feature.
+    # Companies House REST API key — used for AI Prospecting, company lookups,
+    # and enrichment. Register at developer.company-information.service.gov.uk.
+    # Leave empty to disable prospecting.
     companies_house_api_key: str = ""
+
+    # Companies House Streaming API key — separate key type for the live filing
+    # stream (charge feed). Falls back to companies_house_api_key if not set.
+    companies_house_stream_key: str = ""
 
     # DataGardener API — powers the Recent Activity Feed (charge changes,
     # director/PSC events, risk alerts). Leave empty to disable the feature

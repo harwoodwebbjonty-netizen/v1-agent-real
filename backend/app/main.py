@@ -99,8 +99,9 @@ def on_startup() -> None:
     asyncio.create_task(_sequence_scheduler_loop())
     asyncio.create_task(_activity_refresh_loop())
     settings = get_settings()
-    if settings.companies_house_api_key:
-        asyncio.create_task(run_filing_stream(settings.companies_house_api_key))
+    stream_key = settings.companies_house_stream_key or settings.companies_house_api_key
+    if stream_key:
+        asyncio.create_task(run_filing_stream(stream_key))
 
 
 def _backfill_industry_unclassified() -> None:
