@@ -1,4 +1,4 @@
-import { isAdmin } from "../auth";
+import { isAdmin, subscribeAuth } from "../auth";
 import { openTab, type ViewName } from "../tabs";
 
 const NAV_TITLES: Record<ViewName, string> = {
@@ -109,9 +109,15 @@ async function openSettingsWithPin(): Promise<void> {
 }
 
 export function initTabBar(): void {
-  // Hide settings nav for non-admins
   const settingsLink = document.querySelector<HTMLAnchorElement>("#settings-nav-link");
-  if (settingsLink && !isAdmin()) settingsLink.style.display = "none";
+
+  // Auth loads async after initTabBar runs, so subscribe to changes rather
+  // than checking isAdmin() once at startup (it would always be false then).
+  function updateSettingsVisibility(): void {
+    if (settingsLink) settingsLink.style.display = isAdmin() ? "" : "none";
+  }
+  subscribeAuth(updateSettingsVisibility);
+  updateSettingsVisibility();
 
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((link) => {
     const view = link.dataset.nav as ViewName;
