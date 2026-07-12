@@ -5,6 +5,7 @@ from pydantic import BaseModel
 
 class IdentifyRequest(BaseModel):
     name: str
+    password: str = ""
 
 
 class UserOut(BaseModel):

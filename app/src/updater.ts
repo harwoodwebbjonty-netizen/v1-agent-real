@@ -1,7 +1,18 @@
 import { check, type Update } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
 
+const RECHECK_MS = 4 * 60 * 60 * 1000;
+let bannerShown = false;
+
 export async function initUpdater(): Promise<void> {
+  await checkOnce();
+  // People leave the app open for days — a launch-only check would never
+  // tell them about new versions.
+  setInterval(() => void checkOnce(), RECHECK_MS);
+}
+
+async function checkOnce(): Promise<void> {
+  if (bannerShown) return;
   let update: Update | null;
   try {
     update = await check();
@@ -11,6 +22,7 @@ export async function initUpdater(): Promise<void> {
     return;
   }
   if (!update) return;
+  bannerShown = true;
 
   const banner = document.querySelector<HTMLDivElement>("#update-banner")!;
   const label = document.querySelector<HTMLSpanElement>("#update-banner-label")!;

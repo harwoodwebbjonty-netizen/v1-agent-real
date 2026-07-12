@@ -2,7 +2,7 @@ import logging
 import shutil
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Callable, Iterator, Optional
 
@@ -480,6 +480,15 @@ def _migration_014_ch_stream_state(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
+    """Add password_hash to users. NULL means a legacy account that predates
+    passwords — the next successful identify for that name sets its password
+    (first-login claim), after which the password is required."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(users)")}
+    if "password_hash" not in cols:
+        conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -497,8 +506,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (12, _migration_012_credit_tracking),
     (13, _migration_013_prospecting_total_available),
     (14, _migration_014_ch_stream_state),
+    (15, _migration_015_user_passwords),
 ]
-CURRENT_SCHEMA_VERSION = 14
+CURRENT_SCHEMA_VERSION = 15
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -625,6 +635,11 @@ def init_db() -> None:
 def get_connection() -> Iterator[sqlite3.Connection]:
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
+    # WAL lets readers proceed during writes; busy_timeout makes concurrent
+    # writers wait instead of failing immediately with "database is locked"
+    # (multiple users + four background loops all share this one file).
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     try:
         yield conn
         conn.commit()
@@ -644,12 +659,17 @@ def count_admins() -> int:
         return conn.execute("SELECT COUNT(*) FROM users WHERE role = 'admin'").fetchone()[0]
 
 
-def create_user(id: str, name: str, role: str, created_at: str) -> None:
+def create_user(id: str, name: str, role: str, created_at: str, password_hash: Optional[str] = None) -> None:
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO users (id, name, role, created_at) VALUES (?, ?, ?, ?)",
-            (id, name, role, created_at),
+            "INSERT INTO users (id, name, role, created_at, password_hash) VALUES (?, ?, ?, ?, ?)",
+            (id, name, role, created_at, password_hash),
         )
+
+
+def set_user_password(user_id: str, password_hash: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
 
 
 def get_user_by_name(name: str) -> Optional[sqlite3.Row]:
@@ -1794,7 +1814,7 @@ def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
 # Credit tracking
 # ---------------------------------------------------------------------------
 
-CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting"]
+CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment"]
 
 # Approximate cost per operation (GBP) — used for limit enforcement checks
 CREDIT_COST = {
@@ -1802,6 +1822,8 @@ CREDIT_COST = {
     "sales_intel": 0.15,
     "win_back": 0.03,
     "ai_prospecting": 0.15,
+    "email_writer": 0.03,
+    "enrichment": 0.05,
 }
 
 
@@ -1879,6 +1901,18 @@ def set_stream_state(key: str, value: str) -> None:
             "INSERT INTO ch_stream_state (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
             (key, value),
         )
+
+
+def prune_ch_charge_feed(max_age_days: int = 30) -> int:
+    """Delete feed events older than the retention window (except ones that
+    were promoted to leads). The stream inserts thousands of rows a day, so
+    without pruning this table grows unboundedly."""
+    cutoff = (datetime.now() - timedelta(days=max_age_days)).strftime("%Y-%m-%dT%H:%M:%S")
+    with get_connection() as conn:
+        cur = conn.execute(
+            "DELETE FROM ch_charge_feed WHERE detected_at < ? AND lead_id IS NULL", (cutoff,)
+        )
+        return cur.rowcount
 
 
 def save_ch_charge(event: dict) -> bool:

@@ -26,9 +26,10 @@ export async function initAuth(): Promise<void> {
   listeners.forEach((fn) => fn());
 }
 
-/** No passwords — typing an existing name signs in as that person, a new name creates a profile. */
-export async function identify(name: string): Promise<void> {
-  const user = await apiIdentify(name);
+/** Name + password sign-in: a new name creates a profile with that password,
+ * an existing name must supply the matching password. */
+export async function identify(name: string, password: string): Promise<void> {
+  const user = await apiIdentify(name, password);
   setCurrentUser(user);
 }
 

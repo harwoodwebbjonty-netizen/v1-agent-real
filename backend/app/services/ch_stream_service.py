@@ -172,8 +172,26 @@ async def _consume_stream(api_key: str) -> None:
                 await _process_event(event, api_key)
 
 
+FEED_RETENTION_DAYS = 30
+_PRUNE_INTERVAL_SECONDS = 6 * 3600
+
+
+async def _prune_loop() -> None:
+    """The stream inserts thousands of rows a day — without retention the
+    feed table grows unboundedly and slows every feed query."""
+    while True:
+        try:
+            deleted = db.prune_ch_charge_feed(FEED_RETENTION_DAYS)
+            if deleted:
+                logger.info("CH feed: pruned %d event(s) older than %d days", deleted, FEED_RETENTION_DAYS)
+        except Exception:
+            logger.exception("CH feed prune failed")
+        await asyncio.sleep(_PRUNE_INTERVAL_SECONDS)
+
+
 async def run_filing_stream(api_key: str) -> None:
     """Outer loop: reconnect with backoff whenever the stream drops."""
+    asyncio.create_task(_prune_loop())
     backoff = 10
     while True:
         try:

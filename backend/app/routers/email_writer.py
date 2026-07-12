@@ -68,6 +68,16 @@ def _require_draft_access(draft_row: sqlite3.Row, current_user: CurrentUser) -> 
         raise HTTPException(status_code=403, detail="You don't have access to this email draft.")
 
 
+def _check_email_writer_budget(user_id: str) -> None:
+    allowed, spent, limit = db.check_credit_limit(user_id, "email_writer")
+    if not allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Monthly credit limit reached for AI Email Writer (spent £{spent:.2f} of £{limit:.2f}). "
+            "Ask your administrator to raise it.",
+        )
+
+
 def _gather_lead_data(lead_id: str, current_user: CurrentUser):
     lead = db.get_lead(lead_id)
     if lead is None:
@@ -95,12 +105,14 @@ def _gather_lead_data(lead_id: str, current_user: CurrentUser):
 async def generate_draft(
     request: Request, lead_id: str, body: GenerateEmailRequest, current_user: CurrentUser = Depends(get_current_user)
 ) -> EmailDraftOut:
+    _check_email_writer_budget(current_user.id)
     _, lead_context, brand_voice = _gather_lead_data(lead_id, current_user)
     try:
         result = await generate_email(lead_context, brand_voice, body.instruction, body.preset, body.length)
     except Exception:
         raise HTTPException(status_code=502, detail="AI failed to generate the email. Please try again.")
 
+    db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
     draft_id = new_id()
     created_at = now_iso()
     db.create_email_draft(
@@ -133,11 +145,14 @@ async def refine_draft(
     if draft["status"] != "draft":
         raise HTTPException(status_code=400, detail="This email has already been sent and can no longer be refined.")
 
+    _check_email_writer_budget(current_user.id)
     _, lead_context, brand_voice = _gather_lead_data(draft["lead_id"], current_user)
     try:
         result = await refine_email(lead_context, brand_voice, draft["subject"], draft["body"], body.instruction, [])
     except Exception:
         raise HTTPException(status_code=502, detail="AI failed to refine the email. Please try again.")
+
+    db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
 
     db.update_email_draft_fields(
         draft_id,

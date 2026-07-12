@@ -144,11 +144,11 @@ export interface UserInfo {
 }
 
 // --- Auth ---
-// No passwords — typing an existing name signs in as that person, typing a
-// new one creates a profile on the spot (small trusted team).
+// Name + password sign-in. A new name creates a profile with that password;
+// an existing name must supply the matching password.
 
-export async function identify(name: string): Promise<UserInfo> {
-  return invoke<UserInfo>("identify", { name });
+export async function identify(name: string, password: string): Promise<UserInfo> {
+  return invoke<UserInfo>("identify", { name, password });
 }
 
 export async function logout(): Promise<void> {

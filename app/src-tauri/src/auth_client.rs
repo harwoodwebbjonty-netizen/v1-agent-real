@@ -19,6 +19,13 @@ async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Resp
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        // Surface FastAPI's {"detail": "..."} as a plain human message when
+        // present — the UI shows these errors verbatim.
+        if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&body) {
+            if let Some(detail) = parsed.get("detail").and_then(|d| d.as_str()) {
+                return Err(detail.to_string());
+            }
+        }
         return Err(format!("Backend returned {}: {}", status, body));
     }
     response
@@ -30,16 +37,17 @@ async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Resp
 #[derive(Serialize)]
 struct IdentifyRequest<'a> {
     name: &'a str,
+    password: &'a str,
 }
 
-/// No passwords — typing an existing name signs in as that person, typing a
-/// new one creates a profile on the spot (small trusted team).
-pub async fn identify(base_url: &str, name: &str) -> Result<(String, UserInfo), String> {
+/// Name + password sign-in. A new name creates a profile with that password;
+/// an existing name must supply the matching password.
+pub async fn identify(base_url: &str, name: &str, password: &str) -> Result<(String, UserInfo), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/auth/identify", base_url);
     let response = client
         .post(&url)
-        .json(&IdentifyRequest { name })
+        .json(&IdentifyRequest { name, password })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;

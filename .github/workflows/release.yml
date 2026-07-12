@@ -19,8 +19,25 @@ permissions:
   contents: write
 
 jobs:
+  # ── 0. Guard: the tag must match tauri.conf.json's version ─────────────────
+  # Without this, a tag pushed without bumping the config "succeeds" but
+  # silently publishes into the previous release (happened with v0.1.70/71).
+  verify-version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: tag matches tauri.conf.json version
+        run: |
+          TAG="${GITHUB_REF_NAME#v}"
+          CONF=$(python3 -c "import json; print(json.load(open('app/src-tauri/tauri.conf.json'))['version'])")
+          if [ "$TAG" != "$CONF" ]; then
+            echo "::error::Tag v$TAG does not match tauri.conf.json version $CONF — bump the version before tagging."
+            exit 1
+          fi
+
   # ── 1. macOS Apple Silicon ──────────────────────────────────────────────────
   build-macos-arm:
+    needs: verify-version
     permissions:
       contents: write
     runs-on: macos-latest

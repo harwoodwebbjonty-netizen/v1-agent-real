@@ -369,6 +369,24 @@ body {
   margin-left: 0;
 }
 
+.connection-banner {
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 500;
+  padding: var(--space-2) var(--space-4);
+  background: var(--danger);
+  color: #fff;
+  font-size: var(--text-sm);
+  border-radius: 0 0 var(--radius-md) var(--radius-md);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.2);
+}
+
+.connection-banner.hidden {
+  display: none;
+}
+
 .update-banner {
   position: fixed;
   bottom: var(--space-5);

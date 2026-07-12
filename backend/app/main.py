@@ -160,7 +160,19 @@ async def enrich_lead_route(
     body: EnrichLeadRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> EnrichLeadResult:
-    return await enrich_lead(body.company, body.notes, body.industry)
+    from fastapi import HTTPException
+    from app.services.auth_service import new_id, now_iso
+
+    allowed, spent, limit = db.check_credit_limit(current_user.id, "enrichment")
+    if not allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Monthly credit limit reached for Enrichment (spent £{spent:.2f} of £{limit:.2f}). "
+            "Ask your administrator to raise it.",
+        )
+    result = await enrich_lead(body.company, body.notes, body.industry)
+    db.record_credit_spend(new_id(), current_user.id, "enrichment", db.CREDIT_COST["enrichment"], now_iso())
+    return result
 
 
 @app.post("/lead-chat", response_model=LeadChatResponse)

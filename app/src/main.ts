@@ -1,5 +1,6 @@
 import "./style.css";
 import { initAuth } from "./auth";
+import { initConnectionBanner } from "./connection";
 import { initTabBar } from "./components/tabBar";
 import { initIdentitySwitcher } from "./identitySwitcher";
 import { initPresence } from "./presence";
@@ -55,3 +56,4 @@ document.querySelector<HTMLButtonElement>("#theme-toggle-btn")!.addEventListener
 
 void initAuth();
 void initUpdater();
+initConnectionBanner();

@@ -21,12 +21,12 @@ fn require_session(app_handle: &tauri::AppHandle) -> Result<StoredSession, Strin
 
 // --- Auth ---
 
-/// No passwords — typing an existing name signs in as that person, typing a
-/// new one creates a profile on the spot (small trusted team).
+/// Name + password sign-in. A new name creates a profile with that password;
+/// an existing name must supply the matching password.
 #[tauri::command]
-async fn identify(app_handle: tauri::AppHandle, name: String) -> Result<UserInfo, String> {
+async fn identify(app_handle: tauri::AppHandle, name: String, password: String) -> Result<UserInfo, String> {
     let base_url = app_state::resolve_base_url(&app_handle);
-    let (token, user) = auth_client::identify(&base_url, &name).await?;
+    let (token, user) = auth_client::identify(&base_url, &name, &password).await?;
     app_state::save_session(&app_handle, &StoredSession { token, user: user.clone() })?;
     Ok(user)
 }

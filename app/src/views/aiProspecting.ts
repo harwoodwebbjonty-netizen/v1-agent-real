@@ -469,14 +469,8 @@ export function initAiProspecting(): void {
 
         ${!configured
           ? `<section class="card">
-              <h3 class="card-title">⚙ Setup required</h3>
-              <p style="margin:var(--space-2) 0 var(--space-3)">Add your free Companies House API key to start:</p>
-              <ol style="font-size:var(--text-sm);line-height:2;padding-left:var(--space-5)">
-                <li>Register at <strong>developer.company-information.service.gov.uk</strong></li>
-                <li>Create an application and copy your API key</li>
-                <li>Add <code>COMPANIES_HOUSE_API_KEY=your_key</code> to the backend <code>.env</code></li>
-                <li>Restart: <code>systemctl restart phone-lookup-backend</code></li>
-              </ol>
+              <h3 class="card-title">⚙ Not set up yet</h3>
+              <p style="margin:var(--space-2) 0 var(--space-3)">AI Prospecting isn't available because the server doesn't have a Companies House API key configured. Ask your administrator to set one up — it's free and takes a couple of minutes (register at developer.company-information.service.gov.uk, then add the key to the server settings).</p>
             </section>`
           : `<section class="card prospecting-run-panel">
               <h3 class="action-section-title">Run AI Prospecting</h3>
