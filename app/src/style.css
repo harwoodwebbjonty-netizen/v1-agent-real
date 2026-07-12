@@ -444,6 +444,18 @@ body {
   flex-shrink: 0;
 }
 
+/* Per-section icon colours — always on, regardless of hover/active state */
+[data-nav="action-centre"]  .nav-icon { color: #10b981; }
+[data-nav="activity-feed"]  .nav-icon { color: #f59e0b; }
+[data-nav="ai-prospecting"] .nav-icon { color: #3b82f6; }
+[data-nav="dashboard"]      .nav-icon { color: #8b5cf6; }
+[data-nav="cold-call-lists"].nav-icon { color: #06b6d4; }
+[data-nav="outreach"]       .nav-icon { color: #2563eb; }
+[data-nav="win-back"]       .nav-icon { color: #f97316; }
+[data-nav="calendar"]       .nav-icon { color: #14b8a6; }
+[data-nav="analytics"]      .nav-icon { color: #a855f7; }
+[data-nav="settings"]       .nav-icon { color: #94a3b8; }
+
 .app-sidebar-bottom {
   display: flex;
   flex-direction: column;
