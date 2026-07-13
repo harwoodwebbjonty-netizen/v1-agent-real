@@ -1,5 +1,5 @@
 :root {
-  font-family: ui-serif, "New York", Georgia, "Times New Roman", serif;
+  font-family: ui-rounded, "SF Pro Rounded", "Nunito", "Segoe UI", system-ui, sans-serif;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -39,9 +39,10 @@
   --danger-deep: #dc2626;
   --danger-tint: rgba(239, 68, 68, 0.08);
 
-  /* Extra signal hues, used only for the contact-status pipeline chips (New/Contacted/Replied/Converted) */
-  --signal-purple: #8b5cf6;
-  --signal-purple-tint: rgba(139, 92, 246, 0.1);
+  /* Signal hues — kept to three total (blue/green/red) so text colour always
+     means something. "Purple" now aliases the accent blue. */
+  --signal-purple: #2563eb;
+  --signal-purple-tint: rgba(37, 99, 235, 0.08);
   --signal-green: #10b981;
   --signal-green-tint: rgba(16, 185, 129, 0.1);
 
@@ -1028,9 +1029,9 @@ a:hover {
 }
 
 .status-badge.intel-warm {
-  background: rgba(245, 158, 11, 0.1);
-  color: #b45309;
-  border-color: rgba(245, 158, 11, 0.1);
+  background: var(--panel);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 .status-badge.intel-cold {
@@ -1857,9 +1858,9 @@ select.inline-edit { min-width: 110px; }
 }
 
 .status-badge.cal-type-followup {
-  background: rgba(245, 158, 11, 0.1);
-  color: #b45309;
-  border-color: rgba(245, 158, 11, 0.1);
+  background: var(--panel);
+  color: var(--text-muted);
+  border-color: var(--border);
 }
 
 .status-badge.cal-type-task {
@@ -2807,13 +2808,13 @@ body.compact-rows td {
 
 .event-badge-NEW_CHARGE,
 .event-badge-CHARGE_UPDATED,
-.event-badge-FINANCIAL_CHANGE { background: var(--accent-glow); color: var(--accent-core); }
+.event-badge-FINANCIAL_CHANGE,
+.event-badge-PSC_CHANGE { background: var(--accent-glow); color: var(--accent-core); }
 .event-badge-CHARGE_SATISFIED,
-.event-badge-DIRECTOR_APPOINTMENT { background: #dcfce7; color: #16a34a; }
-.event-badge-DIRECTOR_RESIGNATION { background: #fee2e2; color: var(--danger); }
-.event-badge-PSC_CHANGE { background: #f3e8ff; color: #7c3aed; }
-.event-badge-RISK_INCREASE { background: #ffedd5; color: #c2410c; }
-.event-badge-COMPANY_EVENT { background: var(--surface-muted); color: var(--text-muted); }
+.event-badge-DIRECTOR_APPOINTMENT { background: var(--signal-green-tint); color: var(--signal-green); }
+.event-badge-DIRECTOR_RESIGNATION,
+.event-badge-RISK_INCREASE { background: var(--danger-tint); color: var(--danger); }
+.event-badge-COMPANY_EVENT { background: var(--panel); color: var(--text-muted); }
 
 /* Global Activity Feed page */
 .activity-feed-filters {
