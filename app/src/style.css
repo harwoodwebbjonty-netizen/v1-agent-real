@@ -1,4 +1,12 @@
 @font-face {
+  font-family: "Quicksand";
+  font-style: normal;
+  font-weight: 300 700;
+  font-display: swap;
+  src: url("/fonts/Quicksand-Variable.woff2") format("woff2");
+}
+
+@font-face {
   font-family: "Inter";
   font-style: normal;
   font-weight: 100 900;
@@ -8,6 +16,8 @@
 
 :root {
   font-family: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  /* Display face for chrome (nav, titles, buttons, tooltips) — data stays Inter */
+  --font-display: "Quicksand", "Inter", -apple-system, sans-serif;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -176,7 +186,8 @@ body {
 }
 
 .app-sidebar.collapsed {
-  width: 60px;
+  overflow: visible;
+  width: 64px;
   padding: var(--space-5) var(--space-2);
 }
 
@@ -189,6 +200,39 @@ body {
 
 .app-sidebar.collapsed .nav-link {
   justify-content: center;
+  position: relative;
+}
+
+/* Hover tooltip on the collapsed rail — name pops out beside the icon */
+.app-sidebar.collapsed .nav-link:hover::after {
+  content: attr(data-title);
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  background: #16181d;
+  color: #ffffff;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  padding: 7px 14px;
+  border-radius: 10px;
+  white-space: nowrap;
+  z-index: 300;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+  pointer-events: none;
+}
+
+.app-sidebar.collapsed .nav-link:hover::before {
+  content: "";
+  position: absolute;
+  left: calc(100% + 4px);
+  top: 50%;
+  transform: translateY(-50%);
+  border: 5px solid transparent;
+  border-right-color: #16181d;
+  z-index: 300;
+  pointer-events: none;
 }
 
 .app-sidebar.collapsed .identity-trigger {
@@ -416,6 +460,7 @@ body {
 }
 
 .nav-link {
+  font-family: var(--font-display);
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -452,6 +497,16 @@ body {
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: color-mix(in srgb, currentColor 11%, transparent);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.nav-link:hover .nav-icon {
+  background: color-mix(in srgb, currentColor 18%, transparent);
+  transform: scale(1.06);
 }
 
 /* Per-section icon colours — always on, regardless of hover/active state */
@@ -689,6 +744,7 @@ body {
 
 .card-title {
   margin: 0;
+  font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: 600;
   letter-spacing: -0.01em;
@@ -785,7 +841,7 @@ textarea:focus {
 
 /* Buttons — flat, angular, no gradients */
 .btn {
-  font-family: inherit;
+  font-family: var(--font-display);
   font-size: var(--text-sm);
   font-weight: 400;
   padding: 0.45rem 0.85rem;
@@ -2229,6 +2285,7 @@ body.compact-rows td {
 }
 
 .action-section-title {
+  font-family: var(--font-display);
   margin: 0 0 var(--space-3);
   font-size: var(--text-base);
   font-weight: 450;
@@ -2842,6 +2899,7 @@ body.compact-rows td {
 }
 
 .view-header h2 {
+  font-family: var(--font-display);
   font-size: var(--text-xl);
   font-weight: 400;
   margin: 0 0 var(--space-1);

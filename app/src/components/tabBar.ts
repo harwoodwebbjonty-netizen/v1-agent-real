@@ -132,6 +132,8 @@ export function initTabBar(): void {
 
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((link) => {
     const view = link.dataset.nav as ViewName;
+    // Feeds the collapsed-sidebar hover tooltip (CSS attr(data-title))
+    link.dataset.title = NAV_TITLES[view];
     link.addEventListener("click", (event) => {
       event.preventDefault();
       if (view === "settings") {
