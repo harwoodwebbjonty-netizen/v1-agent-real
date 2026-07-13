@@ -405,7 +405,28 @@ function renderEmails(lead: Lead): void {
     el.innerHTML = '<p class="empty-hint">No email addresses yet</p>';
     return;
   }
-  el.innerHTML = lead.emails.map((e) => emailRowHtml(e)).join("");
+  el.innerHTML =
+    lead.emails.map((e) => emailRowHtml(e)).join("") +
+    `<button class="btn btn-ghost btn-sm" id="verify-emails-btn" type="button"
+       title="Free checks: does the domain accept mail, and does the address match the contact or a director">
+       Verify addresses</button>
+     <span id="verify-emails-status" class="empty-hint"></span>`;
+
+  el.querySelector<HTMLButtonElement>("#verify-emails-btn")!.addEventListener("click", async () => {
+    const btn = el.querySelector<HTMLButtonElement>("#verify-emails-btn")!;
+    const status = el.querySelector<HTMLSpanElement>("#verify-emails-status")!;
+    btn.disabled = true;
+    status.textContent = "Checking…";
+    try {
+      const { verifyLeadEmails } = await import("../api");
+      const updated = await verifyLeadEmails(lead.id);
+      currentLead = updated;
+      renderEmails(updated);
+    } catch (err) {
+      status.textContent = String(err);
+      btn.disabled = false;
+    }
+  });
 
   el.querySelectorAll<HTMLButtonElement>(".copy-btn").forEach((btn) => {
     btn.addEventListener("click", () => void copyToClipboard(btn.dataset.value!));
@@ -440,6 +461,29 @@ function renderEmails(lead: Lead): void {
   });
 }
 
+/** Two-part badge: deliverability (domain) + who the address belongs to.
+ * Hover shows the full explanation. */
+function verifyBadgeHtml(e: EmailEntry): string {
+  const status = e.verify_status ?? "unchecked";
+  if (status === "unchecked") return "";
+  const title = escapeHtml(e.verify_detail ?? "");
+
+  let cls = "unverified";
+  let label = "domain?";
+  if (status === "undeliverable") { cls = "not_found"; label = "dead domain"; }
+  else if (status === "deliverable") { cls = "verified"; label = "deliverable"; }
+  else { cls = "unverified"; label = "risky"; }
+
+  const match = e.person_match ?? "unknown";
+  let personHtml = "";
+  if (match === "person") personHtml = `<span class="status-badge verified" title="${title}">matches contact</span>`;
+  else if (match === "director") personHtml = `<span class="status-badge verified" title="${title}">matches director</span>`;
+  else if (match === "generic") personHtml = `<span class="status-badge unverified" title="${title}">generic inbox</span>`;
+  else if (match === "mismatch") personHtml = `<span class="status-badge not_found" title="${title}">name mismatch</span>`;
+
+  return `<span class="status-badge ${cls}" title="${title}">${label}</span>${personHtml}`;
+}
+
 function emailRowHtml(e: EmailEntry): string {
   if (e.id === editingEmailId) {
     return `
@@ -453,6 +497,7 @@ function emailRowHtml(e: EmailEntry): string {
   return `
     <div class="contact-row">
       <span class="contact-row-value">${escapeHtml(e.email)}</span>
+      ${verifyBadgeHtml(e)}
       ${e.source === "scraped" ? '<span class="empty-hint">scraped</span>' : ""}
       <a class="icon-btn" href="mailto:${escapeHtml(e.email)}" title="Email">✉</a>
       <button class="icon-btn copy-btn" type="button" data-value="${escapeHtml(e.email)}" title="Copy">⧉</button>

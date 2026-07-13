@@ -58,6 +58,12 @@ pub struct EmailRecord {
     pub id: String,
     pub email: String,
     pub source: String,
+    #[serde(default)]
+    pub verify_status: String,
+    #[serde(default)]
+    pub person_match: String,
+    #[serde(default)]
+    pub verify_detail: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -340,6 +346,18 @@ pub async fn delete_email(base_url: &str, token: &str, lead_id: &str, email_id: 
 pub async fn scrape_email(base_url: &str, token: &str, lead_id: &str) -> Result<LeadRecord, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/leads/{}/scrape-email", base_url, lead_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn verify_lead_emails(base_url: &str, token: &str, lead_id: &str) -> Result<LeadRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/verify-emails", base_url, lead_id);
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", token))

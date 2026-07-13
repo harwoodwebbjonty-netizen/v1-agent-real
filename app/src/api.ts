@@ -10,6 +10,9 @@ export interface EmailEntry {
   id: string;
   email: string;
   source: "scraped" | "manual";
+  verify_status?: "unchecked" | "deliverable" | "risky" | "undeliverable";
+  person_match?: "unknown" | "person" | "director" | "generic" | "mismatch";
+  verify_detail?: string;
 }
 
 export interface Lead {
@@ -254,6 +257,12 @@ export async function deleteLeadEmail(leadId: string, emailId: string): Promise<
 /** Independent AI email scraper — manual trigger only, never runs automatically. */
 export async function scrapeLeadEmail(leadId: string): Promise<Lead> {
   return invoke<Lead>("scrape_lead_email", { leadId });
+}
+
+/** Free email checks: domain deliverability (DNS) + does the address match
+ * the contact/director or is it a generic inbox. No AI, no paid service. */
+export async function verifyLeadEmails(leadId: string): Promise<Lead> {
+  return invoke<Lead>("verify_lead_emails", { leadId });
 }
 
 export async function exportLogCsv(destPath: string): Promise<void> {

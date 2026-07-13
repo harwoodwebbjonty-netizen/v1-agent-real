@@ -48,3 +48,6 @@ class EmailOut(BaseModel):
     id: str
     email: str
     source: str
+    verify_status: str = "unchecked"
+    person_match: str = "unknown"
+    verify_detail: str = ""

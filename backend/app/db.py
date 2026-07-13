@@ -491,6 +491,21 @@ def _migration_016_campaign_resume(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE win_back_campaigns ADD COLUMN depth TEXT DEFAULT 'standard'")
 
 
+def _migration_017_email_verification(conn: sqlite3.Connection) -> None:
+    """Deliverability + person-match verification results on lead emails.
+    verify_status: unchecked | deliverable | risky | undeliverable
+    person_match: unknown | person | director | generic | mismatch"""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(lead_emails)")}
+    for col, decl in [
+        ("verify_status", "TEXT NOT NULL DEFAULT 'unchecked'"),
+        ("person_match", "TEXT NOT NULL DEFAULT 'unknown'"),
+        ("verify_detail", "TEXT NOT NULL DEFAULT ''"),
+        ("verified_at", "TEXT"),
+    ]:
+        if col not in cols:
+            conn.execute(f"ALTER TABLE lead_emails ADD COLUMN {col} {decl}")
+
+
 def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
     """Add password_hash to users. NULL means a legacy account that predates
     passwords — the next successful identify for that name sets its password
@@ -519,8 +534,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (14, _migration_014_ch_stream_state),
     (15, _migration_015_user_passwords),
     (16, _migration_016_campaign_resume),
+    (17, _migration_017_email_verification),
 ]
-CURRENT_SCHEMA_VERSION = 16
+CURRENT_SCHEMA_VERSION = 17
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -986,6 +1002,14 @@ def list_emails(lead_id: str) -> list[sqlite3.Row]:
         return conn.execute(
             "SELECT * FROM lead_emails WHERE lead_id = ? ORDER BY created_at", (lead_id,)
         ).fetchall()
+
+
+def set_email_verification(email_id: str, status: str, person_match: str, detail: str, verified_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE lead_emails SET verify_status = ?, person_match = ?, verify_detail = ?, verified_at = ? WHERE id = ?",
+            (status, person_match, detail, verified_at, email_id),
+        )
 
 
 def add_email(id: str, lead_id: str, email: str, source: str, created_at: str) -> None:

@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import sqlite3
@@ -165,7 +166,15 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         follow_up_at=row["follow_up_at"] if "follow_up_at" in row.keys() else None,
         list_name=row["list_name"] if "list_name" in row.keys() else None,
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
-        emails=[EmailOut(id=e["id"], email=e["email"], source=e["source"]) for e in db.list_emails(row["id"])],
+        emails=[
+            EmailOut(
+                id=e["id"], email=e["email"], source=e["source"],
+                verify_status=e["verify_status"] if "verify_status" in e.keys() else "unchecked",
+                person_match=e["person_match"] if "person_match" in e.keys() else "unknown",
+                verify_detail=e["verify_detail"] if "verify_detail" in e.keys() else "",
+            )
+            for e in db.list_emails(row["id"])
+        ],
         intelligence=intelligence,
     )
 
@@ -429,6 +438,44 @@ async def scrape_email_route(
     for email in result.emails:
         db.add_email_ignore_duplicate(id=new_id(), lead_id=lead_id, email=email, source="scraped", created_at=created_at)
 
+    # Verify what the scraper found straight away — free DNS + name checks
+    await _verify_lead_emails(lead_id)
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
+
+
+async def _verify_lead_emails(lead_id: str) -> None:
+    from app.services.email_verify_service import directors_from_ch_data, verify_email
+
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        return
+    contact_name = lead["contact_name"] if "contact_name" in lead.keys() else ""
+    directors = directors_from_ch_data(lead["ch_data"] if "ch_data" in lead.keys() else None)
+    emails = db.list_emails(lead_id)
+
+    async def _one(row) -> None:
+        try:
+            r = await verify_email(row["email"], contact_name or "", directors)
+            db.set_email_verification(row["id"], r["status"], r["person_match"], r["detail"], now_iso())
+        except Exception:
+            logger.exception("Email verification failed for %s", row["email"])
+
+    await asyncio.gather(*[_one(e) for e in emails])
+
+
+@router.post("/{lead_id}/verify-emails", response_model=LeadOut)
+async def verify_emails_route(
+    lead_id: str, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
+) -> LeadOut:
+    """Free checks on every email of this lead: does the domain accept mail
+    (DNS), and does the address match the contact/director or is it a
+    generic inbox. No external paid service involved."""
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+    await _verify_lead_emails(lead_id)
     return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 

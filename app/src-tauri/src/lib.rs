@@ -247,6 +247,13 @@ async fn scrape_lead_email(app_handle: tauri::AppHandle, lead_id: String) -> Res
     backend_client::scrape_email(&base_url, &session.token, &lead_id).await
 }
 
+#[tauri::command]
+async fn verify_lead_emails(app_handle: tauri::AppHandle, lead_id: String) -> Result<LeadRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::verify_lead_emails(&base_url, &session.token, &lead_id).await
+}
+
 // --- AI Sales Intelligence — manual trigger only, full version history kept ---
 
 #[tauri::command]
@@ -1144,6 +1151,7 @@ pub fn run() {
       update_lead_email,
       delete_lead_email,
       scrape_lead_email,
+      verify_lead_emails,
       generate_lead_intelligence,
       get_lead_intelligence_history,
       chat_about_lead,
