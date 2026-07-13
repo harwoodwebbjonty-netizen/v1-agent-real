@@ -53,3 +53,9 @@ initPresence();
 void initAuth();
 void initUpdater();
 initConnectionBanner();
+
+// Real version in the sidebar (replaces the hardcoded placeholder)
+void import("@tauri-apps/api/app").then(async ({ getVersion }) => {
+  const el = document.querySelector(".sidebar-version-label");
+  if (el) el.textContent = `v${await getVersion()}`;
+});

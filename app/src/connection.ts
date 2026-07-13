@@ -9,7 +9,7 @@ export function initConnectionBanner(): void {
   const banner = document.createElement("div");
   banner.id = "connection-banner";
   banner.className = "connection-banner hidden";
-  banner.innerHTML = `<span>⚠ Can't reach the server — data shown may be stale. Retrying…</span>`;
+  banner.innerHTML = `<span>Can't reach the server — data shown may be stale. Retrying…</span>`;
   document.body.appendChild(banner);
 
   let offline = false;

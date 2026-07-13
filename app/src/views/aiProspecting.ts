@@ -469,7 +469,7 @@ export function initAiProspecting(): void {
 
         ${!configured
           ? `<section class="card">
-              <h3 class="card-title">⚙ Not set up yet</h3>
+              <h3 class="card-title">Not set up yet</h3>
               <p style="margin:var(--space-2) 0 var(--space-3)">AI Prospecting isn't available because the server doesn't have a Companies House API key configured. Ask your administrator to set one up — it's free and takes a couple of minutes (register at developer.company-information.service.gov.uk, then add the key to the server settings).</p>
             </section>`
           : `<section class="card prospecting-run-panel">

@@ -122,8 +122,13 @@ New DB migrations run automatically on service restart.
 - **DB**: SQLite at `/opt/v1-agent/backend/data/team.db`, WAL mode,
   migrations in `backend/app/db.py` (bump `CURRENT_SCHEMA_VERSION`, append
   to `MIGRATIONS`, never edit shipped ones). CH feed self-prunes to 30 days.
-- **Design**: light-only (no theme toggle), font ui-rounded, text colours
-  limited to blue/green/red + neutrals, coloured per-section nav icons.
+- **Design**: light-only (no theme toggle), font Inter (bundled woff2),
+  text colours limited to blue/green/red + neutrals, coloured per-section
+  nav icons. Flat surfaces — no gradients, glows, glass, ambient blobs or
+  pulse animations; no emoji in UI copy (use stroke SVGs). Weight
+  hierarchy: titles 600, labels/buttons 500, body 400. Legacy token
+  aliases (--primary, --radius, --bg-1…) are defined in :root — never
+  remove them; ~60 view rules depend on them.
 
 ### Known gaps — flag these when relevant
 - No Apple notarization: new Mac users hit Gatekeeper "damaged app"
