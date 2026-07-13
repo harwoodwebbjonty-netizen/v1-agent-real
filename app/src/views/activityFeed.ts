@@ -85,7 +85,9 @@ interface State {
 const s: State = {
   tab: "ch",
   chCharges: [], chLoading: false, chConfigured: false,
-  chTimepoint: null, chSearch: "", chGroups: new Set(),
+  // Default to Charges — debentures and new borrowing are the signal this
+  // feed exists for; director changes etc. are opt-in via the chips.
+  chTimepoint: null, chSearch: "", chGroups: new Set(["Charges"]),
   chNotAdded: false, chOffset: 0, chHasMore: false, chAddingIds: new Set(),
   dgEvents: [], dgLoading: false, dgConfigured: false,
   dgSearch: "", dgTypes: new Set(), dgHours: 7 * 24,

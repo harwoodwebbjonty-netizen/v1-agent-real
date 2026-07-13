@@ -10,6 +10,7 @@ import asyncio
 import json
 import logging
 from datetime import datetime, timezone
+from typing import Optional
 
 import httpx
 
@@ -91,6 +92,57 @@ async def _get_company_name(api_key: str, company_number: str) -> str:
     return company_number
 
 
+_CHARGE_FILING_TYPES = {"MR01", "MR02", "MR03", "MR04", "MR05"}
+
+
+async def _charge_detail_desc(api_key: str, company_number: str, desc_vals: dict) -> Optional[str]:
+    """For charge filings, pull the real charge detail from the charges API —
+    'Debenture — in favour of Barclays Bank PLC (fixed, floating)' is what
+    makes the feed useful; the filing event itself only says 'a charge was
+    registered'."""
+    try:
+        async with httpx.AsyncClient(auth=(api_key, ""), base_url=CH_BASE, timeout=8.0) as c:
+            r = await c.get(f"/company/{company_number}/charges", params={"items_per_page": 25})
+            if r.status_code != 200:
+                return None
+            items = r.json().get("items") or []
+    except Exception:
+        return None
+    if not items:
+        return None
+
+    # Match the specific charge by number when the event gives one; otherwise
+    # take the newest (the list is newest-first).
+    target = None
+    want = str(desc_vals.get("charge_number") or "")
+    if want:
+        for it in items:
+            if str(it.get("charge_number") or "") == want:
+                target = it
+                break
+    if target is None:
+        target = items[0]
+
+    parts = []
+    classification = (target.get("classification") or {}).get("description")
+    if classification:
+        parts.append(str(classification))
+    lenders = [p.get("name") for p in (target.get("persons_entitled") or []) if p.get("name")]
+    if lenders:
+        parts.append(f"— in favour of {', '.join(lenders[:2])}")
+    particulars = target.get("particulars") or {}
+    flags = []
+    if particulars.get("contains_fixed_charge"):
+        flags.append("fixed")
+    if particulars.get("contains_floating_charge"):
+        flags.append("floating")
+    if particulars.get("floating_charge_covers_all"):
+        flags.append("covers all assets")
+    if flags:
+        parts.append(f"({', '.join(flags)})")
+    return " ".join(parts) if parts else None
+
+
 async def _process_event(event: dict, api_key: str) -> None:
     """Store all filing events in DB — no category filter."""
     data = event.get("data") or {}
@@ -116,6 +168,13 @@ async def _process_event(event: dict, api_key: str) -> None:
     desc_vals = data.get("description_values") or {}
     if "charge_number" in desc_vals:
         charge_desc += f" #{desc_vals['charge_number']}"
+
+    # Charge filings get the real detail (debenture/lender/fixed-floating)
+    # from the charges API — the headline signal this feed exists for.
+    if filing_type in _CHARGE_FILING_TYPES:
+        detail = await _charge_detail_desc(api_key, company_number, desc_vals)
+        if detail:
+            charge_desc = f"{_FILING_TYPE_LABEL.get(filing_type, 'Charge')}: {detail}"
 
     record = {
         "id": new_id(),
