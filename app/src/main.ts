@@ -6,7 +6,7 @@ import { initIdentitySwitcher } from "./identitySwitcher";
 import { initPresence } from "./presence";
 import { initTabRouter } from "./router";
 import { initSidebarToggle } from "./sidebarToggle";
-import { initTheme, toggleTheme } from "./theme";
+import { initTheme } from "./theme";
 import { initUpdater } from "./updater";
 import { initActivityFeed } from "./views/activityFeed";
 import { initChargeFeed } from "./views/chargeFeed";
@@ -49,10 +49,6 @@ initTabBar();
 initTabRouter();
 initSidebarToggle();
 initPresence();
-
-document.querySelector<HTMLButtonElement>("#theme-toggle-btn")!.addEventListener("click", () => {
-  toggleTheme();
-});
 
 void initAuth();
 void initUpdater();

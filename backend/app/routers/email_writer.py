@@ -214,11 +214,13 @@ def delete_draft(draft_id: str, current_user: CurrentUser = Depends(get_current_
 async def get_personalisation(
     request: Request, lead_id: str, body: PersonalisationRequest, current_user: CurrentUser = Depends(get_current_user)
 ) -> PersonalisationResponse:
+    _check_email_writer_budget(current_user.id)
     _, lead_context, _ = _gather_lead_data(lead_id, current_user)
     try:
         options = await generate_personalisation(lead_context, body.count)
     except Exception:
         raise HTTPException(status_code=502, detail="AI failed to generate personalisation. Please try again.")
+    db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
     return PersonalisationResponse(options=options)
 
 
@@ -227,11 +229,13 @@ async def get_personalisation(
 async def get_cta_suggestions(
     request: Request, lead_id: str, body: CtaSuggestionsRequest, current_user: CurrentUser = Depends(get_current_user)
 ) -> CtaSuggestionsResponse:
+    _check_email_writer_budget(current_user.id)
     _, lead_context, _ = _gather_lead_data(lead_id, current_user)
     try:
         ctas = await generate_cta_suggestions(lead_context, body.goal)
     except Exception:
         raise HTTPException(status_code=502, detail="AI failed to generate CTA suggestions. Please try again.")
+    db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
     return CtaSuggestionsResponse(ctas=ctas)
 
 

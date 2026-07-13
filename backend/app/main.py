@@ -136,6 +136,24 @@ async def health() -> dict[str, str]:
     return {"status": "ok"}
 
 
+def _require_budget(user_id: str, feature: str, label: str) -> None:
+    from fastapi import HTTPException
+
+    allowed, spent, limit = db.check_credit_limit(user_id, feature)
+    if not allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Monthly credit limit reached for {label} (spent £{spent:.2f} of £{limit:.2f}). "
+            "Ask your administrator to raise it.",
+        )
+
+
+def _record_spend(user_id: str, feature: str) -> None:
+    from app.services.auth_service import new_id, now_iso
+
+    db.record_credit_spend(new_id(), user_id, feature, db.CREDIT_COST[feature], now_iso())
+
+
 @app.post("/lookup-company-phone", response_model=LookupResult)
 @limiter.limit(get_settings().rate_limit)
 async def lookup_company_phone_route(
@@ -143,7 +161,9 @@ async def lookup_company_phone_route(
     body: LookupRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> LookupResult:
+    _require_budget(current_user.id, "phone_lookup", "Phone Lookup")
     result = await lookup_company_phone(body.company)
+    _record_spend(current_user.id, "phone_lookup")
     usage_log.record_usage(
         user_id=current_user.id,
         company=body.company,
@@ -160,18 +180,9 @@ async def enrich_lead_route(
     body: EnrichLeadRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> EnrichLeadResult:
-    from fastapi import HTTPException
-    from app.services.auth_service import new_id, now_iso
-
-    allowed, spent, limit = db.check_credit_limit(current_user.id, "enrichment")
-    if not allowed:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Monthly credit limit reached for Enrichment (spent £{spent:.2f} of £{limit:.2f}). "
-            "Ask your administrator to raise it.",
-        )
+    _require_budget(current_user.id, "enrichment", "Enrichment")
     result = await enrich_lead(body.company, body.notes, body.industry)
-    db.record_credit_spend(new_id(), current_user.id, "enrichment", db.CREDIT_COST["enrichment"], now_iso())
+    _record_spend(current_user.id, "enrichment")
     return result
 
 
@@ -182,5 +193,7 @@ async def lead_chat_route(
     body: LeadChatRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> LeadChatResponse:
+    _require_budget(current_user.id, "lead_chat", "Lead Chat")
     reply = await chat_about_lead(body.context, body.message, body.history)
+    _record_spend(current_user.id, "lead_chat")
     return LeadChatResponse(reply=reply)

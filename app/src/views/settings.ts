@@ -25,7 +25,6 @@ import { CONTACT_STATUS_ORDER } from "../constants";
 import { getCompactRows, getDefaultContactStatus, setCompactRows, setDefaultContactStatus } from "../preferences";
 import { refreshLeads } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
-import { getStoredTheme, subscribeTheme, toggleTheme } from "../theme";
 import { escapeHtml } from "../utils";
 
 export function initSettings(): void {
@@ -37,16 +36,6 @@ export function initSettings(): void {
         <p class="card-subtitle" id="account-info"></p>
         <div class="card-actions">
           <button id="logout-btn" class="btn btn-secondary">Log out</button>
-        </div>
-      </section>
-
-      <section class="card">
-        <h2 class="card-title">Appearance</h2>
-        <p class="card-subtitle">Theme applies across the whole app.</p>
-        <div class="card-actions">
-          <button id="settings-theme-toggle-btn" class="btn btn-secondary">
-            Toggle Theme (<span id="settings-theme-label"></span>)
-          </button>
         </div>
       </section>
 
@@ -174,17 +163,6 @@ export function initSettings(): void {
   renderAccount();
   subscribeAuth(renderAccount);
   document.querySelector("#logout-btn")!.addEventListener("click", () => void logout());
-
-  // --- Appearance ---
-  const themeLabel = document.querySelector<HTMLSpanElement>("#settings-theme-label")!;
-  function updateThemeLabel(): void {
-    themeLabel.textContent = getStoredTheme() === "dark" ? "Dark" : "Light";
-  }
-  updateThemeLabel();
-  subscribeTheme(updateThemeLabel);
-  document.querySelector("#settings-theme-toggle-btn")!.addEventListener("click", () => {
-    toggleTheme();
-  });
 
   // --- Backend connection ---
   const backendUrlInput = document.querySelector<HTMLInputElement>("#backend-url-input")!;
@@ -432,37 +410,48 @@ export function initSettings(): void {
   });
 
   // --- Credit limits ---
-  const CREDIT_FEATURE_LABELS: Record<string, { label: string; cost: string }> = {
-    phone_lookup:    { label: "Phone Lookup",          cost: "~£0.03 / lookup" },
-    sales_intel:     { label: "Sales Intelligence",    cost: "~£0.15 / generation" },
-    win_back:        { label: "Win-back Emails",        cost: "~£0.03 / email" },
-    ai_prospecting:  { label: "AI Prospecting (enrich)", cost: "~£0.15 / lead enriched" },
+  // defaultLimit mirrors the backend's DEFAULT_CREDIT_LIMIT_GBP — applied
+  // per user per month whenever no explicit limit is set. Nothing is unlimited.
+  const CREDIT_FEATURE_LABELS: Record<string, { label: string; cost: string; defaultLimit: number }> = {
+    phone_lookup:    { label: "Phone Lookup",           cost: "~£0.03 / lookup",          defaultLimit: 20 },
+    sales_intel:     { label: "Sales Intelligence",     cost: "~£0.15 / generation",      defaultLimit: 20 },
+    win_back:        { label: "Win-back Emails",         cost: "~£0.03 / email",           defaultLimit: 20 },
+    ai_prospecting:  { label: "AI Prospecting (enrich)", cost: "~£0.15 / lead enriched",   defaultLimit: 50 },
+    email_writer:    { label: "AI Email Writer",         cost: "~£0.03 / generation",      defaultLimit: 20 },
+    enrichment:      { label: "Lead Enrichment",         cost: "~£0.05 / lead",            defaultLimit: 20 },
+    lead_chat:       { label: "Lead Chat",               cost: "~£0.02 / message",         defaultLimit: 10 },
   };
 
   const creditLimitsRows = document.querySelector<HTMLTableSectionElement>("#credit-limits-rows")!;
   const creditLimitsStatus = document.querySelector<HTMLSpanElement>("#credit-limits-status")!;
-  let _currentLimits: CreditLimits = { limit_phone_lookup: 0, limit_sales_intel: 0, limit_win_back: 0, limit_ai_prospecting: 0 };
+  let _currentLimits: CreditLimits = {
+    limit_phone_lookup: 0, limit_sales_intel: 0, limit_win_back: 0,
+    limit_ai_prospecting: 0, limit_email_writer: 0, limit_enrichment: 0, limit_lead_chat: 0,
+  };
 
   async function renderCreditLimits(): Promise<void> {
     try {
       const usage: CreditUsage = await getCreditUsage();
       _currentLimits = usage.limits;
       creditLimitsRows.innerHTML = Object.entries(CREDIT_FEATURE_LABELS)
-        .map(([key, { label, cost }]) => {
+        .map(([key, { label, cost, defaultLimit }]) => {
           const limitKey = `limit_${key}` as keyof CreditLimits;
-          const spend = (usage.spend[key] ?? 0).toFixed(2);
-          const limit = usage.limits[limitKey] ?? 0;
-          const pct = limit > 0 ? Math.min(100, ((usage.spend[key] ?? 0) / limit) * 100) : 0;
-          const overBudget = limit > 0 && (usage.spend[key] ?? 0) >= limit;
+          const spendVal = usage.spend[key] ?? 0;
+          const spend = spendVal.toFixed(2);
+          const setLimit = usage.limits[limitKey] ?? 0;
+          const effectiveLimit = setLimit > 0 ? setLimit : defaultLimit;
+          const pct = Math.min(100, (spendVal / effectiveLimit) * 100);
+          const overBudget = spendVal >= effectiveLimit;
           return `<tr style="border-top:1px solid var(--border)">
             <td style="padding:var(--space-2) var(--space-3) var(--space-2) 0">${label}</td>
             <td style="padding:var(--space-2) var(--space-3);color:var(--text-muted);font-size:var(--text-sm)">${cost}</td>
             <td style="padding:var(--space-2) var(--space-3)">
               <span style="color:${overBudget ? "var(--danger)" : "var(--accent)"}">£${spend}</span>
-              ${limit > 0 ? `<div style="margin-top:3px;height:4px;width:80px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${overBudget ? "var(--danger)" : "var(--accent)"};border-radius:2px"></div></div>` : ""}
+              <span style="color:var(--text-muted);font-size:var(--text-xs)"> / £${effectiveLimit}</span>
+              <div style="margin-top:3px;height:4px;width:80px;background:var(--border);border-radius:2px"><div style="height:100%;width:${pct}%;background:${overBudget ? "var(--danger)" : "var(--accent)"};border-radius:2px"></div></div>
             </td>
             <td style="padding:var(--space-2) 0">
-              <input type="number" class="search-input credit-limit-input" data-feature="${key}" min="0" step="1" value="${limit || ""}" placeholder="No limit" style="width:110px" />
+              <input type="number" class="search-input credit-limit-input" data-feature="${key}" min="0" step="1" value="${setLimit || ""}" placeholder="Default £${defaultLimit}" style="width:110px" />
             </td>
           </tr>`;
         })

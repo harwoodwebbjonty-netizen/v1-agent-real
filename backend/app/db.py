@@ -1814,7 +1814,7 @@ def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
 # Credit tracking
 # ---------------------------------------------------------------------------
 
-CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment"]
+CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment", "lead_chat"]
 
 # Approximate cost per operation (GBP) — used for limit enforcement checks
 CREDIT_COST = {
@@ -1824,6 +1824,20 @@ CREDIT_COST = {
     "ai_prospecting": 0.15,
     "email_writer": 0.03,
     "enrichment": 0.05,
+    "lead_chat": 0.02,
+}
+
+# Per-user monthly ceilings applied when the admin hasn't set an explicit
+# limit. Nothing is ever unlimited — a runaway user or bug on a shared API
+# key must always hit a ceiling. Admins raise these per user in Settings.
+DEFAULT_CREDIT_LIMIT_GBP = {
+    "phone_lookup": 20.0,
+    "sales_intel": 20.0,
+    "win_back": 20.0,
+    "ai_prospecting": 50.0,
+    "email_writer": 20.0,
+    "enrichment": 20.0,
+    "lead_chat": 10.0,
 }
 
 
@@ -1871,14 +1885,16 @@ def get_all_user_settings(user_id: str) -> dict:
 
 
 def check_credit_limit(user_id: str, feature: str) -> tuple[bool, float, float]:
-    """Returns (allowed, spent_this_month, limit). allowed=True when no limit or within budget."""
+    """Returns (allowed, spent_this_month, limit). An unset/zero limit falls
+    back to the feature's default ceiling — never unlimited, since every call
+    spends on the org's shared API keys."""
     limit_str = get_user_setting(user_id, f"limit_{feature}", "0")
     try:
         limit = float(limit_str)
     except (ValueError, TypeError):
         limit = 0.0
     if limit <= 0:
-        return True, 0.0, 0.0
+        limit = DEFAULT_CREDIT_LIMIT_GBP.get(feature, 20.0)
     spend = get_monthly_credit_spend(user_id).get(feature, 0.0)
     cost = CREDIT_COST.get(feature, 0.0)
     allowed = (spend + cost) <= limit

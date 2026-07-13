@@ -470,6 +470,9 @@ export interface CreditLimits {
   limit_sales_intel: number;
   limit_win_back: number;
   limit_ai_prospecting: number;
+  limit_email_writer: number;
+  limit_enrichment: number;
+  limit_lead_chat: number;
 }
 
 export interface CreditUsage {
