@@ -1,5 +1,7 @@
 import { isAdmin, subscribeAuth } from "../auth";
-import { openTab, type ViewName } from "../tabs";
+import { getActiveTabId, openTab, type ViewName } from "../tabs";
+
+const ADMIN_ONLY_VIEWS: ViewName[] = ["settings", "win-back", "ai-prospecting"];
 
 const NAV_TITLES: Record<ViewName, string> = {
   "action-centre": "Today",
@@ -109,15 +111,24 @@ async function openSettingsWithPin(): Promise<void> {
 }
 
 export function initTabBar(): void {
-  const settingsLink = document.querySelector<HTMLAnchorElement>("#settings-nav-link");
+  const adminOnlyLinks = document.querySelectorAll<HTMLAnchorElement>('[data-admin-only="true"]');
 
   // Auth loads async after initTabBar runs, so subscribe to changes rather
   // than checking isAdmin() once at startup (it would always be false then).
-  function updateSettingsVisibility(): void {
-    if (settingsLink) settingsLink.style.display = isAdmin() ? "" : "none";
+  // Hides every admin-only section (Settings, Win-back, AI Prospecting) for
+  // members — the backend enforces the same restriction on its endpoints.
+  function updateAdminVisibility(): void {
+    adminOnlyLinks.forEach((link) => {
+      link.style.display = isAdmin() ? "" : "none";
+    });
+    // If a member is somehow on an admin-only view (e.g. user switch while
+    // it was open), bounce them to Today.
+    if (!isAdmin() && ADMIN_ONLY_VIEWS.includes(getActiveTabId() as ViewName)) {
+      openTab("action-centre", "Today");
+    }
   }
-  subscribeAuth(updateSettingsVisibility);
-  updateSettingsVisibility();
+  subscribeAuth(updateAdminVisibility);
+  updateAdminVisibility();
 
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((link) => {
     const view = link.dataset.nav as ViewName;

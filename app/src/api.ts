@@ -966,6 +966,12 @@ export async function sendWinBackEmail(campaignId: string, emailId: string, prov
   await invoke("send_win_back_email", { campaignId, emailId, provider });
 }
 
+/** Regenerates only the leads that never got an email (credit ceiling hit,
+ * crash) — progress continues from where the campaign stopped. */
+export async function resumeWinBackCampaign(campaignId: string): Promise<{ resumed: boolean; remaining: number }> {
+  return invoke<{ resumed: boolean; remaining: number }>("resume_win_back_campaign", { campaignId });
+}
+
 export async function sendAllWinBackEmails(campaignId: string, provider = "gmail"): Promise<{ sent: number; failed: number }> {
   return invoke("send_all_win_back_emails", { campaignId, provider });
 }

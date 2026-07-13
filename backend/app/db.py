@@ -480,6 +480,17 @@ def _migration_014_ch_stream_state(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_016_campaign_resume(conn: sqlite3.Connection) -> None:
+    """Persist the full lead list + depth on win-back campaigns so a campaign
+    stopped mid-generation (credit ceiling, crash) can resume with just the
+    leads that never got an email. NULL lead_ids = pre-resume campaign."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(win_back_campaigns)")}
+    if "lead_ids" not in cols:
+        conn.execute("ALTER TABLE win_back_campaigns ADD COLUMN lead_ids TEXT")
+    if "depth" not in cols:
+        conn.execute("ALTER TABLE win_back_campaigns ADD COLUMN depth TEXT DEFAULT 'standard'")
+
+
 def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
     """Add password_hash to users. NULL means a legacy account that predates
     passwords — the next successful identify for that name sets its password
@@ -507,8 +518,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (13, _migration_013_prospecting_total_available),
     (14, _migration_014_ch_stream_state),
     (15, _migration_015_user_passwords),
+    (16, _migration_016_campaign_resume),
 ]
-CURRENT_SCHEMA_VERSION = 15
+CURRENT_SCHEMA_VERSION = 16
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1746,12 +1758,15 @@ def update_lead_dg_refresh(lead_id: str, tier: str, next_refresh_at: str, last_r
 
 # --- win-back campaigns ---
 
-def create_win_back_campaign(id: str, name: str, created_by: str, total: int, created_at: str) -> None:
+def create_win_back_campaign(
+    id: str, name: str, created_by: str, total: int, created_at: str,
+    lead_ids_json: Optional[str] = None, depth: str = "standard",
+) -> None:
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at) "
-            "VALUES (?, ?, ?, 'generating', ?, 0, ?)",
-            (id, name, created_by, total, created_at),
+            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at, lead_ids, depth) "
+            "VALUES (?, ?, ?, 'generating', ?, 0, ?, ?, ?)",
+            (id, name, created_by, total, created_at, lead_ids_json, depth),
         )
 
 

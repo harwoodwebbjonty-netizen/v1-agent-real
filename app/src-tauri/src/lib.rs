@@ -1072,6 +1072,13 @@ async fn send_all_win_back_emails(app_handle: tauri::AppHandle, campaign_id: Str
 }
 
 #[tauri::command]
+async fn resume_win_back_campaign(app_handle: tauri::AppHandle, campaign_id: String) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::resume_win_back_campaign(&base_url, &session.token, &campaign_id).await
+}
+
+#[tauri::command]
 async fn export_win_back_mailchimp(app_handle: tauri::AppHandle, campaign_id: String, provider: String) -> Result<String, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -1214,6 +1221,7 @@ pub fn run() {
       get_win_back_campaign,
       send_win_back_email,
       send_all_win_back_emails,
+      resume_win_back_campaign,
       export_win_back_mailchimp,
       parse_win_back_csv,
       create_win_back_campaign_from_csv

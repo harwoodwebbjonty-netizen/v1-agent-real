@@ -2206,6 +2206,18 @@ pub async fn send_all_win_back_emails(base_url: &str, token: &str, campaign_id: 
     handle_response(response).await
 }
 
+pub async fn resume_win_back_campaign(base_url: &str, token: &str, campaign_id: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/win-back/campaigns/{}/resume", base_url, campaign_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
 pub async fn export_win_back_mailchimp(base_url: &str, token: &str, campaign_id: &str, provider: &str) -> Result<String, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/win-back/campaigns/{}/export-mailchimp", base_url, campaign_id);

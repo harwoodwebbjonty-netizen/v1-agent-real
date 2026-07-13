@@ -9,7 +9,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app import db
-from app.dependencies import CurrentUser, get_current_user
+from app.dependencies import CurrentUser, get_current_user, require_admin
 from app.services.auth_service import new_id, now_iso
 from app.services.email_oauth_service import OAuthError, send_email as send_email_via_oauth
 from app.services.mailchimp_service import (
@@ -23,7 +23,10 @@ from app.services.win_back_email_service import generate_win_back_email
 
 logger = logging.getLogger("app.win_back")
 
-router = APIRouter(prefix="/win-back", tags=["win-back"])
+# Win-back campaigns are admin-only: they mass-generate and mass-send emails
+# on the org's API keys and OAuth accounts — not something the sales team
+# needs for day-to-day calling.
+router = APIRouter(prefix="/win-back", tags=["win-back"], dependencies=[Depends(require_admin)])
 
 
 # --- Pydantic schemas ---
@@ -73,7 +76,12 @@ def _days_since(iso_ts: str) -> float:
         return 999.0
 
 
-async def _generate_campaign(campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard") -> None:
+async def _generate_campaign(
+    campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0
+) -> None:
+    """already_done offsets the progress counter when resuming a campaign that
+    stopped partway (credit ceiling, crash) — only the missing leads are in
+    lead_ids, but the campaign's generated/total counts cover the whole run."""
     max_uses = DEPTH_TO_MAX_USES.get(depth, 5)
     semaphore = asyncio.Semaphore(CAMPAIGN_CONCURRENCY)
     completed = 0
@@ -151,7 +159,7 @@ async def _generate_campaign(campaign_id: str, lead_ids: list, user_id: str, dep
                     completed += 1
                     is_last = completed == len(lead_ids)
                     db.update_win_back_campaign_progress(
-                        campaign_id, completed, "ready" if is_last else "generating"
+                        campaign_id, already_done + completed, "ready" if is_last else "generating"
                     )
 
         await asyncio.gather(*[_process_lead(lid) for lid in lead_ids], return_exceptions=True)
@@ -230,6 +238,8 @@ async def create_campaign(
         created_by=current_user.id,
         total=len(body.lead_ids),
         created_at=now_iso(),
+        lead_ids_json=json.dumps(body.lead_ids),
+        depth=body.depth,
     )
     asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id, body.depth))
     campaign = db.get_win_back_campaign(campaign_id)
@@ -283,10 +293,54 @@ async def create_campaign_from_csv(
         created_by=current_user.id,
         total=len(lead_ids),
         created_at=ts,
+        lead_ids_json=json.dumps(lead_ids),
+        depth=body.depth,
     )
     asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
+
+
+@router.post("/campaigns/{campaign_id}/resume")
+async def resume_campaign(campaign_id: str, current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """Picks up a campaign that stopped partway — typically at the monthly
+    credit ceiling — and generates emails only for the leads that never got
+    one. Fresh sales intelligence from the first pass is reused, so resumed
+    leads usually cost just the email generation."""
+    campaign = db.get_win_back_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if campaign["created_by"] != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+    if campaign["status"] == "generating":
+        raise HTTPException(status_code=400, detail="Campaign is still generating.")
+
+    stored = json.loads(campaign["lead_ids"] or "null") if "lead_ids" in campaign.keys() else None
+    if not stored:
+        raise HTTPException(
+            status_code=400,
+            detail="This campaign predates resume support — its lead list wasn't saved. Create a new campaign instead.",
+        )
+
+    done_lead_ids = {e["lead_id"] for e in db.get_win_back_emails(campaign_id)}
+    missing = [lid for lid in stored if lid not in done_lead_ids]
+    if not missing:
+        raise HTTPException(status_code=400, detail="Nothing to resume — every lead already has an email.")
+
+    allowed, spent, limit = db.check_credit_limit(campaign["created_by"], "win_back")
+    if not allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Still over the Win-back credit limit (spent £{spent:.2f} of £{limit:.2f}). "
+            "Raise the limit in Settings → Credit Limits first, then resume.",
+        )
+
+    depth = (campaign["depth"] if "depth" in campaign.keys() else None) or "standard"
+    db.update_win_back_campaign_progress(campaign_id, len(done_lead_ids), "generating")
+    asyncio.create_task(
+        _generate_campaign(campaign_id, missing, campaign["created_by"], depth, already_done=len(done_lead_ids))
+    )
+    return {"resumed": True, "remaining": len(missing)}
 
 
 @router.get("/campaigns/{campaign_id}")

@@ -8,6 +8,7 @@ import {
   getWinBackCampaign,
   getWinBackCampaigns,
   parseWinBackCsv,
+  resumeWinBackCampaign,
   sendAllWinBackEmails,
   sendWinBackEmail,
 } from "../api";
@@ -319,9 +320,15 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
             <p class="card-subtitle">${campaign.generated} of ${campaign.total} emails generated</p>
           </div>
           <div class="card-header-actions">
+            ${
+              !generating && campaign.generated < campaign.total
+                ? `<button id="wb-resume-btn" class="btn btn-primary btn-sm">Resume (${campaign.total - campaign.generated} remaining)</button>`
+                : ""
+            }
             <button id="wb-back-btn" class="btn btn-ghost">Back</button>
           </div>
         </div>
+        <p id="wb-resume-status" class="status-message" style="margin:0"></p>
 
         ${
           generating
@@ -384,6 +391,22 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
   container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", async () => {
     clearPoll();
     await loadCampaignList(container);
+  });
+
+  container.querySelector<HTMLButtonElement>("#wb-resume-btn")?.addEventListener("click", async () => {
+    const btn = container.querySelector<HTMLButtonElement>("#wb-resume-btn")!;
+    const status = container.querySelector<HTMLParagraphElement>("#wb-resume-status")!;
+    btn.disabled = true;
+    btn.textContent = "Resuming…";
+    try {
+      const result = await resumeWinBackCampaign(campaign.id);
+      status.textContent = `Resumed — generating ${result.remaining} remaining email(s).`;
+      await showCampaignDetail(container, campaign.id);
+    } catch (err) {
+      status.textContent = String(err);
+      btn.disabled = false;
+      btn.textContent = `Resume (${campaign.total - campaign.generated} remaining)`;
+    }
   });
 
   const emailMap = new Map<string, WinBackEmail>(emails.map((e) => [e.id, e]));
