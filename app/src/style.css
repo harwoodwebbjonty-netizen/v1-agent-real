@@ -20,12 +20,12 @@
   --space-8: 64px;
 
   /* Type scale */
-  --text-xs: 0.8125rem;
-  --text-sm: 0.875rem;
-  --text-base: 0.9375rem;
-  --text-lg: 1.0625rem;
-  --text-xl: 1.3rem;
-  --text-2xl: 1.7rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.875rem;
+  --text-lg: 1rem;
+  --text-xl: 1.125rem;
+  --text-2xl: 1.5rem;
 
   /* Geometry — structured, editorial */
   --radius-sm: 4px;
@@ -111,7 +111,7 @@ body {
   background: var(--bg);
   min-height: 100vh;
   font-size: var(--text-base);
-  line-height: 1.5;
+  line-height: 1.45;
   transition: background-color 0.15s ease, color 0.15s ease;
 }
 
@@ -163,7 +163,7 @@ body {
 
 /* Left dock — navigation rail */
 .app-sidebar {
-  width: 264px;
+  width: 228px;
   flex-shrink: 0;
   background: var(--surface);
   border-right: 2px solid var(--border);
@@ -238,13 +238,13 @@ body {
 }
 
 .brand-logo {
-  height: 88px;
+  height: 48px;
   width: auto;
-  max-width: 200px;
+  max-width: 170px;
   object-fit: contain;
   background: #ffffff;
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 4px 8px;
 }
 
 .app-sidebar.collapsed .brand-logo {
@@ -419,7 +419,7 @@ body {
   display: flex;
   align-items: center;
   gap: var(--space-3);
-  padding: 0.55rem var(--space-3);
+  padding: 0.42rem var(--space-3);
   border-radius: var(--radius-sm);
   border: none;
   color: var(--text-muted);
@@ -525,10 +525,10 @@ body {
 .container {
   position: relative;
   z-index: 1;
-  max-width: 980px;
+  max-width: 1440px;
   width: 100%;
   margin: 0 auto;
-  padding: var(--space-6) var(--space-6) var(--space-8);
+  padding: var(--space-5) var(--space-5) var(--space-7);
   display: flex;
   flex-direction: column;
   gap: var(--space-5);
@@ -543,7 +543,7 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-6);
+  padding: 20px;
   box-shadow: var(--shadow-card);
   transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.2s ease, transform 0.2s ease;
 }
@@ -559,10 +559,10 @@ body {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-5);
+  padding: var(--space-4);
   display: flex;
   flex-direction: column;
-  gap: var(--space-2);
+  gap: var(--space-1);
   min-width: 0;
   box-shadow: var(--shadow-card);
   cursor: pointer;
@@ -788,7 +788,7 @@ textarea:focus {
   font-family: inherit;
   font-size: var(--text-sm);
   font-weight: 400;
-  padding: 0.6rem 1.1rem;
+  padding: 0.45rem 0.85rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
   cursor: pointer;
@@ -874,7 +874,7 @@ th[data-sort="contact_status"] { min-width: 155px; }
 
 th,
 td {
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-2) var(--space-3);
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--border);
@@ -1079,7 +1079,7 @@ a:hover {
   background: var(--surface);
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
-  padding: var(--space-6);
+  padding: var(--space-5);
   max-width: 400px;
   width: 90%;
   box-shadow: 0 18px 50px rgba(16, 24, 40, 0.2);
@@ -1578,7 +1578,7 @@ select.inline-edit { min-width: 110px; }
 }
 
 .side-panel-body {
-  padding: var(--space-5);
+  padding: var(--space-4);
   overflow-y: auto;
   flex: 1;
 }
