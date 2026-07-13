@@ -190,10 +190,22 @@ function showLeadPicker(container: HTMLElement): void {
 
 async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<void> {
   let rows: WinBackCsvRow[] = [];
+  let droppedNoEmail = 0;
   try {
     rows = await parseWinBackCsv(csvPath);
+    // Email campaigns can only reach leads with an email — drop the rest up
+    // front so they don't cost generation money for an unsendable draft.
+    const total = rows.length;
+    rows = rows.filter((r) => (r.email || "").trim().length > 0);
+    droppedNoEmail = total - rows.length;
   } catch (err) {
     container.innerHTML = `<main class="container"><p class="status-error">Could not parse CSV: ${escapeHtml(String(err))}</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
+    container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
+    return;
+  }
+
+  if (rows.length === 0) {
+    container.innerHTML = `<main class="container"><p class="status-error">No rows with an email address found in this CSV — a win-back campaign needs emails to send to.</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
     container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
     return;
   }
@@ -204,7 +216,7 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
         <div class="card-header-row">
           <div>
             <h2 class="card-title">Review imported leads</h2>
-            <p class="card-subtitle">${rows.length} lead${rows.length !== 1 ? "s" : ""} found in CSV. Review before generating.</p>
+            <p class="card-subtitle">${rows.length} lead${rows.length !== 1 ? "s" : ""} with an email address${droppedNoEmail > 0 ? ` (${droppedNoEmail} without an email skipped)` : ""}. Review before generating.</p>
           </div>
           <div class="card-header-actions">
             <button id="wb-back-btn" class="btn btn-ghost">Back</button>
