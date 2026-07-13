@@ -1,5 +1,6 @@
 import hashlib
 import logging
+from datetime import datetime
 
 import httpx
 
@@ -141,6 +142,21 @@ async def _ensure_merge_field(base: str, api_key: str, audience_id: str, tag: st
             )
 
 
+async def _create_static_segment(base: str, api_key: str, audience_id: str, name: str, emails: list[str]) -> int:
+    """Creates a static segment holding exactly these contacts. Campaigns are
+    scoped to this segment so pressing Send in Mailchimp can never blast the
+    whole audience (which may hold tens of thousands of unrelated contacts)."""
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        r = await client.post(
+            f"{base}/lists/{audience_id}/segments",
+            json={"name": name[:100], "static_segment": emails},
+            auth=("anystring", api_key),
+        )
+    if r.status_code not in (200, 201):
+        raise MailchimpError(f"Mailchimp segment create failed ({r.status_code}): {r.text[:200]}")
+    return r.json()["id"]
+
+
 async def export_outreach_campaign(
     campaign_name: str,
     from_name: str,
@@ -152,9 +168,11 @@ async def export_outreach_campaign(
     Each draft must have: contact_email, contact_name, company, subject, body.
     Returns { mailchimp_url, exported, skipped }.
 
-    Mechanism: upserts each contact with EMAILSUBJ + EMAILBODY merge tags, then
-    creates one campaign whose subject is *|EMAILSUBJ|* and body is *|EMAILBODY|*.
-    Each recipient therefore receives their own fully personalised email.
+    Mechanism: upserts each contact with EMAILSUBJ + EMAILBODY merge tags,
+    puts just those contacts in a static segment, then creates one campaign
+    targeting that segment whose subject is *|EMAILSUBJ|* and body is
+    *|EMAILBODY|*. Each recipient therefore receives their own fully
+    personalised email — and nobody outside the batch can be emailed.
     """
     api_key, audience_id = _require_config()
     base = _base_url(api_key)
@@ -165,6 +183,7 @@ async def export_outreach_campaign(
 
     exported = 0
     skipped = 0
+    exported_emails: list[str] = []
     for draft in drafts:
         email_addr = (draft.get("contact_email") or "").strip()
         if not email_addr:
@@ -193,6 +212,7 @@ async def export_outreach_campaign(
                 )
             if resp.status_code in (200, 201):
                 exported += 1
+                exported_emails.append(email_addr)
             else:
                 logger.warning("Mailchimp upsert failed for %s: %s", email_addr, resp.text[:120])
                 skipped += 1
@@ -202,6 +222,12 @@ async def export_outreach_campaign(
 
     if exported == 0:
         raise MailchimpError("No contacts could be added — check that leads have email addresses on file.")
+
+    # Scope the campaign to exactly the exported contacts. If the segment
+    # can't be created we fail the export rather than fall back to the whole
+    # audience — that fallback would make Send in Mailchimp a mass-mail.
+    segment_name = f"{campaign_name} — {datetime.now().strftime('%d %b %Y %H:%M')}"
+    segment_id = await _create_static_segment(base, api_key, audience_id, segment_name, exported_emails)
 
     # Campaign: subject uses the EMAILSUBJ merge tag so each recipient sees
     # their own subject line (requires Mailchimp Essentials plan or higher).
@@ -213,7 +239,7 @@ async def export_outreach_campaign(
             "reply_to": from_email,
             "title": campaign_name,
         },
-        "recipients": {"list_id": audience_id},
+        "recipients": {"list_id": audience_id, "segment_opts": {"saved_segment_id": segment_id}},
     }
     async with httpx.AsyncClient(timeout=15.0) as client:
         r = await client.post(f"{base}/campaigns", json=campaign_payload, auth=("anystring", api_key))
@@ -243,35 +269,22 @@ async def export_win_back_campaign(
     from_email: str,
     emails: list[dict],
 ) -> str:
-    """Upserts all contacts, creates a campaign draft, returns the Mailchimp URL.
+    """Exports a win-back campaign with full per-recipient personalisation.
 
-    Each dict in emails must have: email, first_name, last_name, company, body (full email body).
-    The first paragraph of each email body is used as the personalised hook merge tag.
-    """
-    for entry in emails:
-        email_addr = entry.get("contact_email") or ""
-        if not email_addr:
-            continue
-        body = entry.get("body") or ""
-        hook = body.split("\n\n")[0].strip() if body else ""
-        parts = (entry.get("contact_name") or "").split(" ", 1)
-        first = parts[0] if parts else ""
-        last = parts[1] if len(parts) > 1 else ""
-        try:
-            await upsert_contact(
-                email=email_addr,
-                first_name=first,
-                last_name=last,
-                company=entry.get("company") or "",
-                winback_hook=hook,
-            )
-        except MailchimpError as exc:
-            logger.warning("Mailchimp upsert skipped for %s: %s", email_addr, exc)
-
-    subject_line = emails[0].get("subject") or "Re: staying in touch" if emails else "Win-back campaign"
-    return await create_campaign_draft(
-        name=campaign_name,
-        from_name=from_name,
-        from_email=from_email,
-        subject_line=subject_line,
-    )
+    Uses the same EMAILSUBJ/EMAILBODY merge-tag mechanism as outreach export
+    (each contact gets their own AI-written subject and full body — the old
+    approach shared one subject and only personalised the first paragraph)
+    and the same static-segment scoping, so the draft can only ever send to
+    exactly these contacts."""
+    drafts = [
+        {
+            "contact_email": e.get("contact_email") or "",
+            "contact_name": e.get("contact_name") or "",
+            "company": e.get("company") or "",
+            "subject": e.get("subject") or "",
+            "body": e.get("body") or "",
+        }
+        for e in emails
+    ]
+    result = await export_outreach_campaign(campaign_name, from_name, from_email, drafts)
+    return result["mailchimp_url"]
