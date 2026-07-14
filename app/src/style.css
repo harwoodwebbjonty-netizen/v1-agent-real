@@ -1,9 +1,25 @@
 @font-face {
-  font-family: "Quicksand";
+  font-family: "Poppins";
   font-style: normal;
-  font-weight: 300 700;
+  font-weight: 500;
   font-display: swap;
-  src: url("/fonts/Quicksand-Variable.woff2") format("woff2");
+  src: url("/fonts/Poppins-500.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/Poppins-600.woff2") format("woff2");
+}
+
+@font-face {
+  font-family: "Poppins";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/Poppins-700.woff2") format("woff2");
 }
 
 @font-face {
@@ -17,7 +33,7 @@
 :root {
   font-family: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
   /* Display face for chrome (nav, titles, buttons, tooltips) — data stays Inter */
-  --font-display: "Quicksand", "Inter", -apple-system, sans-serif;
+  --font-display: "Poppins", "Inter", -apple-system, sans-serif;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -37,16 +53,16 @@
   --text-xl: 1.125rem;
   --text-2xl: 1.5rem;
 
-  /* Geometry — structured, editorial */
-  --radius-sm: 4px;
-  --radius-md: 6px;
+  /* Geometry — soft, rounded (CoPilotIQ brand: nothing sharp) */
+  --radius-sm: 10px;
+  --radius-md: 14px;
 
   /* Legacy token aliases — many view styles were written against an older
      token set (--primary, --radius, --bg-1…). Without these aliases those
      rules silently break: invisible progress bars, unfilled active buttons,
      mismatched corners. Map them all onto the current system. */
   --primary: var(--accent-core);
-  --primary-20: rgba(37, 99, 235, 0.2);
+  --primary-20: rgba(79, 107, 255, 0.2);
   --accent: var(--accent-core);
   --radius: var(--radius-sm);
   --radius-lg: var(--radius-md);
@@ -60,14 +76,14 @@
   --border-subtle: var(--border);
   --shadow-lg: var(--shadow-card-hover);
 
-  /* Accent blue — system interaction layer */
-  --accent-300: #3b82f6;
-  --accent-core: #2563eb;
-  --accent-500: #2563eb;
-  --accent-text: #2563eb;
-  --accent-glow: rgba(37, 99, 235, 0.08);
+  /* Accent — CoPilotIQ brand: periwinkle #4F6BFF core, violet #8B5CF6 secondary */
+  --accent-300: #8B5CF6;
+  --accent-core: #4F6BFF;
+  --accent-500: #4F6BFF;
+  --accent-text: #3D55E8; /* darker step of the brand blue so small text stays legible */
+  --accent-glow: rgba(79, 107, 255, 0.08);
   --on-accent: #ffffff;
-  --accent-gradient: linear-gradient(135deg, #2563eb, #3b82f6);
+  --accent-gradient: linear-gradient(135deg, #4F6BFF, #8B5CF6);
   --shadow-card: 0 1px 3px rgba(16, 24, 40, 0.08);
   --shadow-card-hover: 0 4px 14px rgba(16, 24, 40, 0.12);
 
@@ -78,8 +94,8 @@
 
   /* Signal hues — kept to three total (blue/green/red) so text colour always
      means something. "Purple" now aliases the accent blue. */
-  --signal-purple: #2563eb;
-  --signal-purple-tint: rgba(37, 99, 235, 0.08);
+  --signal-purple: #4F6BFF;
+  --signal-purple-tint: rgba(79, 107, 255, 0.08);
   --signal-green: #10b981;
   --signal-green-tint: rgba(16, 185, 129, 0.1);
 
@@ -88,7 +104,7 @@
   --surface: #ffffff;
   --panel: #eceef2;
   --border: #d0d4db;
-  --text: #0a0a0a;
+  --text: #151826; /* brand ink */
   --text-muted: #6b7280;
   --input-bg: #ffffff;
 
@@ -97,14 +113,14 @@
 }
 
 [data-theme="dark"] {
-  /* Neutral system — dark (same blue-accent language, darkened) */
-  --bg: #0b1220;
-  --surface: #111827;
-  --panel: #1a2333;
-  --border: #334058;
-  --text: #e5e9f0;
+  /* Neutral system — dark (CoPilotIQ dark bg #0B0D16 family) */
+  --bg: #0b0d16;
+  --surface: #151826;
+  --panel: #1d2130;
+  --border: #323850;
+  --text: #e8e9ee;
   --text-muted: #94a3b8;
-  --input-bg: #111827;
+  --input-bg: #151826;
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 6px 20px rgba(0, 0, 0, 0.35);
   --shadow-card-hover: 0 14px 34px rgba(0, 0, 0, 0.45);
 
@@ -512,10 +528,10 @@ body {
 /* Per-section icon colours — always on, regardless of hover/active state */
 [data-nav="action-centre"]  .nav-icon { color: #10b981; }
 [data-nav="activity-feed"]  .nav-icon { color: #f59e0b; }
-[data-nav="ai-prospecting"] .nav-icon { color: #3b82f6; }
-[data-nav="dashboard"]      .nav-icon { color: #8b5cf6; }
+[data-nav="ai-prospecting"] .nav-icon { color: #8B5CF6; }
+[data-nav="dashboard"]      .nav-icon { color: #ec4899; }
 [data-nav="cold-call-lists"].nav-icon { color: #06b6d4; }
-[data-nav="outreach"]       .nav-icon { color: #2563eb; }
+[data-nav="outreach"]       .nav-icon { color: #4F6BFF; }
 [data-nav="win-back"]       .nav-icon { color: #f97316; }
 [data-nav="calendar"]       .nav-icon { color: #14b8a6; }
 [data-nav="analytics"]      .nav-icon { color: #a855f7; }
@@ -867,11 +883,11 @@ textarea:focus {
 }
 
 .btn-primary:hover:not(:disabled) {
-  background: #1d4ed8;
+  background: #3D55E8;
 }
 
 .btn-primary:active:not(:disabled) {
-  background: #1e40af;
+  background: #3448C8;
 }
 
 .btn-secondary {
@@ -2032,7 +2048,7 @@ body.compact-rows td {
   background: var(--accent-core);
   cursor: pointer;
   border: 2px solid var(--surface);
-  box-shadow: 0 1px 4px rgba(37, 99, 235, 0.35);
+  box-shadow: 0 1px 4px rgba(79, 107, 255, 0.35);
 }
 .p-slider::-moz-range-thumb {
   width: 14px;
@@ -2088,8 +2104,8 @@ body.compact-rows td {
   padding: 2px var(--space-2);
   background: var(--accent-glow);
   color: var(--accent-core);
-  border: 1px solid rgba(37, 99, 235, 0.2);
-  border-radius: 4px;
+  border: 1px solid rgba(79, 107, 255, 0.2);
+  border-radius: 7px;
   font-size: var(--text-xs);
   font-weight: 400;
   white-space: nowrap;
@@ -2691,8 +2707,8 @@ body.compact-rows td {
 }
 
 @keyframes activity-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55); }
-  50% { box-shadow: 0 0 0 6px rgba(37, 99, 235, 0); }
+  0%, 100% { box-shadow: 0 0 0 0 rgba(79, 107, 255, 0.55); }
+  50% { box-shadow: 0 0 0 6px rgba(79, 107, 255, 0); }
 }
 
 /* Activity modal */
@@ -3155,7 +3171,7 @@ body.compact-rows td {
 /* ── Selector-specific styles ─────────────────────────────────────────────── */
 .selector-row td { padding: var(--space-2) var(--space-3); }
 .lead-directors { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
-.list-badge { font-size: 0.72rem; background: var(--surface-alt, var(--surface)); color: var(--primary); border: 1px solid var(--primary-20, #c7d7f4); border-radius: 4px; padding: 1px 6px; }
+.list-badge { font-size: 0.72rem; background: var(--surface-alt, var(--surface)); color: var(--primary); border: 1px solid var(--primary-20, #d3d9fb); border-radius: 7px; padding: 1px 6px; }
 .selector-select-all-label { display: flex; align-items: center; gap: var(--space-1); font-size: 0.85rem; color: var(--text-muted); cursor: pointer; margin-left: auto; }
 .selector-select-all-label input { cursor: pointer; }
 

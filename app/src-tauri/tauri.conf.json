@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "company-phone-lookup",
-  "version": "0.1.88",
+  "version": "0.2.0",
   "identifier": "com.jontyhw.phonelookup",
   "build": {
     "frontendDist": "../dist",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "Company Phone Lookup",
+        "title": "CoPilotIQ",
         "width": 1280,
         "height": 860,
         "minWidth": 960,

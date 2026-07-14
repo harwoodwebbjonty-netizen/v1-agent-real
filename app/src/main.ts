@@ -1,4 +1,5 @@
 import "./style.css";
+import "./dashboard-polish.css";
 import { initAuth } from "./auth";
 import { initConnectionBanner } from "./connection";
 import { initTabBar } from "./components/tabBar";
