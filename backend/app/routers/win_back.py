@@ -39,6 +39,9 @@ class CreateCampaignRequest(BaseModel):
     name: str
     lead_ids: List[str]
     depth: str = "standard"
+    email_instruction: str = ""
+    offer_context: str = ""
+    additional_context: str = ""
 
 
 class CsvLeadRow(BaseModel):
@@ -56,6 +59,16 @@ class CreateCampaignFromCsvRequest(BaseModel):
     name: str
     rows: List[CsvLeadRow]
     depth: str = "standard"
+    email_instruction: str = ""
+    offer_context: str = ""
+    additional_context: str = ""
+
+
+class PreviewCampaignRequest(BaseModel):
+    row: CsvLeadRow
+    email_instruction: str = ""
+    offer_context: str = ""
+    additional_context: str = ""
 
 
 class SendEmailRequest(BaseModel):
@@ -77,7 +90,8 @@ def _days_since(iso_ts: str) -> float:
 
 
 async def _generate_campaign(
-    campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0
+    campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0,
+    email_instruction: str = "", offer_context: str = "", additional_context: str = "",
 ) -> None:
     """already_done offsets the progress counter when resuming a campaign that
     stopped partway (credit ceiling, crash) — only the missing leads are in
@@ -133,6 +147,9 @@ async def _generate_campaign(
                     phones = db.list_phones(lead_id)
                     emails_list = db.list_emails(lead_id)
                     ctx = build_lead_context(lead, phones, emails_list, intel, sender_name, brand_voice)
+                    ctx["email_instruction"] = email_instruction
+                    ctx["offer_context"] = offer_context
+                    ctx["additional_context"] = additional_context
                     if intel:
                         ctx["ch_data"] = _format_ch_data(lead)
 
@@ -202,6 +219,9 @@ def _campaign_dict(row: sqlite3.Row) -> dict:
         "total": row["total"],
         "generated": row["generated"],
         "created_at": row["created_at"],
+        "email_instruction": row["email_instruction"] if "email_instruction" in row.keys() else "",
+        "offer_context": row["offer_context"] if "offer_context" in row.keys() else "",
+        "additional_context": row["additional_context"] if "additional_context" in row.keys() else "",
     }
 
 
@@ -240,8 +260,11 @@ async def create_campaign(
         created_at=now_iso(),
         lead_ids_json=json.dumps(body.lead_ids),
         depth=body.depth,
+        email_instruction=body.email_instruction.strip(),
+        offer_context=body.offer_context.strip(),
+        additional_context=body.additional_context.strip(),
     )
-    asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id, body.depth))
+    asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip()))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
@@ -295,10 +318,41 @@ async def create_campaign_from_csv(
         created_at=ts,
         lead_ids_json=json.dumps(lead_ids),
         depth=body.depth,
+        email_instruction=body.email_instruction.strip(),
+        offer_context=body.offer_context.strip(),
+        additional_context=body.additional_context.strip(),
     )
-    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth))
+    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip()))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
+
+
+@router.post("/campaigns/preview")
+async def preview_campaign_email(
+    body: PreviewCampaignRequest,
+    current_user: CurrentUser = Depends(get_current_user),
+) -> dict:
+    """Generate one representative draft before campaign creation. This uses
+    only imported CSV data (no research), saves nothing, and records no
+    Win-back credit usage."""
+    row = body.row
+    contact_parts = row.contact_name.strip().split(maxsplit=1)
+    context = {
+        "company": row.company,
+        "first_name": contact_parts[0] if contact_parts else "",
+        "job_title": "",
+        "website": row.website,
+        "linkedin": row.linkedin,
+        "industry": row.industry,
+        "email": row.email,
+        "lead_notes": row.notes,
+        "ai_summary": "",
+        "recent_activity": "",
+        "email_instruction": body.email_instruction.strip(),
+        "offer_context": body.offer_context.strip(),
+        "additional_context": body.additional_context.strip(),
+    }
+    return await generate_win_back_email(context)
 
 
 @router.post("/campaigns/{campaign_id}/resume")
@@ -336,9 +390,12 @@ async def resume_campaign(campaign_id: str, current_user: CurrentUser = Depends(
         )
 
     depth = (campaign["depth"] if "depth" in campaign.keys() else None) or "standard"
+    email_instruction = (campaign["email_instruction"] if "email_instruction" in campaign.keys() else "") or ""
+    offer_context = (campaign["offer_context"] if "offer_context" in campaign.keys() else "") or ""
+    additional_context = (campaign["additional_context"] if "additional_context" in campaign.keys() else "") or ""
     db.update_win_back_campaign_progress(campaign_id, len(done_lead_ids), "generating")
     asyncio.create_task(
-        _generate_campaign(campaign_id, missing, campaign["created_by"], depth, already_done=len(done_lead_ids))
+        _generate_campaign(campaign_id, missing, campaign["created_by"], depth, already_done=len(done_lead_ids), email_instruction=email_instruction, offer_context=offer_context, additional_context=additional_context)
     )
     return {"resumed": True, "remaining": len(missing)}
 

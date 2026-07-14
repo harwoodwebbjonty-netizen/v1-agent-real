@@ -3630,6 +3630,31 @@ body.compact-rows td {
   flex-wrap: wrap;
 }
 
+.wb-generation-form {
+  max-width: 760px;
+}
+
+.wb-generation-form .form-label {
+  display: block;
+  margin-top: var(--space-3);
+  margin-bottom: var(--space-1);
+}
+
+.wb-brief-textarea {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  line-height: 1.45;
+}
+
+.wb-preview-result {
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-2);
+}
+
 .wb-bulk-bar {
   display: flex;
   align-items: center;

@@ -8,6 +8,7 @@ import {
   getWinBackCampaign,
   getWinBackCampaigns,
   parseWinBackCsv,
+  previewWinBackCampaignEmail,
   resumeWinBackCampaign,
   sendAllWinBackEmails,
   sendWinBackEmail,
@@ -223,14 +224,8 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
           </div>
         </div>
         <div class="wb-picker-bar">
-          <input id="wb-name-input" class="search-input" type="text"
-            placeholder="Campaign name (e.g. Q3 Win-back)" style="width:280px" />
-          <select id="wb-depth-select" class="search-input" style="width:220px" title="Research depth controls how many web searches are run per lead">
-            <option value="quick">Quick scan (3 searches) ~$0.04/lead</option>
-            <option value="standard" selected>Standard (5 searches) ~$0.10/lead</option>
-            <option value="deep">Deep research (10 searches) ~$0.20/lead</option>
-          </select>
-          <button id="wb-generate-btn" class="btn btn-primary btn-sm">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail("standard"))} est.)</button>
+          <button id="wb-configure-btn" class="btn btn-primary">Configure generation</button>
+          <span class="status-message">Set the email brief, offers and preview a draft before generating.</span>
         </div>
         <table class="data-table">
           <thead><tr>
@@ -259,30 +254,102 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
     showLeadPicker(container);
   });
 
+  container.querySelector<HTMLButtonElement>("#wb-configure-btn")!.addEventListener("click", () => {
+    showGenerationConfig(container, rows);
+  });
+}
+
+// --- Campaign configuration sub-view ---
+
+function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): void {
+  const defaultRelationshipContext = "These recipients are previous Winchester Corporate Finance customers. Acknowledge the existing funding relationship naturally, without inventing a specific facility, amount or date.";
+  container.innerHTML = `
+    <main class="container">
+      <section class="card">
+        <div class="card-header-row">
+          <div>
+            <h2 class="card-title">Configure generation</h2>
+            <p class="card-subtitle">These settings apply only to this campaign. They do not change the imported lead or CRM data.</p>
+          </div>
+          <div class="card-header-actions"><button id="wb-back-review-btn" class="btn btn-ghost">Back</button></div>
+        </div>
+        <div class="wb-generation-form">
+          <label class="form-label" for="wb-name-input">Campaign name</label>
+          <input id="wb-name-input" class="search-input" type="text" placeholder="e.g. Q3 customer re-engagement" />
+
+          <label class="form-label" for="wb-email-instruction-input">Email direction</label>
+          <textarea id="wb-email-instruction-input" class="search-input wb-brief-textarea" rows="3">Existing customer re-engagement email. Reconnect warmly and invite a short review of current funding needs.</textarea>
+
+          <label class="form-label" for="wb-offer-context-input">Current offers or deals</label>
+          <textarea id="wb-offer-context-input" class="search-input wb-brief-textarea" rows="3" placeholder="e.g. Unsecured business lending from 6.9% (subject to status and underwriting)."></textarea>
+          <p class="card-subtitle">Only enter approved, current terms. The email will mention them only where relevant.</p>
+
+          <label class="form-label" for="wb-additional-context-input">Additional campaign context</label>
+          <textarea id="wb-additional-context-input" class="search-input wb-brief-textarea" rows="4">${escapeHtml(defaultRelationshipContext)}</textarea>
+
+          <label class="form-label" for="wb-depth-select">Research depth</label>
+          <select id="wb-depth-select" class="search-input" title="Research depth controls how many web searches are run per lead">
+            <option value="quick">Quick scan (3 searches) ~$0.04/lead</option>
+            <option value="standard" selected>Standard (5 searches) ~$0.10/lead</option>
+            <option value="deep">Deep research (10 searches) ~$0.20/lead</option>
+          </select>
+
+          <div class="wb-picker-bar">
+            <select id="wb-preview-lead-select" class="search-input" title="Choose the imported lead used for the preview">
+              ${rows.map((row, index) => `<option value="${index}">${escapeHtml(row.company)}${row.contact_name ? ` — ${escapeHtml(row.contact_name)}` : ""}</option>`).join("")}
+            </select>
+            <button id="wb-preview-btn" class="btn btn-secondary">Preview one email (no credits)</button>
+            <button id="wb-generate-btn" class="btn btn-primary">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail("standard"))} est.)</button>
+          </div>
+          <p class="card-subtitle">Preview uses the selected imported lead and this brief only. It does not save a campaign, run research or deduct a Win-back credit.</p>
+          <div id="wb-preview-result" class="wb-preview-result hidden"></div>
+        </div>
+      </section>
+    </main>`;
+
+  container.querySelector<HTMLButtonElement>("#wb-back-review-btn")!.addEventListener("click", () => showLeadPicker(container));
+
   const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
   const generateBtn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
-
-  function updateBtnLabel(): void {
-    const cost = formatCost(rows.length * totalCostPerEmail(depthSelect.value));
-    generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${cost} est.)`;
-  }
-
+  const getBrief = () => ({
+    name: container.querySelector<HTMLInputElement>("#wb-name-input")!.value.trim() || `Win-back ${new Date().toLocaleDateString()}`,
+    emailInstruction: container.querySelector<HTMLTextAreaElement>("#wb-email-instruction-input")!.value.trim(),
+    offerContext: container.querySelector<HTMLTextAreaElement>("#wb-offer-context-input")!.value.trim(),
+    additionalContext: container.querySelector<HTMLTextAreaElement>("#wb-additional-context-input")!.value.trim(),
+  });
+  const updateBtnLabel = () => {
+    generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail(depthSelect.value))} est.)`;
+  };
   depthSelect.addEventListener("change", updateBtnLabel);
 
+  container.querySelector<HTMLButtonElement>("#wb-preview-btn")!.addEventListener("click", async () => {
+    const previewBtn = container.querySelector<HTMLButtonElement>("#wb-preview-btn")!;
+    const result = container.querySelector<HTMLDivElement>("#wb-preview-result")!;
+    const index = Number(container.querySelector<HTMLSelectElement>("#wb-preview-lead-select")!.value);
+    const brief = getBrief();
+    previewBtn.disabled = true;
+    previewBtn.textContent = "Creating preview...";
+    try {
+      const email = await previewWinBackCampaignEmail(rows[index], brief.emailInstruction, brief.offerContext, brief.additionalContext);
+      result.innerHTML = `<strong>Preview: ${escapeHtml(email.subject)}</strong><pre class="wb-modal-body">${escapeHtml(email.body)}</pre>`;
+      result.classList.remove("hidden");
+    } catch (err) {
+      result.textContent = `Could not create preview: ${String(err)}`;
+      result.classList.remove("hidden");
+    } finally {
+      previewBtn.disabled = false;
+      previewBtn.textContent = "Preview one email (no credits)";
+    }
+  });
+
   generateBtn.addEventListener("click", async () => {
-    const nameInput = container.querySelector<HTMLInputElement>("#wb-name-input")!;
-    const name = nameInput.value.trim() || `Win-back ${new Date().toLocaleDateString()}`;
-    const depth = depthSelect.value;
-
-    const costEach = totalCostPerEmail(depth);
-    const totalCostStr = formatCost(rows.length * costEach);
-    const confirmed = await showCostConfirm(rows.length, totalCostStr);
+    const brief = getBrief();
+    const confirmed = await showCostConfirm(rows.length, formatCost(rows.length * totalCostPerEmail(depthSelect.value)));
     if (!confirmed) return;
-
     generateBtn.disabled = true;
     generateBtn.textContent = "Creating...";
     try {
-      const campaign = await createWinBackCampaignFromCsv(name, rows, depth);
+      const campaign = await createWinBackCampaignFromCsv(brief.name, rows, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
       generateBtn.disabled = false;
@@ -330,6 +397,8 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
           <div>
             <h2 class="card-title">${escapeHtml(campaign.name)}</h2>
             <p class="card-subtitle">${campaign.generated} of ${campaign.total} emails generated</p>
+            ${campaign.email_instruction ? `<p class="card-subtitle">Email instruction: ${escapeHtml(campaign.email_instruction)}</p>` : ""}
+            ${campaign.offer_context ? `<p class="card-subtitle">Offers: ${escapeHtml(campaign.offer_context)}</p>` : ""}
           </div>
           <div class="card-header-actions">
             ${

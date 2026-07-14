@@ -937,6 +937,9 @@ export interface WinBackCampaign {
   total: number;
   generated: number;
   created_at: string;
+  email_instruction: string;
+  offer_context: string;
+  additional_context: string;
 }
 
 export interface WinBackEmail {
@@ -959,8 +962,8 @@ export interface WinBackCampaignDetail {
   emails: WinBackEmail[];
 }
 
-export async function createWinBackCampaign(name: string, leadIds: string[], depth = "standard"): Promise<WinBackCampaign> {
-  return invoke<WinBackCampaign>("create_win_back_campaign", { name, leadIds, depth });
+export async function createWinBackCampaign(name: string, leadIds: string[], depth = "standard", emailInstruction = "", offerContext = "", additionalContext = ""): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign", { name, leadIds, depth, emailInstruction, offerContext, additionalContext });
 }
 
 export async function getWinBackCampaigns(): Promise<WinBackCampaign[]> {
@@ -1004,6 +1007,10 @@ export async function parseWinBackCsv(path: string): Promise<WinBackCsvRow[]> {
   return invoke<WinBackCsvRow[]>("parse_win_back_csv", { path });
 }
 
-export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard"): Promise<WinBackCampaign> {
-  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, depth });
+export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard", emailInstruction = "", offerContext = "", additionalContext = ""): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, depth, emailInstruction, offerContext, additionalContext });
+}
+
+export async function previewWinBackCampaignEmail(row: WinBackCsvRow, emailInstruction = "", offerContext = "", additionalContext = ""): Promise<{ subject: string; body: string }> {
+  return invoke<{ subject: string; body: string }>("preview_win_back_campaign_email", { row, emailInstruction, offerContext, additionalContext });
 }

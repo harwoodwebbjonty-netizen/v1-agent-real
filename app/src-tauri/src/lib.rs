@@ -1043,10 +1043,10 @@ struct WinBackCampaignDetail {
 }
 
 #[tauri::command]
-async fn create_win_back_campaign(app_handle: tauri::AppHandle, name: String, lead_ids: Vec<String>, depth: String) -> Result<WinBackCampaign, String> {
+async fn create_win_back_campaign(app_handle: tauri::AppHandle, name: String, lead_ids: Vec<String>, depth: String, email_instruction: String, offer_context: String, additional_context: String) -> Result<WinBackCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_win_back_campaign(&base_url, &session.token, &name, lead_ids, &depth).await
+    backend_client::create_win_back_campaign(&base_url, &session.token, &name, lead_ids, &depth, &email_instruction, &offer_context, &additional_context).await
 }
 
 #[tauri::command]
@@ -1103,10 +1103,26 @@ async fn create_win_back_campaign_from_csv(
     name: String,
     rows: Vec<backend_client::WinBackCsvRow>,
     depth: String,
+    email_instruction: String,
+    offer_context: String,
+    additional_context: String,
 ) -> Result<WinBackCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, &depth).await
+    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, &depth, &email_instruction, &offer_context, &additional_context).await
+}
+
+#[tauri::command]
+async fn preview_win_back_campaign_email(
+    app_handle: tauri::AppHandle,
+    row: backend_client::WinBackCsvRow,
+    email_instruction: String,
+    offer_context: String,
+    additional_context: String,
+) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::preview_win_back_campaign_email(&base_url, &session.token, row, &email_instruction, &offer_context, &additional_context).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -1232,7 +1248,8 @@ pub fn run() {
       resume_win_back_campaign,
       export_win_back_mailchimp,
       parse_win_back_csv,
-      create_win_back_campaign_from_csv
+      create_win_back_campaign_from_csv,
+      preview_win_back_campaign_email
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

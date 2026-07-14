@@ -506,6 +506,23 @@ def _migration_017_email_verification(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE lead_emails ADD COLUMN {col} {decl}")
 
 
+def _migration_018_win_back_email_instruction(conn: sqlite3.Connection) -> None:
+    """Store the campaign-specific email direction so resumed work keeps the
+    same brief as the original generation run."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(win_back_campaigns)")}
+    if "email_instruction" not in cols:
+        conn.execute("ALTER TABLE win_back_campaigns ADD COLUMN email_instruction TEXT NOT NULL DEFAULT ''")
+
+
+def _migration_019_win_back_campaign_brief(conn: sqlite3.Connection) -> None:
+    """Keep campaign-only offer and context notes separate from the CRM lead
+    record. These notes shape a generation run but never overwrite lead data."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(win_back_campaigns)")}
+    for column in ("offer_context", "additional_context"):
+        if column not in cols:
+            conn.execute(f"ALTER TABLE win_back_campaigns ADD COLUMN {column} TEXT NOT NULL DEFAULT ''")
+
+
 def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
     """Add password_hash to users. NULL means a legacy account that predates
     passwords — the next successful identify for that name sets its password
@@ -535,8 +552,10 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (15, _migration_015_user_passwords),
     (16, _migration_016_campaign_resume),
     (17, _migration_017_email_verification),
+    (18, _migration_018_win_back_email_instruction),
+    (19, _migration_019_win_back_campaign_brief),
 ]
-CURRENT_SCHEMA_VERSION = 17
+CURRENT_SCHEMA_VERSION = 19
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1784,13 +1803,14 @@ def update_lead_dg_refresh(lead_id: str, tier: str, next_refresh_at: str, last_r
 
 def create_win_back_campaign(
     id: str, name: str, created_by: str, total: int, created_at: str,
-    lead_ids_json: Optional[str] = None, depth: str = "standard",
+    lead_ids_json: Optional[str] = None, depth: str = "standard", email_instruction: str = "",
+    offer_context: str = "", additional_context: str = "",
 ) -> None:
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at, lead_ids, depth) "
-            "VALUES (?, ?, ?, 'generating', ?, 0, ?, ?, ?)",
-            (id, name, created_by, total, created_at, lead_ids_json, depth),
+            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at, lead_ids, depth, email_instruction, offer_context, additional_context) "
+            "VALUES (?, ?, ?, 'generating', ?, 0, ?, ?, ?, ?, ?, ?)",
+            (id, name, created_by, total, created_at, lead_ids_json, depth, email_instruction, offer_context, additional_context),
         )
 
 

@@ -25,6 +25,28 @@ def _format_lead_sources(lead_context: dict) -> str:
     """Formats lead data as a structured brief matching the Step 1 source
     categories referenced in the Winchester CF win-back prompt."""
     lines = []
+    if lead_context.get("email_instruction"):
+        lines.extend([
+            "Campaign email instruction:",
+            lead_context["email_instruction"].strip(),
+            "",
+            "Apply this as an additional writing instruction. Keep every requirement in the system brief and use the lead data below as the source of truth.",
+            "",
+        ])
+    if lead_context.get("offer_context"):
+        lines.extend([
+            "Current approved offers or deals:",
+            lead_context["offer_context"].strip(),
+            "Only mention these where relevant. Do not alter figures or add terms that are not stated here.",
+            "",
+        ])
+    if lead_context.get("additional_context"):
+        lines.extend([
+            "Additional campaign context:",
+            lead_context["additional_context"].strip(),
+            "Use this to shape the email, but do not treat it as a reason to invent lead-specific facts.",
+            "",
+        ])
     if lead_context.get("company"):
         lines.append(f"Company: {lead_context['company']}")
     contact_parts = [p for p in [lead_context.get("first_name"), lead_context.get("last_name")] if p]
