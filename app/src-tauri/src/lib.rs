@@ -1106,10 +1106,12 @@ async fn create_win_back_campaign_from_csv(
     email_instruction: String,
     offer_context: String,
     additional_context: String,
+    campaign_links: String,
+    signature: String,
 ) -> Result<WinBackCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, &depth, &email_instruction, &offer_context, &additional_context).await
+    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, &depth, &email_instruction, &offer_context, &additional_context, &campaign_links, &signature).await
 }
 
 #[tauri::command]
@@ -1119,10 +1121,13 @@ async fn preview_win_back_campaign_email(
     email_instruction: String,
     offer_context: String,
     additional_context: String,
+    campaign_links: String,
+    signature: String,
+    depth: String,
 ) -> Result<serde_json::Value, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::preview_win_back_campaign_email(&base_url, &session.token, row, &email_instruction, &offer_context, &additional_context).await
+    backend_client::preview_win_back_campaign_email(&base_url, &session.token, row, &email_instruction, &offer_context, &additional_context, &campaign_links, &signature, &depth).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]

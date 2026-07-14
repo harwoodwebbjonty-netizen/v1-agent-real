@@ -2158,6 +2158,8 @@ struct CreateCampaignFromCsvRequest {
     email_instruction: String,
     offer_context: String,
     additional_context: String,
+    campaign_links: String,
+    signature: String,
 }
 
 #[derive(Serialize)]
@@ -2166,6 +2168,9 @@ struct PreviewCampaignRequest {
     email_instruction: String,
     offer_context: String,
     additional_context: String,
+    campaign_links: String,
+    signature: String,
+    depth: String,
 }
 
 #[derive(Serialize)]
@@ -2264,26 +2269,26 @@ pub async fn export_win_back_mailchimp(base_url: &str, token: &str, campaign_id:
     Ok(val["mailchimp_url"].as_str().unwrap_or("").to_string())
 }
 
-pub async fn create_win_back_campaign_from_csv(base_url: &str, token: &str, name: &str, rows: Vec<WinBackCsvRow>, depth: &str, email_instruction: &str, offer_context: &str, additional_context: &str) -> Result<WinBackCampaign, String> {
+pub async fn create_win_back_campaign_from_csv(base_url: &str, token: &str, name: &str, rows: Vec<WinBackCsvRow>, depth: &str, email_instruction: &str, offer_context: &str, additional_context: &str, campaign_links: &str, signature: &str) -> Result<WinBackCampaign, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/win-back/campaigns/from-csv", base_url);
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", token))
-        .json(&CreateCampaignFromCsvRequest { name: name.to_string(), rows, depth: depth.to_string(), email_instruction: email_instruction.to_string(), offer_context: offer_context.to_string(), additional_context: additional_context.to_string() })
+        .json(&CreateCampaignFromCsvRequest { name: name.to_string(), rows, depth: depth.to_string(), email_instruction: email_instruction.to_string(), offer_context: offer_context.to_string(), additional_context: additional_context.to_string(), campaign_links: campaign_links.to_string(), signature: signature.to_string() })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
 }
 
-pub async fn preview_win_back_campaign_email(base_url: &str, token: &str, row: WinBackCsvRow, email_instruction: &str, offer_context: &str, additional_context: &str) -> Result<serde_json::Value, String> {
+pub async fn preview_win_back_campaign_email(base_url: &str, token: &str, row: WinBackCsvRow, email_instruction: &str, offer_context: &str, additional_context: &str, campaign_links: &str, signature: &str, depth: &str) -> Result<serde_json::Value, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/win-back/campaigns/preview", base_url);
     let response = client
         .post(&url)
         .header("Authorization", format!("Bearer {}", token))
-        .json(&PreviewCampaignRequest { row, email_instruction: email_instruction.to_string(), offer_context: offer_context.to_string(), additional_context: additional_context.to_string() })
+        .json(&PreviewCampaignRequest { row, email_instruction: email_instruction.to_string(), offer_context: offer_context.to_string(), additional_context: additional_context.to_string(), campaign_links: campaign_links.to_string(), signature: signature.to_string(), depth: depth.to_string() })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;

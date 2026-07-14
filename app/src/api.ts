@@ -940,6 +940,8 @@ export interface WinBackCampaign {
   email_instruction: string;
   offer_context: string;
   additional_context: string;
+  campaign_links: string;
+  signature: string;
 }
 
 export interface WinBackEmail {
@@ -1007,10 +1009,10 @@ export async function parseWinBackCsv(path: string): Promise<WinBackCsvRow[]> {
   return invoke<WinBackCsvRow[]>("parse_win_back_csv", { path });
 }
 
-export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard", emailInstruction = "", offerContext = "", additionalContext = ""): Promise<WinBackCampaign> {
-  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, depth, emailInstruction, offerContext, additionalContext });
+export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard", emailInstruction = "", offerContext = "", additionalContext = "", campaignLinks = "", signature = ""): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, depth, emailInstruction, offerContext, additionalContext, campaignLinks, signature });
 }
 
-export async function previewWinBackCampaignEmail(row: WinBackCsvRow, emailInstruction = "", offerContext = "", additionalContext = ""): Promise<{ subject: string; body: string }> {
-  return invoke<{ subject: string; body: string }>("preview_win_back_campaign_email", { row, emailInstruction, offerContext, additionalContext });
+export async function previewWinBackCampaignEmail(row: WinBackCsvRow, emailInstruction = "", offerContext = "", additionalContext = "", campaignLinks = "", signature = "", depth = "standard"): Promise<{ subject: string; body: string }> {
+  return invoke<{ subject: string; body: string }>("preview_win_back_campaign_email", { row, emailInstruction, offerContext, additionalContext, campaignLinks, signature, depth });
 }

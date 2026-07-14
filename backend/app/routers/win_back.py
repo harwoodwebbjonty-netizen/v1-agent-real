@@ -19,7 +19,7 @@ from app.services.mailchimp_service import (
 )
 from app.services.sales_intelligence_service import generate_sales_intelligence
 from app.services.template_variables import build_lead_context
-from app.services.win_back_email_service import generate_win_back_email
+from app.services.win_back_email_service import append_signature, generate_win_back_email
 
 logger = logging.getLogger("app.win_back")
 
@@ -42,6 +42,8 @@ class CreateCampaignRequest(BaseModel):
     email_instruction: str = ""
     offer_context: str = ""
     additional_context: str = ""
+    campaign_links: str = ""
+    signature: str = ""
 
 
 class CsvLeadRow(BaseModel):
@@ -62,6 +64,8 @@ class CreateCampaignFromCsvRequest(BaseModel):
     email_instruction: str = ""
     offer_context: str = ""
     additional_context: str = ""
+    campaign_links: str = ""
+    signature: str = ""
 
 
 class PreviewCampaignRequest(BaseModel):
@@ -69,6 +73,9 @@ class PreviewCampaignRequest(BaseModel):
     email_instruction: str = ""
     offer_context: str = ""
     additional_context: str = ""
+    campaign_links: str = ""
+    signature: str = ""
+    depth: str = "standard"
 
 
 class SendEmailRequest(BaseModel):
@@ -91,7 +98,7 @@ def _days_since(iso_ts: str) -> float:
 
 async def _generate_campaign(
     campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0,
-    email_instruction: str = "", offer_context: str = "", additional_context: str = "",
+    email_instruction: str = "", offer_context: str = "", additional_context: str = "", campaign_links: str = "", signature: str = "",
 ) -> None:
     """already_done offsets the progress counter when resuming a campaign that
     stopped partway (credit ceiling, crash) — only the missing leads are in
@@ -150,6 +157,7 @@ async def _generate_campaign(
                     ctx["email_instruction"] = email_instruction
                     ctx["offer_context"] = offer_context
                     ctx["additional_context"] = additional_context
+                    ctx["campaign_links"] = campaign_links
                     if intel:
                         ctx["ch_data"] = _format_ch_data(lead)
 
@@ -161,7 +169,7 @@ async def _generate_campaign(
                                 limit, spent, lead_id,
                             )
                         else:
-                            email_result = await generate_win_back_email(ctx)
+                            email_result = append_signature(await generate_win_back_email(ctx), signature)
                             db.upsert_win_back_email(
                                 campaign_id, lead_id, new_id(),
                                 email_result["subject"], email_result["body"], now_iso(),
@@ -222,6 +230,8 @@ def _campaign_dict(row: sqlite3.Row) -> dict:
         "email_instruction": row["email_instruction"] if "email_instruction" in row.keys() else "",
         "offer_context": row["offer_context"] if "offer_context" in row.keys() else "",
         "additional_context": row["additional_context"] if "additional_context" in row.keys() else "",
+        "campaign_links": row["campaign_links"] if "campaign_links" in row.keys() else "",
+        "signature": row["signature"] if "signature" in row.keys() else "",
     }
 
 
@@ -263,8 +273,10 @@ async def create_campaign(
         email_instruction=body.email_instruction.strip(),
         offer_context=body.offer_context.strip(),
         additional_context=body.additional_context.strip(),
+        campaign_links=body.campaign_links.strip(),
+        signature=body.signature.strip(),
     )
-    asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip()))
+    asyncio.create_task(_generate_campaign(campaign_id, body.lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), signature=body.signature.strip()))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
@@ -321,8 +333,10 @@ async def create_campaign_from_csv(
         email_instruction=body.email_instruction.strip(),
         offer_context=body.offer_context.strip(),
         additional_context=body.additional_context.strip(),
+        campaign_links=body.campaign_links.strip(),
+        signature=body.signature.strip(),
     )
-    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip()))
+    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), signature=body.signature.strip()))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
@@ -332,11 +346,14 @@ async def preview_campaign_email(
     body: PreviewCampaignRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict:
-    """Generate one representative draft before campaign creation. This uses
-    only imported CSV data (no research), saves nothing, and records no
-    Win-back credit usage."""
+    """Generate one representative draft using the same enrichment and email
+    generation as a campaign lead, without creating or sending a campaign."""
     row = body.row
     contact_parts = row.contact_name.strip().split(maxsplit=1)
+    allowed, spent, limit = db.check_credit_limit(current_user.id, "win_back")
+    if not allowed:
+        raise HTTPException(status_code=402, detail=f"Win-back credit limit reached (spent £{spent:.2f} of £{limit:.2f}).")
+    intel = await generate_sales_intelligence(row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5))
     context = {
         "company": row.company,
         "first_name": contact_parts[0] if contact_parts else "",
@@ -346,13 +363,16 @@ async def preview_campaign_email(
         "industry": row.industry,
         "email": row.email,
         "lead_notes": row.notes,
-        "ai_summary": "",
+        "ai_summary": intel.sales_summary,
         "recent_activity": "",
         "email_instruction": body.email_instruction.strip(),
         "offer_context": body.offer_context.strip(),
         "additional_context": body.additional_context.strip(),
+        "campaign_links": body.campaign_links.strip(),
     }
-    return await generate_win_back_email(context)
+    result = append_signature(await generate_win_back_email(context), body.signature)
+    db.record_credit_spend(new_id(), current_user.id, "win_back", db.CREDIT_COST["win_back"], now_iso())
+    return result
 
 
 @router.post("/campaigns/{campaign_id}/resume")
@@ -393,9 +413,11 @@ async def resume_campaign(campaign_id: str, current_user: CurrentUser = Depends(
     email_instruction = (campaign["email_instruction"] if "email_instruction" in campaign.keys() else "") or ""
     offer_context = (campaign["offer_context"] if "offer_context" in campaign.keys() else "") or ""
     additional_context = (campaign["additional_context"] if "additional_context" in campaign.keys() else "") or ""
+    campaign_links = (campaign["campaign_links"] if "campaign_links" in campaign.keys() else "") or ""
+    signature = (campaign["signature"] if "signature" in campaign.keys() else "") or ""
     db.update_win_back_campaign_progress(campaign_id, len(done_lead_ids), "generating")
     asyncio.create_task(
-        _generate_campaign(campaign_id, missing, campaign["created_by"], depth, already_done=len(done_lead_ids), email_instruction=email_instruction, offer_context=offer_context, additional_context=additional_context)
+        _generate_campaign(campaign_id, missing, campaign["created_by"], depth, already_done=len(done_lead_ids), email_instruction=email_instruction, offer_context=offer_context, additional_context=additional_context, campaign_links=campaign_links, signature=signature)
     )
     return {"resumed": True, "remaining": len(missing)}
 

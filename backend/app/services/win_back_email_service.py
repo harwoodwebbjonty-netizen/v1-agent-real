@@ -47,6 +47,15 @@ def _format_lead_sources(lead_context: dict) -> str:
             "Use this to shape the email, but do not treat it as a reason to invent lead-specific facts.",
             "",
         ])
+    if lead_context.get("campaign_links"):
+        links = lead_context["campaign_links"].strip()
+        link_kind = "booking" if re.search(r"calendly|calendar|cal\.com|book", links, re.IGNORECASE) else "reapplication" if re.search(r"reapply|application|apply", links, re.IGNORECASE) else "campaign"
+        lines.extend([
+            f"Approved {link_kind} link(s):",
+            links,
+            "Use the most relevant approved link as the call to action. Copy it exactly and do not invent a URL.",
+            "",
+        ])
     if lead_context.get("company"):
         lines.append(f"Company: {lead_context['company']}")
     contact_parts = [p for p in [lead_context.get("first_name"), lead_context.get("last_name")] if p]
@@ -93,6 +102,15 @@ def _parse_subject_email(raw: str) -> dict:
                 body = "\n".join(lines[i + 1:]).strip()
                 break
     return {"subject": subject or raw[:80], "body": body or raw}
+
+
+def append_signature(email: dict, signature: str) -> dict:
+    """Appends the operator's exact campaign signature after generation so it
+    is present in every draft and cannot be omitted by the model."""
+    signature = signature.strip()
+    if signature:
+        email["body"] = f"{email['body'].rstrip()}\n\n{signature}"
+    return email
 
 
 async def generate_win_back_email(lead_context: dict) -> dict:
