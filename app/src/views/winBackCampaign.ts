@@ -287,6 +287,9 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
 
           <label class="form-label" for="wb-campaign-links-input">Campaign links</label>
           <textarea id="wb-campaign-links-input" class="search-input wb-brief-textarea" rows="2" placeholder="Paste a Calendly booking link or a reapplication link."></textarea>
+          <label class="form-label" for="wb-campaign-link-text-input">Link display text (optional)</label>
+          <input id="wb-campaign-link-text-input" class="search-input" type="text" placeholder="Book a call here — leave blank to send the link as plain text" />
+          <p class="card-subtitle">If filled in, the link above appears as clickable text with this label instead of a plain web address.</p>
           <label class="form-label" for="wb-signature-input">Email signature</label>
           <textarea id="wb-signature-input" class="search-input wb-brief-textarea" rows="4" placeholder="Kind regards,\nJonty Harwood\nWinchester Corporate Finance"></textarea>
           <p class="card-subtitle">Pre-filled from your saved signature in Settings → Brand Voice. Edit it here for this campaign only, or update Settings to change the default.</p>
@@ -332,6 +335,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     offerContext: container.querySelector<HTMLTextAreaElement>("#wb-offer-context-input")!.value.trim(),
     additionalContext: container.querySelector<HTMLTextAreaElement>("#wb-additional-context-input")!.value.trim(),
     campaignLinks: container.querySelector<HTMLTextAreaElement>("#wb-campaign-links-input")!.value.trim(),
+    campaignLinkText: container.querySelector<HTMLInputElement>("#wb-campaign-link-text-input")!.value.trim(),
     signature: container.querySelector<HTMLTextAreaElement>("#wb-signature-input")!.value.trim(),
   });
   const updateBtnLabel = () => {
@@ -347,7 +351,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     previewBtn.disabled = true;
     previewBtn.textContent = "Creating preview...";
     try {
-      const email = await previewWinBackCampaignEmail(rows[index], brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.signature, depthSelect.value);
+      const email = await previewWinBackCampaignEmail(rows[index], brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature, depthSelect.value);
       result.innerHTML = `<strong>Preview: ${escapeHtml(email.subject)}</strong><pre class="wb-modal-body">${escapeHtml(email.body)}</pre>`;
       result.classList.remove("hidden");
     } catch (err) {
@@ -366,7 +370,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     generateBtn.disabled = true;
     generateBtn.textContent = "Creating...";
     try {
-      const campaign = await createWinBackCampaignFromCsv(brief.name, rows, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.signature);
+      const campaign = await createWinBackCampaignFromCsv(brief.name, rows, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
       generateBtn.disabled = false;

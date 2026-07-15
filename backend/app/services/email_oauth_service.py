@@ -1,4 +1,6 @@
 import base64
+import html
+import re
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
@@ -7,6 +9,26 @@ import httpx
 from app import db
 from app.core.config import get_settings
 from app.services.auth_service import new_id, now_iso
+
+# Win-back bodies are plain text by default; apply_campaign_link() (in
+# win_back_email_service.py) may deterministically insert a single <a href>
+# tag. Detecting it here — rather than threading an is_html flag through
+# every caller of send_email() — keeps the body text as the single source
+# of truth for whether HTML rendering is needed.
+HTML_ANCHOR_RE = re.compile(r'<a\s+href="[^"]*"[^>]*>.*?</a>', re.IGNORECASE | re.DOTALL)
+
+
+def _build_html_alternative(body: str) -> str:
+    """Escapes everything except the anchor tag(s) already embedded in the
+    body, and converts newlines to <br> so line breaks survive as HTML."""
+    parts = HTML_ANCHOR_RE.split(body)
+    anchors = HTML_ANCHOR_RE.findall(body)
+    chunks = []
+    for i, part in enumerate(parts):
+        chunks.append(html.escape(part).replace("\n", "<br>"))
+        if i < len(anchors):
+            chunks.append(anchors[i])
+    return "".join(chunks)
 
 # Isolated from the Anthropic-based AI services — this module never touches
 # the `anthropic` SDK. OAuth consent always happens in the system browser
@@ -183,6 +205,8 @@ async def send_email(account_row, to: str, subject: str, body: str) -> None:
             message["From"] = account_row["email_address"]
             message["Subject"] = subject
             message.set_content(body)
+            if HTML_ANCHOR_RE.search(body):
+                message.add_alternative(_build_html_alternative(body), subtype="html")
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
             response = await client.post(
                 "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",

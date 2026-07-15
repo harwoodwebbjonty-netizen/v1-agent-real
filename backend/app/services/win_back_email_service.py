@@ -1,3 +1,4 @@
+import html
 import json
 import pathlib
 import re
@@ -102,6 +103,23 @@ def _parse_subject_email(raw: str) -> dict:
                 body = "\n".join(lines[i + 1:]).strip()
                 break
     return {"subject": subject or raw[:80], "body": body or raw}
+
+
+def apply_campaign_link(email: dict, campaign_links: str, link_text: str) -> dict:
+    """Swaps a bare URL the model already placed in the body for a real
+    <a href> hyperlink, using the operator's chosen display text. Deterministic
+    on purpose — the model is trusted to copy the URL exactly (per the prompt)
+    but not to hand-author HTML markup itself."""
+    link_text = link_text.strip()
+    campaign_links = campaign_links.strip()
+    if not link_text or not campaign_links:
+        return email
+    urls = re.findall(r"https?://\S+", campaign_links)
+    for url in urls:
+        url = url.rstrip(".,;)")
+        if url in email["body"]:
+            email["body"] = email["body"].replace(url, f'<a href="{url}">{html.escape(link_text)}</a>')
+    return email
 
 
 def append_signature(email: dict, signature: str) -> dict:
