@@ -5,6 +5,7 @@ import {
   type WinBackEmail,
   createWinBackCampaignFromCsv,
   exportWinBackMailchimp,
+  getBrandVoice,
   getWinBackCampaign,
   getWinBackCampaigns,
   parseWinBackCsv,
@@ -288,6 +289,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
           <textarea id="wb-campaign-links-input" class="search-input wb-brief-textarea" rows="2" placeholder="Paste a Calendly booking link or a reapplication link."></textarea>
           <label class="form-label" for="wb-signature-input">Email signature</label>
           <textarea id="wb-signature-input" class="search-input wb-brief-textarea" rows="4" placeholder="Kind regards,\nJonty Harwood\nWinchester Corporate Finance"></textarea>
+          <p class="card-subtitle">Pre-filled from your saved signature in Settings → Brand Voice. Edit it here for this campaign only, or update Settings to change the default.</p>
 
           <label class="form-label" for="wb-depth-select">Research depth</label>
           <select id="wb-depth-select" class="search-input" title="Research depth controls how many web searches are run per lead">
@@ -310,6 +312,17 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     </main>`;
 
   container.querySelector<HTMLButtonElement>("#wb-back-review-btn")!.addEventListener("click", () => showLeadPicker(container));
+
+  const signatureInput = container.querySelector<HTMLTextAreaElement>("#wb-signature-input")!;
+  getBrandVoice()
+    .then((brandVoice) => {
+      if (brandVoice.signature.trim() && !signatureInput.value.trim()) {
+        signatureInput.value = brandVoice.signature;
+      }
+    })
+    .catch(() => {
+      // No saved brand voice yet — leave the field blank for manual entry.
+    });
 
   const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
   const generateBtn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;

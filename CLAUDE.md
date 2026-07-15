@@ -122,15 +122,20 @@ New DB migrations run automatically on service restart.
 - **DB**: SQLite at `/opt/v1-agent/backend/data/team.db`, WAL mode,
   migrations in `backend/app/db.py` (bump `CURRENT_SCHEMA_VERSION`, append
   to `MIGRATIONS`, never edit shipped ones). CH feed self-prunes to 30 days.
-- **Design**: light-only (no theme toggle), body font Inter + display font
-  Quicksand for chrome (nav/titles/buttons/tooltips, via --font-display;
-  both bundled woff2),
-  text colours limited to blue/green/red + neutrals, coloured per-section
-  nav icons. Flat surfaces — no gradients, glows, glass, ambient blobs or
-  pulse animations; no emoji in UI copy (use stroke SVGs). Weight
-  hierarchy: titles 600, labels/buttons 500, body 400. Legacy token
-  aliases (--primary, --radius, --bg-1…) are defined in :root — never
-  remove them; ~60 view rules depend on them.
+- **Design**: CoPilotIQ brand (v0.2.0 rebrand) — accent periwinkle
+  #4F6BFF (core) + violet #8B5CF6 (secondary), ink text #151826, dark bg
+  #0B0D16; mark = gradient "C" arc + dot (logo.png/app icons generated
+  from the brand spec with PIL — regenerate, don't hand-edit). Light-only
+  (no theme toggle), body font Inter + display font Poppins 500/600/700
+  for chrome (nav/titles/buttons/tooltips, via --font-display; all
+  bundled woff2). Soft geometry: --radius-sm 10px / --radius-md 14px —
+  nothing sharp. Text colours limited to accent/green/red + neutrals,
+  coloured per-section nav icons. Flat surfaces — no glows, glass,
+  ambient blobs or pulse animations (the logo mark carries the one
+  gradient); no emoji in UI copy (use stroke SVGs). Weight hierarchy:
+  titles 600, labels/buttons 500, body 400. Legacy token aliases
+  (--primary, --radius, --bg-1…) are defined in :root — never remove
+  them; ~60 view rules depend on them.
 
 ### Known gaps — flag these when relevant
 - No Apple notarization: new Mac users hit Gatekeeper "damaged app"
