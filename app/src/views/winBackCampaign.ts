@@ -1,4 +1,5 @@
 import {
+  type CreditLimits,
   type WinBackCampaign,
   type WinBackCampaignDetail,
   type WinBackCsvRow,
@@ -6,11 +7,13 @@ import {
   createWinBackCampaignFromCsv,
   exportWinBackMailchimp,
   getBrandVoice,
+  getCreditUsage,
   getWinBackCampaign,
   getWinBackCampaigns,
   parseWinBackCsv,
   previewWinBackCampaignEmail,
   resumeWinBackCampaign,
+  saveCreditLimits,
   sendAllWinBackEmails,
   sendWinBackEmail,
 } from "../api";
@@ -18,15 +21,39 @@ import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentUser, subscribeAuth } from "../auth";
 import { escapeHtml } from "../utils";
 
-// Haiku pricing (claude-haiku-4-5): $0.80/MTok input, $4/MTok output
-// Average per win-back email: ~1,500 input tokens + ~350 output tokens
-const WINBACK_COST_PER_EMAIL = 1500 * (0.80 / 1_000_000) + 350 * (4 / 1_000_000);
+// Haiku pricing (claude-haiku-4-5): $0.80/MTok input, $4/MTok output.
+// The win-back system prompt (workflows/win_back_email_prompt.md) alone
+// measures ~2,300 tokens and is sent as the `system` param on every call —
+// it was not accounted for at all in the old 1,500-token estimate, which
+// undercounted before a single word of lead context was added. Using
+// system (2,300) + a realistic populated lead-context message (~800,
+// covering CRM notes/offer/campaign link/AI research summary/CH data) for
+// input, and the service's actual MAX_TOKENS cap (400, not an average) for
+// output, so this is a safe ceiling rather than an optimistic average.
+const WINBACK_SYSTEM_PROMPT_TOKENS = 2300;
+const WINBACK_LEAD_CONTEXT_TOKENS = 800;
+const WINBACK_OUTPUT_TOKENS_MAX = 400; // matches MAX_TOKENS in win_back_email_service.py
+const WINBACK_COST_PER_EMAIL =
+  (WINBACK_SYSTEM_PROMPT_TOKENS + WINBACK_LEAD_CONTEXT_TOKENS) * (0.80 / 1_000_000) +
+  WINBACK_OUTPUT_TOKENS_MAX * (4 / 1_000_000);
 
-// Research depth costs (web searches + Claude synthesis per lead)
+// Research depth costs (Sales Intelligence, which runs before every win-back
+// email). The old $0.04/$0.10/$0.20 figures didn't reflect two things found
+// while investigating: (1) this call uses Sonnet (settings.model =
+// claude-sonnet-4-6, $3/MTok in, $15/MTok out), not Haiku — 4x pricier on
+// input, ~4x on output; (2) it enables BOTH web_search ($10/1,000 searches
+// flat fee + token cost for results) AND web_fetch (full-page-content token
+// cost, no flat fee) up to max_uses times EACH — so "deep" (max_uses: 10)
+// can mean up to 20 tool calls, and a single web_fetch of a real page can
+// run several thousand tokens on its own. Real spend depends heavily on how
+// much the model decides to dig for a given lead, so these are ceilings
+// (search fee + a generous per-search/fetch token allowance at Sonnet
+// pricing), not averages — revisit against real Anthropic invoices once
+// there's usage history.
 const DEPTH_COST: Record<string, number> = {
-  quick: 0.04,
-  standard: 0.10,
-  deep: 0.20,
+  quick: 0.10,
+  standard: 0.20,
+  deep: 0.45,
 };
 
 function totalCostPerEmail(depth: string): number {
@@ -38,10 +65,83 @@ function formatCost(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-function showCostConfirm(count: number, totalCost: string): Promise<boolean> {
+// Separate from the $ Haiku estimate above because it's a genuinely different
+// spend: Apify bills per post actually returned (~£1.60/1,000 posts, matching
+// APIFY_COST_PER_1K_POSTS_GBP in backend/app/services/linkedin_activity_service.py),
+// not per lead. This is a ceiling, not a real average — only leads with a
+// LinkedIn URL already on file or discoverable via a free website scrape /
+// Companies House lookup ever reach Apify, and the actor may return fewer
+// than the max. Shown as its own £ figure rather than folded into the $
+// total so we're not silently applying a made-up FX rate.
+const APIFY_MAX_POSTS_PER_LEAD = 10;
+const APIFY_COST_PER_1K_POSTS_GBP = 1.60;
+const APIFY_MAX_COST_PER_LEAD_GBP = (APIFY_MAX_POSTS_PER_LEAD / 1000) * APIFY_COST_PER_1K_POSTS_GBP;
+
+function formatApifyCeiling(count: number): string {
+  return `£${(count * APIFY_MAX_COST_PER_LEAD_GBP).toFixed(2)}`;
+}
+
+// Matches backend/app/db.py CREDIT_COST — the £ figures actually enforced by
+// db.check_credit_limit() per feature, as opposed to the $ Haiku estimate
+// above (which is a separate, rougher pre-flight number). Used here so the
+// per-feature "would this run hit the ceiling" check matches what the
+// backend will really do partway through the batch.
+const WIN_BACK_CREDIT_COST_GBP = 0.03;
+const LINKEDIN_DISCOVERY_CREDIT_COST_GBP = 0.03;
+
+interface RunEstimate {
+  feature: keyof CreditLimits;
+  label: string;
+  note: string;
+  estimate: number;
+}
+
+function buildRunEstimates(count: number): RunEstimate[] {
+  return [
+    { feature: "limit_win_back", label: "Win-back Emails", note: "generation, £0.03/email", estimate: count * WIN_BACK_CREDIT_COST_GBP },
+    { feature: "limit_linkedin_scrape", label: "LinkedIn Activity", note: "Apify post fetch, ceiling", estimate: count * APIFY_MAX_COST_PER_LEAD_GBP },
+    { feature: "limit_linkedin_discovery", label: "LinkedIn Discovery", note: "CH + AI search fallback, ceiling", estimate: count * LINKEDIN_DISCOVERY_CREDIT_COST_GBP },
+  ];
+}
+
+async function showCostConfirm(count: number, totalCost: string, apifyCeiling: string): Promise<boolean> {
+  const runEstimates = buildRunEstimates(count);
+
+  let usage: { spend: Record<string, number>; limits: CreditLimits } | null = null;
+  try {
+    usage = await getCreditUsage();
+  } catch {
+    // Backend offline or usage not available — skip the per-feature limit
+    // check below and fall back to the plain cost estimate only.
+  }
+
   return new Promise((resolve) => {
     const overlay = document.createElement("div");
     overlay.className = "conflict-modal-overlay";
+
+    const limitRowsHtml = usage
+      ? runEstimates
+          .map(({ feature, label, note, estimate }) => {
+            const limit = usage!.limits[feature] || 0; // 0 = no limit
+            const spent = usage!.spend[feature.replace("limit_", "")] || 0;
+            const remaining = limit === 0 ? Infinity : limit - spent;
+            const wouldExceed = estimate > remaining;
+            if (!wouldExceed) return "";
+            const suggested = Math.ceil(spent + estimate);
+            return `
+              <div class="conflict-modal-question cost-confirm-warn" data-feature="${feature}">
+                <strong>${label}</strong> limit is £${limit.toFixed(2)} (£${spent.toFixed(2)} spent this month) —
+                this run could need up to £${estimate.toFixed(2)} more <span class="cost-confirm-note">(${note})</span>.
+                <div class="cost-confirm-adjust">
+                  <input type="number" min="0" step="1" value="${suggested}" class="search-input cost-confirm-limit-input" style="width:90px" />
+                  <button class="btn btn-secondary btn-sm cost-confirm-adjust-btn">Raise limit to this</button>
+                  <span class="cost-confirm-adjust-status"></span>
+                </div>
+              </div>`;
+          })
+          .join("")
+      : "";
+
     overlay.innerHTML = `
       <div class="conflict-modal">
         <div class="conflict-modal-title">Confirm email generation</div>
@@ -53,6 +153,11 @@ function showCostConfirm(count: number, totalCost: string): Promise<boolean> {
           Estimated cost: <strong>${totalCost}</strong>
           <span class="cost-confirm-note">(web research + AI email generation via Haiku)</span>
         </div>
+        <div class="conflict-modal-question">
+          Up to <strong>${apifyCeiling}</strong> more on Apify
+          <span class="cost-confirm-note">(LinkedIn lookup — only spent on leads where a LinkedIn page is found; often less)</span>
+        </div>
+        ${limitRowsHtml}
         <div class="conflict-modal-actions">
           <button class="btn btn-primary" id="cost-confirm-yes">Generate</button>
           <button class="btn btn-secondary" id="cost-confirm-no">Cancel</button>
@@ -60,6 +165,31 @@ function showCostConfirm(count: number, totalCost: string): Promise<boolean> {
       </div>
     `;
     document.body.appendChild(overlay);
+
+    overlay.querySelectorAll<HTMLElement>(".cost-confirm-warn").forEach((row) => {
+      const feature = row.dataset.feature as keyof CreditLimits;
+      const input = row.querySelector<HTMLInputElement>(".cost-confirm-limit-input")!;
+      const btn = row.querySelector<HTMLButtonElement>(".cost-confirm-adjust-btn")!;
+      const status = row.querySelector<HTMLSpanElement>(".cost-confirm-adjust-status")!;
+      btn.addEventListener("click", async () => {
+        if (!usage) return;
+        btn.disabled = true;
+        status.textContent = "Saving…";
+        try {
+          const newLimits: CreditLimits = { ...usage.limits, [feature]: Number(input.value) || 0 };
+          await saveCreditLimits(newLimits);
+          usage.limits = newLimits;
+          status.textContent = "Updated";
+          row.style.opacity = "0.6";
+          input.disabled = true;
+          btn.remove();
+        } catch (err) {
+          status.textContent = `Failed: ${err}`;
+          btn.disabled = false;
+        }
+      });
+    });
+
     overlay.querySelector("#cost-confirm-yes")!.addEventListener("click", () => {
       overlay.remove();
       resolve(true);
@@ -290,15 +420,12 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
           <label class="form-label" for="wb-campaign-link-text-input">Link display text (optional)</label>
           <input id="wb-campaign-link-text-input" class="search-input" type="text" placeholder="Book a call here — leave blank to send the link as plain text" />
           <p class="card-subtitle">If filled in, the link above appears as clickable text with this label instead of a plain web address.</p>
-          <label class="form-label" for="wb-signature-input">Email signature</label>
-          <textarea id="wb-signature-input" class="search-input wb-brief-textarea" rows="4" placeholder="Kind regards,\nJonty Harwood\nWinchester Corporate Finance"></textarea>
-          <p class="card-subtitle">Pre-filled from your saved signature in Settings → Brand Voice. Edit it here for this campaign only, or update Settings to change the default.</p>
 
           <label class="form-label" for="wb-depth-select">Research depth</label>
           <select id="wb-depth-select" class="search-input" title="Research depth controls how many web searches are run per lead">
-            <option value="quick">Quick scan (3 searches) ~$0.04/lead</option>
-            <option value="standard" selected>Standard (5 searches) ~$0.10/lead</option>
-            <option value="deep">Deep research (10 searches) ~$0.20/lead</option>
+            <option value="quick">Quick scan (up to 3 searches + 3 fetches) up to $0.10/lead</option>
+            <option value="standard" selected>Standard (up to 5 searches + 5 fetches) up to $0.20/lead</option>
+            <option value="deep">Deep research (up to 10 searches + 10 fetches) up to $0.45/lead</option>
           </select>
 
           <div class="wb-picker-bar">
@@ -306,7 +433,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
               ${rows.map((row, index) => `<option value="${index}">${escapeHtml(row.company)}${row.contact_name ? ` — ${escapeHtml(row.contact_name)}` : ""}</option>`).join("")}
             </select>
             <button id="wb-preview-btn" class="btn btn-secondary">Preview one email</button>
-            <button id="wb-generate-btn" class="btn btn-primary">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail("standard"))} est.)</button>
+            <button id="wb-generate-btn" class="btn btn-primary">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail("standard"))} + up to ${formatApifyCeiling(rows.length)} est.)</button>
           </div>
           <p class="card-subtitle">Preview runs the same enrichment and email generation as one campaign lead, but does not save or send a campaign. It uses one lead's Win-back credit.</p>
           <div id="wb-preview-result" class="wb-preview-result hidden"></div>
@@ -316,30 +443,27 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
 
   container.querySelector<HTMLButtonElement>("#wb-back-review-btn")!.addEventListener("click", () => showLeadPicker(container));
 
-  const signatureInput = container.querySelector<HTMLTextAreaElement>("#wb-signature-input")!;
-  getBrandVoice()
-    .then((brandVoice) => {
-      if (brandVoice.signature.trim() && !signatureInput.value.trim()) {
-        signatureInput.value = brandVoice.signature;
-      }
-    })
-    .catch(() => {
-      // No saved brand voice yet — leave the field blank for manual entry.
-    });
+  // Signature is no longer editable per campaign — it always comes from the
+  // one assigned in Settings -> Brand Voice. getBrief() is async and awaits
+  // this promise so a fast click right after the view loads can't race the
+  // fetch and silently generate emails with no signature.
+  const brandVoiceSignaturePromise = getBrandVoice()
+    .then((brandVoice) => brandVoice.signature.trim())
+    .catch(() => ""); // No saved brand voice yet — generate without one.
 
   const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
   const generateBtn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
-  const getBrief = () => ({
+  const getBrief = async () => ({
     name: container.querySelector<HTMLInputElement>("#wb-name-input")!.value.trim() || `Win-back ${new Date().toLocaleDateString()}`,
     emailInstruction: "",
     offerContext: container.querySelector<HTMLTextAreaElement>("#wb-offer-context-input")!.value.trim(),
     additionalContext: container.querySelector<HTMLTextAreaElement>("#wb-additional-context-input")!.value.trim(),
     campaignLinks: container.querySelector<HTMLTextAreaElement>("#wb-campaign-links-input")!.value.trim(),
     campaignLinkText: container.querySelector<HTMLInputElement>("#wb-campaign-link-text-input")!.value.trim(),
-    signature: container.querySelector<HTMLTextAreaElement>("#wb-signature-input")!.value.trim(),
+    signature: await brandVoiceSignaturePromise,
   });
   const updateBtnLabel = () => {
-    generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail(depthSelect.value))} est.)`;
+    generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail(depthSelect.value))} + up to ${formatApifyCeiling(rows.length)} est.)`;
   };
   depthSelect.addEventListener("change", updateBtnLabel);
 
@@ -347,7 +471,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     const previewBtn = container.querySelector<HTMLButtonElement>("#wb-preview-btn")!;
     const result = container.querySelector<HTMLDivElement>("#wb-preview-result")!;
     const index = Number(container.querySelector<HTMLSelectElement>("#wb-preview-lead-select")!.value);
-    const brief = getBrief();
+    const brief = await getBrief();
     previewBtn.disabled = true;
     previewBtn.textContent = "Creating preview...";
     try {
@@ -364,8 +488,8 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
   });
 
   generateBtn.addEventListener("click", async () => {
-    const brief = getBrief();
-    const confirmed = await showCostConfirm(rows.length, formatCost(rows.length * totalCostPerEmail(depthSelect.value)));
+    const brief = await getBrief();
+    const confirmed = await showCostConfirm(rows.length, formatCost(rows.length * totalCostPerEmail(depthSelect.value)), formatApifyCeiling(rows.length));
     if (!confirmed) return;
     generateBtn.disabled = true;
     generateBtn.textContent = "Creating...";
