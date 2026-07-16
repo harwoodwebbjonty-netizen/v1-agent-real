@@ -502,6 +502,7 @@ export interface CreditLimits {
   limit_enrichment: number;
   limit_lead_chat: number;
   limit_linkedin_scrape: number;
+  limit_linkedin_discovery: number;
 }
 
 export interface CreditUsage {

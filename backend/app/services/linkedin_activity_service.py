@@ -13,6 +13,7 @@ from app import db
 from app.core.config import get_settings
 from app.services.apify_service import ApifyRateLimitError, run_linkedin_post_scrape
 from app.services.auth_service import days_since, new_id, now_iso
+from app.services.linkedin_discovery_service import find_director_linkedin, scrape_website_for_linkedin
 
 logger = logging.getLogger("app.linkedin_activity")
 
@@ -54,12 +55,42 @@ async def _fetch_and_charge(linkedin_url: str, user_id: str) -> list[dict]:
     return posts
 
 
+async def _discover_and_save_linkedin_url(lead: sqlite3.Row, user_id: str) -> str:
+    """Website scrape first (free), then Companies House director + AI
+    search (credit-gated) as a fallback. Persists a find onto the lead
+    record so this never re-runs for the same lead."""
+    website = (lead["website"] or "").strip() if "website" in lead.keys() else ""
+    found = await scrape_website_for_linkedin(website)
+
+    if not found:
+        company_number = (lead["company_number"] or "").strip() if "company_number" in lead.keys() else ""
+        company_name = lead["company"] if "company" in lead.keys() else ""
+        if company_number:
+            allowed, spent, limit = db.check_credit_limit(user_id, "linkedin_discovery")
+            if not allowed:
+                logger.warning(
+                    "LinkedIn discovery: credit limit £%.2f reached (spent £%.2f) — skipping director search for %s",
+                    limit, spent, company_name,
+                )
+            else:
+                found = await find_director_linkedin(company_number, company_name)
+                db.record_credit_spend(new_id(), user_id, "linkedin_discovery", db.CREDIT_COST["linkedin_discovery"], now_iso())
+
+    if found:
+        db.update_lead_fields(lead["id"], {"linkedin": found}, now_iso())
+        logger.info("LinkedIn discovery: found %s for lead %s", found, lead["id"])
+    return found or ""
+
+
 async def get_or_fetch_linkedin_posts(lead: sqlite3.Row, user_id: str) -> list[dict]:
     """Returns cached LinkedIn posts for a lead, fetching fresh via Apify only
-    if the cache is missing/stale and the lead has a LinkedIn URL set. Most
-    freshly-discovered AI Prospecting leads have no LinkedIn URL yet, so this
-    silently no-ops for them — that's expected, not a bug."""
+    if the cache is missing/stale. If the lead has no LinkedIn URL on file,
+    tries to discover one first — a free website scrape, then (credit-gated)
+    a Companies House director + AI search fallback — and persists whatever
+    is found onto the lead record so discovery only ever runs once."""
     linkedin_url = (lead["linkedin"] or "").strip() if "linkedin" in lead.keys() else ""
+    if not linkedin_url:
+        linkedin_url = await _discover_and_save_linkedin_url(lead, user_id)
     if not linkedin_url:
         return []
 

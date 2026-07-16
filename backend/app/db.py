@@ -1930,12 +1930,14 @@ def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
 # Credit tracking
 # ---------------------------------------------------------------------------
 
-CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment", "lead_chat", "linkedin_scrape"]
+CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment", "lead_chat", "linkedin_scrape", "linkedin_discovery"]
 
 # Approximate cost per operation (GBP) — used for limit enforcement checks.
 # linkedin_scrape's actual spend is variable (Apify bills per post, not per
 # call) — this is a conservative pre-flight estimate for a ~10-post fetch;
 # the real cost is computed and recorded after each fetch completes.
+# linkedin_discovery only ever costs money on its AI-search fallback step —
+# the website-scrape route it tries first is free and never charged.
 CREDIT_COST = {
     "phone_lookup": 0.03,
     "sales_intel": 0.15,
@@ -1945,6 +1947,7 @@ CREDIT_COST = {
     "enrichment": 0.05,
     "lead_chat": 0.02,
     "linkedin_scrape": 0.02,
+    "linkedin_discovery": 0.03,
 }
 
 # Per-user monthly ceilings applied when the admin hasn't set an explicit
@@ -1959,6 +1962,7 @@ DEFAULT_CREDIT_LIMIT_GBP = {
     "enrichment": 20.0,
     "lead_chat": 10.0,
     "linkedin_scrape": 15.0,
+    "linkedin_discovery": 10.0,
 }
 
 
