@@ -337,9 +337,17 @@ async def run_prospecting(
                     break
 
                 try:
+                    from app.services.linkedin_activity_service import format_posts_for_prompt, get_or_fetch_linkedin_posts
                     from app.services.sales_intelligence_service import generate_sales_intelligence
                     import json as json_mod
-                    result = await generate_sales_intelligence(company_name, "")
+                    # Freshly-discovered CH leads rarely have a linkedin URL yet
+                    # (not captured by this pipeline), so this is usually a no-op
+                    # — kept for consistency if one is ever added before rescoring.
+                    lead_row = db.get_lead(lead_id)
+                    linkedin_posts = await get_or_fetch_linkedin_posts(lead_row, owner_user_id) if lead_row else []
+                    result = await generate_sales_intelligence(
+                        company_name, "", linkedin_context=format_posts_for_prompt(linkedin_posts)
+                    )
                     db.add_lead_intelligence_version(
                         new_id(), lead_id,
                         {

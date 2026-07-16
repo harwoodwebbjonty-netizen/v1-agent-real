@@ -273,6 +273,13 @@ async fn get_lead_intelligence_history(
     backend_client::get_intelligence_history(&base_url, &session.token, &lead_id).await
 }
 
+#[tauri::command]
+async fn get_lead_linkedin_posts(app_handle: tauri::AppHandle, lead_id: String) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_lead_linkedin_posts(&base_url, &session.token, &lead_id).await
+}
+
 // --- Lead chat — read-only Q&A about a single lead (pre-existing backend endpoint) ---
 
 #[tauri::command]
@@ -1177,6 +1184,7 @@ pub fn run() {
       verify_lead_emails,
       generate_lead_intelligence,
       get_lead_intelligence_history,
+      get_lead_linkedin_posts,
       chat_about_lead,
       list_calendar_events,
       create_calendar_event,

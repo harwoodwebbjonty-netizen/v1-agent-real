@@ -2,7 +2,6 @@ import asyncio
 import json
 import logging
 import sqlite3
-from datetime import datetime, timezone
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -10,8 +9,9 @@ from pydantic import BaseModel
 
 from app import db
 from app.dependencies import CurrentUser, get_current_user, require_admin
-from app.services.auth_service import new_id, now_iso
+from app.services.auth_service import days_since, new_id, now_iso
 from app.services.email_oauth_service import OAuthError, send_email as send_email_via_oauth
+from app.services.linkedin_activity_service import fetch_linkedin_posts_preview, format_posts_for_prompt, get_or_fetch_linkedin_posts
 from app.services.mailchimp_service import (
     MailchimpError,
     MailchimpNotConfiguredError,
@@ -91,14 +91,6 @@ class MailchimpExportRequest(BaseModel):
 
 # --- Background generation ---
 
-def _days_since(iso_ts: str) -> float:
-    try:
-        ts = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
-        return (datetime.now(timezone.utc) - ts).total_seconds() / 86400
-    except Exception:
-        return 999.0
-
-
 async def _generate_campaign(
     campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0,
     email_instruction: str = "", offer_context: str = "", additional_context: str = "", campaign_links: str = "", campaign_link_text: str = "", signature: str = "",
@@ -126,10 +118,12 @@ async def _generate_campaign(
                         return
 
                     intel = db.get_latest_lead_intelligence(lead_id)
-                    if not intel or _days_since(intel["created_at"]) > 30:
+                    if not intel or days_since(intel["created_at"]) > 30:
                         try:
+                            linkedin_posts = await get_or_fetch_linkedin_posts(lead, user_id)
                             result = await generate_sales_intelligence(
-                                lead["company"], lead["website"] or "", max_uses=max_uses
+                                lead["company"], lead["website"] or "", max_uses=max_uses,
+                                linkedin_context=format_posts_for_prompt(linkedin_posts),
                             )
                             db.add_lead_intelligence_version(
                                 new_id(), lead_id,
@@ -359,7 +353,11 @@ async def preview_campaign_email(
     allowed, spent, limit = db.check_credit_limit(current_user.id, "win_back")
     if not allowed:
         raise HTTPException(status_code=402, detail=f"Win-back credit limit reached (spent £{spent:.2f} of £{limit:.2f}).")
-    intel = await generate_sales_intelligence(row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5))
+    linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id)
+    intel = await generate_sales_intelligence(
+        row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
+        linkedin_context=format_posts_for_prompt(linkedin_posts),
+    )
     context = {
         "company": row.company,
         "first_name": contact_parts[0] if contact_parts else "",

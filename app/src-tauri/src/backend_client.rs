@@ -700,6 +700,18 @@ pub async fn get_intelligence_history(
     Ok(parsed.versions)
 }
 
+pub async fn get_lead_linkedin_posts(base_url: &str, token: &str, lead_id: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/linkedin-posts", base_url, lead_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
 // --- Lead chat — read-only Q&A about a single lead, pre-existing backend
 // endpoint (`/lead-chat`) that had no caller until now. No backend changes. ---
 

@@ -51,6 +51,7 @@ from app.services.companies_house_service import (
     search_company_by_name,
 )
 from app.services.email_scraper_service import scrape_emails
+from app.services.linkedin_activity_service import format_posts_for_prompt, get_or_fetch_linkedin_posts
 from app.services.next_best_action import compute_next_best_action
 from app.services.sales_intelligence_service import (
     IntelligenceExtractionError,
@@ -505,7 +506,11 @@ async def generate_intelligence_route(
         raise HTTPException(status_code=409, detail="Intelligence generation already in progress")
 
     try:
-        result = await generate_sales_intelligence(lead["company"], lead["website"] or "")
+        linkedin_posts = await get_or_fetch_linkedin_posts(lead, current_user.id)
+        result = await generate_sales_intelligence(
+            lead["company"], lead["website"] or "",
+            linkedin_context=format_posts_for_prompt(linkedin_posts),
+        )
         db.add_lead_intelligence_version(
             new_id(),
             lead_id,
@@ -548,6 +553,25 @@ def get_intelligence_history(
     return LeadIntelligenceHistoryResponse(
         versions=[_to_intelligence_version_out(r) for r in db.list_lead_intelligence_versions(lead_id)]
     )
+
+
+@router.get("/{lead_id}/linkedin-posts")
+def get_linkedin_posts(lead_id: str, current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """Read-only — returns whatever's cached. Never triggers a fetch itself;
+    fetching only happens automatically inside sales-intelligence generation
+    (win-back, AI Prospecting, and this router's generate-intelligence)."""
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+    row = db.get_latest_lead_linkedin_posts(lead_id)
+    if row is None:
+        return {"linkedin_url": lead["linkedin"] or "", "posts": [], "fetched_at": None}
+    try:
+        posts = json.loads(row["posts_json"])
+    except (TypeError, ValueError):
+        posts = []
+    return {"linkedin_url": row["linkedin_url"], "posts": posts, "fetched_at": row["created_at"]}
 
 
 @router.post("/import-csv", response_model=ImportLeadsResponse)

@@ -540,6 +540,25 @@ def _migration_021_win_back_link_text(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE win_back_campaigns ADD COLUMN campaign_link_text TEXT NOT NULL DEFAULT ''")
 
 
+def _migration_022_lead_linkedin_posts(conn: sqlite3.Connection) -> None:
+    """Cached LinkedIn post data fetched via Apify, per lead. Mirrors
+    lead_intelligence_versions' shape (one row per fetch, latest wins) but
+    stays a separate table since it has its own cache window and its own
+    real-money credit-tracked cost, independent of sales-intel spend."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS lead_linkedin_posts (
+            id TEXT PRIMARY KEY,
+            lead_id TEXT NOT NULL,
+            linkedin_url TEXT NOT NULL DEFAULT '',
+            posts_json TEXT NOT NULL DEFAULT '[]',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_lead_linkedin_posts_lead_id ON lead_linkedin_posts(lead_id);
+        """
+    )
+
+
 def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
     """Add password_hash to users. NULL means a legacy account that predates
     passwords — the next successful identify for that name sets its password
@@ -573,8 +592,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (19, _migration_019_win_back_campaign_brief),
     (20, _migration_020_win_back_links_and_signature),
     (21, _migration_021_win_back_link_text),
+    (22, _migration_022_lead_linkedin_posts),
 ]
-CURRENT_SCHEMA_VERSION = 21
+CURRENT_SCHEMA_VERSION = 22
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1203,6 +1223,24 @@ def get_latest_lead_intelligence(lead_id: str) -> Optional[sqlite3.Row]:
     with get_connection() as conn:
         return conn.execute(
             "SELECT * FROM lead_intelligence_versions WHERE lead_id = ? "
+            "ORDER BY created_at DESC, id DESC LIMIT 1",
+            (lead_id,),
+        ).fetchone()
+
+
+def add_lead_linkedin_posts(id: str, lead_id: str, linkedin_url: str, posts_json: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO lead_linkedin_posts (id, lead_id, linkedin_url, posts_json, created_at) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (id, lead_id, linkedin_url, posts_json, created_at),
+        )
+
+
+def get_latest_lead_linkedin_posts(lead_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM lead_linkedin_posts WHERE lead_id = ? "
             "ORDER BY created_at DESC, id DESC LIMIT 1",
             (lead_id,),
         ).fetchone()
@@ -1892,9 +1930,12 @@ def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
 # Credit tracking
 # ---------------------------------------------------------------------------
 
-CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment", "lead_chat"]
+CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", "email_writer", "enrichment", "lead_chat", "linkedin_scrape"]
 
-# Approximate cost per operation (GBP) — used for limit enforcement checks
+# Approximate cost per operation (GBP) — used for limit enforcement checks.
+# linkedin_scrape's actual spend is variable (Apify bills per post, not per
+# call) — this is a conservative pre-flight estimate for a ~10-post fetch;
+# the real cost is computed and recorded after each fetch completes.
 CREDIT_COST = {
     "phone_lookup": 0.03,
     "sales_intel": 0.15,
@@ -1903,6 +1944,7 @@ CREDIT_COST = {
     "email_writer": 0.03,
     "enrichment": 0.05,
     "lead_chat": 0.02,
+    "linkedin_scrape": 0.02,
 }
 
 # Per-user monthly ceilings applied when the admin hasn't set an explicit
@@ -1916,6 +1958,7 @@ DEFAULT_CREDIT_LIMIT_GBP = {
     "email_writer": 20.0,
     "enrichment": 20.0,
     "lead_chat": 10.0,
+    "linkedin_scrape": 15.0,
 }
 
 

@@ -133,7 +133,7 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text()
 
 
-async def _research(company: str, website: str, max_uses: int = 5) -> str:
+async def _research(company: str, website: str, max_uses: int = 5, linkedin_context: str = "") -> str:
     """Phase 1: agentic research with web_search/web_fetch. Raises
     IntelligenceExtractionError on a terminal failure (refusal / continuation
     limit exhausted / no text produced) — there's no sensible "not found"
@@ -143,9 +143,14 @@ async def _research(company: str, website: str, max_uses: int = 5) -> str:
     client = _client()
     system_prompt = SYSTEM_PREAMBLE + _workflow_text()
     website_line = f" Known website: {website}." if website else ""
+    linkedin_block = (
+        f"\n\nKnown recent LinkedIn posts (already fetched — use this directly instead of "
+        f"trying web_fetch on linkedin.com):\n{linkedin_context}"
+        if linkedin_context else ""
+    )
     original_message = {
         "role": "user",
-        "content": f"Research this company for sales call preparation: {company}.{website_line}",
+        "content": f"Research this company for sales call preparation: {company}.{website_line}{linkedin_block}",
     }
     messages = [original_message]
     research_tools = [
@@ -214,9 +219,9 @@ async def _extract(research_text: str) -> SalesIntelligenceResult:
     return SalesIntelligenceResult(**data)
 
 
-async def generate_sales_intelligence(company: str, website: str, max_uses: int = 5) -> SalesIntelligenceResult:
+async def generate_sales_intelligence(company: str, website: str, max_uses: int = 5, linkedin_context: str = "") -> SalesIntelligenceResult:
     try:
-        research_text = await _research(company, website, max_uses=max_uses)
+        research_text = await _research(company, website, max_uses=max_uses, linkedin_context=linkedin_context)
     except anthropic.APIError as exc:
         raise IntelligenceExtractionError(f"Anthropic API error during research: {exc}") from exc
 

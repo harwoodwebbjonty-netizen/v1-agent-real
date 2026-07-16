@@ -107,6 +107,20 @@ export interface LeadIntelligenceVersion {
   created_at: string;
 }
 
+export interface LinkedInPost {
+  content: string;
+  linkedinUrl: string;
+  author?: { name?: string };
+  postedAt?: { postedAgoText?: string; postedAgoShort?: string; date?: string };
+  engagement?: { likes?: number; comments?: number; shares?: number };
+}
+
+export interface LeadLinkedInPosts {
+  linkedin_url: string;
+  posts: LinkedInPost[];
+  fetched_at: string | null;
+}
+
 export interface LeadList {
   id: string;
   name: string;
@@ -355,6 +369,11 @@ export async function getLeadIntelligenceHistory(leadId: string): Promise<LeadIn
   return invoke<LeadIntelligenceVersion[]>("get_lead_intelligence_history", { leadId });
 }
 
+/** Read-only — reflects whatever's cached from the last intelligence generation. Never triggers a fetch itself. */
+export async function getLeadLinkedInPosts(leadId: string): Promise<LeadLinkedInPosts> {
+  return invoke<LeadLinkedInPosts>("get_lead_linkedin_posts", { leadId });
+}
+
 // --- Lead chat — read-only Q&A about a single lead (pre-existing backend endpoint) ---
 
 export interface ChatTurn {
@@ -482,6 +501,7 @@ export interface CreditLimits {
   limit_email_writer: number;
   limit_enrichment: number;
   limit_lead_chat: number;
+  limit_linkedin_scrape: number;
 }
 
 export interface CreditUsage {

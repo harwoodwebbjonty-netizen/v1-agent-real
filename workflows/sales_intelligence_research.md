@@ -19,7 +19,7 @@ Work through these source categories in order. Don't stop at the first dead end 
 2. **External signals**: LinkedIn company page and recent posts, hiring activity, public announcements (press releases, funding news, product launches).
 3. **Contextual signals**: industry type, company size indicators (employee count signals, office locations), growth-stage signals (funding rounds, expansion, new hires in leadership).
 
-**LinkedIn caveat**: `web_fetch` against linkedin.com is frequently blocked by LinkedIn itself. When that happens, rely on whatever `web_search` surfaces (snippets, cached text) instead of fabricating content, and say so plainly in the Data Quality block (see Output below) rather than presenting unverified information as fact.
+**LinkedIn caveat**: `web_fetch` against linkedin.com is frequently blocked by LinkedIn itself. When that happens, rely on whatever `web_search` surfaces (snippets, cached text) instead of fabricating content, and say so plainly in the Data Quality block (see Output below) rather than presenting unverified information as fact. If the research request already includes a "Known recent LinkedIn posts" block, that data was fetched through a separate pipeline that bypasses the block — use it directly as real, verified LinkedIn signal and don't attempt `web_fetch` on linkedin.com at all (it would just waste a tool call).
 
 **Tool-use de-duplication (cost control)**: maintain a mental visited-URL set as you go. Never re-fetch the same domain path twice. Prefer visiting more distinct pages (breadth) over repeatedly re-opening ones you've already read. Do not re-open a previously visited URL unless you are specifically extracting new, different section-specific data from it that you didn't capture the first time.
 

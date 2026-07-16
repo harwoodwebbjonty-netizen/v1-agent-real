@@ -1797,6 +1797,22 @@ select.inline-edit { min-width: 110px; }
   align-self: flex-start;
 }
 
+.intel-linkedin-post {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  border: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.intel-linkedin-post p {
+  margin: 0;
+}
+
+.intel-linkedin-post p + p {
+  margin-top: var(--space-1);
+}
+
 /* --- Calendar --- */
 
 .calendar-weekdays {

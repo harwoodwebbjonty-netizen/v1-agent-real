@@ -420,6 +420,7 @@ export function initSettings(): void {
     email_writer:    { label: "AI Email Writer",         cost: "~£0.03 / generation",      defaultLimit: 20 },
     enrichment:      { label: "Lead Enrichment",         cost: "~£0.05 / lead",            defaultLimit: 20 },
     lead_chat:       { label: "Lead Chat",               cost: "~£0.02 / message",         defaultLimit: 10 },
+    linkedin_scrape: { label: "LinkedIn Activity",        cost: "~£1.60 / 1,000 posts",      defaultLimit: 15 },
   };
 
   const creditLimitsRows = document.querySelector<HTMLTableSectionElement>("#credit-limits-rows")!;
@@ -427,6 +428,7 @@ export function initSettings(): void {
   let _currentLimits: CreditLimits = {
     limit_phone_lookup: 0, limit_sales_intel: 0, limit_win_back: 0,
     limit_ai_prospecting: 0, limit_email_writer: 0, limit_enrichment: 0, limit_lead_chat: 0,
+    limit_linkedin_scrape: 0,
   };
 
   async function renderCreditLimits(): Promise<void> {

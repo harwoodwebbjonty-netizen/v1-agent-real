@@ -47,6 +47,14 @@ class Settings(BaseSettings):
     # connected. Must be a verified sender domain in your Mailchimp account.
     mailchimp_from_email: str = ""
 
+    # Apify — runs the "LinkedIn Profile Posts scraper" actor to pull real post
+    # content into sales-intelligence research. Get the token from Apify
+    # Console → Settings → Integrations, and the actor ID from the specific
+    # actor's page → API tab (format "username/actor-name"). Leave either
+    # empty to disable — LinkedIn enrichment silently no-ops.
+    apify_api_token: str = ""
+    apify_linkedin_actor_id: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

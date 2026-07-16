@@ -2,9 +2,11 @@ import {
   type ChatTurn,
   type Lead,
   type LeadIntelligenceVersion,
+  type LeadLinkedInPosts,
   chatAboutLead,
   generateLeadIntelligence,
   getLeadIntelligenceHistory,
+  getLeadLinkedInPosts,
   lookupCompanyPhone,
 } from "../api";
 import { formatDate, reportBodyHtml, temperatureClass } from "../components/sidePanel";
@@ -57,6 +59,8 @@ export function initSalesIntelligence(): void {
   let cooldownTimer: ReturnType<typeof setTimeout> | null = null;
   let chatHistory: ChatTurn[] = [];
   let chatPending = false;
+  let linkedinPosts: LeadLinkedInPosts | null = null;
+  let linkedinPostsLeadId: string | null = null;
 
   function leadsWithIntelligence(): Lead[] {
     return getLeads()
@@ -91,6 +95,8 @@ export function initSalesIntelligence(): void {
     intelHistory = null;
     viewingVersionId = null;
     chatHistory = [];
+    linkedinPosts = null;
+    linkedinPostsLeadId = null;
     renderLeadsList();
     renderWorkspace();
   }
@@ -135,6 +141,9 @@ export function initSalesIntelligence(): void {
         <button id="intel-generate-btn" class="btn btn-secondary btn-sm">Refresh AI Intelligence</button>
         <span id="intel-generate-status" class="status-message"></span>
       </div>
+
+      <h4>Recent LinkedIn Activity</h4>
+      <div id="intel-linkedin-section"><p class="empty-hint">Loading…</p></div>
       ${
         intel.version_count > 1
           ? `<button id="intel-toggle-history-btn" class="btn btn-ghost btn-sm">
@@ -185,6 +194,51 @@ export function initSalesIntelligence(): void {
     }
 
     renderChat(lead);
+    void loadLinkedInSection(lead);
+  }
+
+  function renderLinkedInSection(): void {
+    const section = document.querySelector<HTMLDivElement>("#intel-linkedin-section");
+    if (!section) return;
+    if (!linkedinPosts) {
+      section.innerHTML = '<p class="empty-hint">Loading…</p>';
+      return;
+    }
+    if (!linkedinPosts.linkedin_url) {
+      section.innerHTML = '<p class="empty-hint">No LinkedIn URL on this lead — add one on the lead\'s contact details to enable this.</p>';
+      return;
+    }
+    if (linkedinPosts.posts.length === 0) {
+      section.innerHTML = '<p class="empty-hint">No LinkedIn posts found yet — this refreshes automatically the next time intelligence regenerates.</p>';
+      return;
+    }
+    section.innerHTML = linkedinPosts.posts
+      .map((post) => {
+        const posted = post.postedAt?.postedAgoText || post.postedAt?.postedAgoShort || "";
+        const likes = post.engagement?.likes ?? 0;
+        const comments = post.engagement?.comments ?? 0;
+        return `
+          <div class="intel-linkedin-post">
+            <p>${escapeHtml(post.content || "")}</p>
+            <p class="empty-hint">${escapeHtml(posted)}${posted ? " · " : ""}${likes} likes · ${comments} comments</p>
+          </div>`;
+      })
+      .join("");
+  }
+
+  async function loadLinkedInSection(lead: Lead): Promise<void> {
+    if (linkedinPostsLeadId === lead.id && linkedinPosts) {
+      renderLinkedInSection();
+      return;
+    }
+    try {
+      linkedinPosts = await getLeadLinkedInPosts(lead.id);
+      linkedinPostsLeadId = lead.id;
+    } catch {
+      linkedinPosts = { linkedin_url: "", posts: [], fetched_at: null };
+      linkedinPostsLeadId = lead.id;
+    }
+    if (selectedLeadId === lead.id) renderLinkedInSection();
   }
 
   function chatContextFor(lead: Lead): string {

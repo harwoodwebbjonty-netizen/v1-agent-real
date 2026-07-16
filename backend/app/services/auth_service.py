@@ -34,6 +34,18 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def days_since(iso_ts: str) -> float:
+    """Age of an ISO timestamp in days. Used to decide when cached
+    AI/enrichment results (sales intel, LinkedIn posts) are stale enough
+    to re-fetch. Returns a large number on a malformed timestamp so callers
+    treat it as "always stale" rather than crashing."""
+    try:
+        ts = datetime.fromisoformat(iso_ts.replace("Z", "+00:00"))
+        return (datetime.now(timezone.utc) - ts).total_seconds() / 86400
+    except Exception:
+        return 999.0
+
+
 def session_expiry_iso() -> str:
     return (datetime.now(timezone.utc) + SESSION_TTL).isoformat()
 
