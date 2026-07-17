@@ -169,16 +169,18 @@ def _workflow_text() -> str:
 
 
 async def _research(
-    company: str, website: str, max_uses: int = 5, linkedin_context: str = "", website_content: str = "",
+    company: str, website: str, max_uses: int = 5, linkedin_context: str = "",
+    website_content: str = "", ch_context: str = "",
 ) -> str:
     """Phase 1: a single, tool-free Sonnet call. No web_search, no
     web_fetch — see the module-level comment for why. `max_uses` is accepted
     for backward compatibility with every caller (win_back.py's depth
     selector, leads.py, ai_prospecting_service.py) but has no effect; it's
     not removed from the signature so none of them need a matching change.
-    `linkedin_context`/`website_content` are real data, pre-fetched and
-    pre-truncated by the caller (website_content_service.fetch_website_text,
-    linkedin_activity_service) — this function never fetches anything
+    `linkedin_context`/`website_content`/`ch_context` are real data,
+    pre-fetched by the caller (website_content_service.fetch_website_text,
+    linkedin_activity_service, companies_house_service via win_back.py's
+    _fetch_ch_data_for_company) — this function never fetches anything
     itself. Cost is fixed and known ahead of time: system prompt + user
     message (bounded by those callers' own hard truncation, not a remote
     parameter) + RESEARCH_MAX_TOKENS output cap, nothing else can ever enter
@@ -196,12 +198,17 @@ async def _research(
         f"\n\nKnown recent LinkedIn posts (already fetched):\n{linkedin_context}"
         if linkedin_context else ""
     )
+    ch_block = (
+        f"\n\nOfficial Companies House filing data (already fetched — real, government-verified, "
+        f"not an inference):\n{ch_context}"
+        if ch_context else ""
+    )
     original_message = {
         "role": "user",
         "content": (
             f"Research this company for sales call preparation, using your own knowledge plus "
             f"the real data already fetched below (no live web access is available for this "
-            f"step beyond what's given here): {company}.{website_line}{website_block}{linkedin_block}"
+            f"step beyond what's given here): {company}.{website_line}{website_block}{linkedin_block}{ch_block}"
         ),
     }
 
@@ -256,11 +263,13 @@ async def _extract(research_text: str) -> SalesIntelligenceResult:
 
 
 async def generate_sales_intelligence(
-    company: str, website: str, max_uses: int = 5, linkedin_context: str = "", website_content: str = "",
+    company: str, website: str, max_uses: int = 5, linkedin_context: str = "",
+    website_content: str = "", ch_context: str = "",
 ) -> SalesIntelligenceResult:
     try:
         research_text = await _research(
-            company, website, max_uses=max_uses, linkedin_context=linkedin_context, website_content=website_content,
+            company, website, max_uses=max_uses, linkedin_context=linkedin_context,
+            website_content=website_content, ch_context=ch_context,
         )
     except anthropic.APIError as exc:
         raise IntelligenceExtractionError(f"Anthropic API error during research: {exc}") from exc

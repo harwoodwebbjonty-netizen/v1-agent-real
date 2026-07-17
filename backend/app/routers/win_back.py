@@ -2,14 +2,23 @@ import asyncio
 import json
 import logging
 import sqlite3
-from typing import List
+from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app import db
+from app.core.config import get_settings
 from app.dependencies import CurrentUser, get_current_user, require_admin
 from app.services.auth_service import days_since, new_id, now_iso
+from app.services.companies_house_service import (
+    CHRateLimitError,
+    build_ch_data_json,
+    get_company_charges,
+    get_company_officers,
+    get_company_profile,
+    search_company_by_name,
+)
 from app.services.email_oauth_service import OAuthError, send_email as send_email_via_oauth
 from app.services.linkedin_activity_service import fetch_linkedin_posts_preview, format_posts_for_prompt, get_or_fetch_linkedin_posts
 from app.services.mailchimp_service import (
@@ -137,10 +146,11 @@ async def _generate_campaign(
                             else:
                                 linkedin_posts = await get_or_fetch_linkedin_posts(lead, user_id)
                                 website_content = await fetch_website_text(lead["website"] or "")
+                                ch_context = await _fetch_ch_data_for_company(lead["company"])
                                 result = await generate_sales_intelligence(
                                     lead["company"], lead["website"] or "", max_uses=max_uses,
                                     linkedin_context=format_posts_for_prompt(linkedin_posts),
-                                    website_content=website_content,
+                                    website_content=website_content, ch_context=ch_context,
                                 )
                                 db.add_lead_intelligence_version(
                                     new_id(), lead_id,
@@ -209,9 +219,8 @@ async def _generate_campaign(
         db.update_win_back_campaign_progress(campaign_id, 0, "error")
 
 
-def _format_ch_data(lead: sqlite3.Row) -> str:
-    """Returns a readable string of CH data to enrich the email context."""
-    raw = lead["ch_data"] if "ch_data" in lead.keys() else None
+def _format_ch_data_json(raw: Optional[str]) -> str:
+    """Returns a readable string of CH data from a raw ch_data JSON string."""
     if not raw:
         return ""
     try:
@@ -229,6 +238,44 @@ def _format_ch_data(lead: sqlite3.Row) -> str:
             parts.append(f"SIC codes: {', '.join(str(s) for s in cd['sic_codes'])}")
         return "; ".join(parts)
     except Exception:
+        return ""
+
+
+def _format_ch_data(lead: sqlite3.Row) -> str:
+    """Returns a readable string of CH data to enrich the email context."""
+    raw = lead["ch_data"] if "ch_data" in lead.keys() else None
+    return _format_ch_data_json(raw)
+
+
+async def _fetch_ch_data_for_company(company_name: str) -> str:
+    """Looks up a company on Companies House by name and returns formatted
+    text for the research prompt — free, real, government-verified data
+    that works regardless of whether a lead has a website or LinkedIn
+    presence, and is directly relevant for a finance broker (existing
+    charges/debentures are a real lending signal). Best-effort: returns ""
+    on any failure (no API key configured, no match found, rate limited,
+    company not found on CH at all, etc.) — never raises."""
+    settings = get_settings()
+    api_key = settings.companies_house_api_key
+    if not api_key or not company_name:
+        return ""
+    try:
+        result = await search_company_by_name(api_key, company_name)
+        if not result:
+            return ""
+        company_number = result.get("company_number", "")
+        if not company_number:
+            return ""
+        profile = await get_company_profile(api_key, company_number) or {}
+        charges, charges_total = await get_company_charges(api_key, company_number)
+        officers = await get_company_officers(api_key, company_number)
+        ch_data_json = build_ch_data_json(profile, charges, officers, charges_total)
+        return _format_ch_data_json(ch_data_json)
+    except CHRateLimitError:
+        logger.warning("Win-back: CH rate limited looking up '%s'", company_name)
+        return ""
+    except Exception:
+        logger.debug("Win-back: CH lookup failed for '%s'", company_name, exc_info=True)
         return ""
 
 
@@ -398,6 +445,7 @@ async def preview_campaign_email(
         )
     linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id, row.website)
     website_content = await fetch_website_text(row.website)
+    ch_context = await _fetch_ch_data_for_company(row.company)
     # Research/generation failures (refusal, extraction-schema mismatch after
     # retrying, a transient Anthropic API error) are expected, retryable
     # outcomes elsewhere in the app (see leads.py's IntelligenceExtractionError
@@ -407,7 +455,7 @@ async def preview_campaign_email(
         intel = await generate_sales_intelligence(
             row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
             linkedin_context=format_posts_for_prompt(linkedin_posts),
-            website_content=website_content,
+            website_content=website_content, ch_context=ch_context,
         )
         db.record_credit_spend(new_id(), current_user.id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
         context = {
