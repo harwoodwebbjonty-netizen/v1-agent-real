@@ -37,23 +37,22 @@ const WINBACK_COST_PER_EMAIL =
   (WINBACK_SYSTEM_PROMPT_TOKENS + WINBACK_LEAD_CONTEXT_TOKENS) * (0.80 / 1_000_000) +
   WINBACK_OUTPUT_TOKENS_MAX * (4 / 1_000_000);
 
-// Research depth costs (Sales Intelligence, which runs before every win-back
-// email). The old $0.04/$0.10/$0.20 figures didn't reflect two things found
-// while investigating: (1) this call uses Sonnet (settings.model =
-// claude-sonnet-4-6, $3/MTok in, $15/MTok out), not Haiku — 4x pricier on
-// input, ~4x on output; (2) it enables BOTH web_search ($10/1,000 searches
-// flat fee + token cost for results) AND web_fetch (full-page-content token
-// cost, no flat fee) up to max_uses times EACH — so "deep" (max_uses: 10)
-// can mean up to 20 tool calls, and a single web_fetch of a real page can
-// run several thousand tokens on its own. Real spend depends heavily on how
-// much the model decides to dig for a given lead, so these are ceilings
-// (search fee + a generous per-search/fetch token allowance at Sonnet
-// pricing), not averages — revisit against real Anthropic invoices once
-// there's usage history.
+// Research depth cost (Sales Intelligence, which runs before every win-back
+// email). Real spend was measured at $2 for a single "standard" call before
+// backend/app/services/sales_intelligence_service.py added a hard, code-
+// enforced cost ceiling (RESEARCH_COST_CEILING_USD) that tracks actual
+// dollars via the API's own usage data turn-by-turn and stops research
+// before exceeding budget — this number is no longer a token-count estimate,
+// it's the real enforced maximum (research ceiling + worst-case one-more-
+// turn overshoot + the extraction call), so it's now the SAME for all three
+// depths: max_uses still controls how many tool calls are attempted, but the
+// dollar ceiling is what actually gets enforced regardless of depth. "quick"
+// will typically cost less in practice (fewer tool calls needed to finish
+// naturally), "deep" is more likely to actually hit the ceiling.
 const DEPTH_COST: Record<string, number> = {
-  quick: 0.10,
-  standard: 0.20,
-  deep: 0.45,
+  quick: 0.40,
+  standard: 0.40,
+  deep: 0.40,
 };
 
 function totalCostPerEmail(depth: string): number {
@@ -423,9 +422,9 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
 
           <label class="form-label" for="wb-depth-select">Research depth</label>
           <select id="wb-depth-select" class="search-input" title="Research depth controls how many web searches are run per lead">
-            <option value="quick">Quick scan (up to 3 searches + 3 fetches) up to $0.10/lead</option>
-            <option value="standard" selected>Standard (up to 5 searches + 5 fetches) up to $0.20/lead</option>
-            <option value="deep">Deep research (up to 10 searches + 10 fetches) up to $0.45/lead</option>
+            <option value="quick">Quick scan (up to 3 searches + 3 fetches) — usually cheapest, capped at $0.50/lead</option>
+            <option value="standard" selected>Standard (up to 5 searches + 5 fetches) — capped at $0.50/lead</option>
+            <option value="deep">Deep research (up to 10 searches + 10 fetches) — capped at $0.50/lead</option>
           </select>
 
           <div class="wb-picker-bar">
@@ -462,6 +461,16 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     campaignLinkText: container.querySelector<HTMLInputElement>("#wb-campaign-link-text-input")!.value.trim(),
     signature: await brandVoiceSignaturePromise,
   });
+
+  // Caches a successful preview's exact output alongside a signature of the
+  // settings it was generated under (brief + depth). Generate Campaign only
+  // reuses a cached result for a row if the signature still matches at the
+  // moment of generating — so changing the brief/offer/links/depth after
+  // previewing correctly invalidates it instead of silently sending stale,
+  // already-paid-for copy under different settings.
+  const previewedEmails = new Map<number, { subject: string; body: string; signature: string }>();
+  const briefSignature = (brief: Awaited<ReturnType<typeof getBrief>>, depth: string) =>
+    JSON.stringify([brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature, depth]);
   const updateBtnLabel = () => {
     generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail(depthSelect.value))} + up to ${formatApifyCeiling(rows.length)} est.)`;
   };
@@ -515,6 +524,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
       const email = await previewWinBackCampaignEmail(rows[index], brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature, depthSelect.value);
       result.innerHTML = `<strong>Preview: ${escapeHtml(email.subject)}</strong><pre class="wb-modal-body">${escapeHtml(email.body)}</pre>`;
       result.classList.remove("hidden");
+      previewedEmails.set(index, { subject: email.subject, body: email.body, signature: briefSignature(brief, depthSelect.value) });
       previewCooldownUntil.delete(index);
       previewBtn.disabled = false;
       previewBtn.textContent = "Preview one email";
@@ -528,12 +538,23 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
 
   generateBtn.addEventListener("click", async () => {
     const brief = await getBrief();
-    const confirmed = await showCostConfirm(rows.length, formatCost(rows.length * totalCostPerEmail(depthSelect.value)), formatApifyCeiling(rows.length));
+    const sig = briefSignature(brief, depthSelect.value);
+    // Rows already previewed under these exact settings are reused as-is by
+    // the backend instead of being generated (and charged for) again — only
+    // the remaining rows count toward the cost estimate and confirmation.
+    const rowsWithReuse = rows.map((row, index) => {
+      const cached = previewedEmails.get(index);
+      return cached && cached.signature === sig
+        ? { ...row, preview_subject: cached.subject, preview_body: cached.body }
+        : row;
+    });
+    const toGenerateCount = rowsWithReuse.filter((row) => !row.preview_subject || !row.preview_body).length;
+    const confirmed = await showCostConfirm(toGenerateCount, formatCost(toGenerateCount * totalCostPerEmail(depthSelect.value)), formatApifyCeiling(toGenerateCount));
     if (!confirmed) return;
     generateBtn.disabled = true;
     generateBtn.textContent = "Creating...";
     try {
-      const campaign = await createWinBackCampaignFromCsv(brief.name, rows, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature);
+      const campaign = await createWinBackCampaignFromCsv(brief.name, rowsWithReuse, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
       generateBtn.disabled = false;

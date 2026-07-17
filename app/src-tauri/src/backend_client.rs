@@ -2165,6 +2165,10 @@ pub struct WinBackCsvRow {
     pub notes: String,
     #[serde(default)]
     pub industry: String,
+    #[serde(default)]
+    pub preview_subject: String,
+    #[serde(default)]
+    pub preview_body: String,
 }
 
 #[derive(Serialize)]

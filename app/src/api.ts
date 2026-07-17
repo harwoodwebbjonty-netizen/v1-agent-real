@@ -1024,6 +1024,11 @@ export interface WinBackCsvRow {
   linkedin: string;
   notes: string;
   industry: string;
+  // If both are set, create_win_back_campaign_from_csv reuses this instead of
+  // paying for research + email generation again — only set when this row was
+  // already previewed under the exact same generation settings.
+  preview_subject?: string;
+  preview_body?: string;
 }
 
 export async function parseWinBackCsv(path: string): Promise<WinBackCsvRow[]> {

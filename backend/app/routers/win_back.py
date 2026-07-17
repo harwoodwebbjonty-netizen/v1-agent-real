@@ -56,6 +56,13 @@ class CsvLeadRow(BaseModel):
     linkedin: str = ""
     notes: str = ""
     industry: str = ""
+    # If both are set, this row was already previewed under the exact same
+    # generation settings — reuse it as-is in create_campaign_from_csv
+    # instead of paying for research + email generation again for the same
+    # company. The frontend only sends these when its cached preview's
+    # settings signature still matches what's about to be generated.
+    preview_subject: str = ""
+    preview_body: str = ""
 
 
 class CreateCampaignFromCsvRequest(BaseModel):
@@ -303,7 +310,10 @@ async def create_campaign_from_csv(
         raise HTTPException(status_code=400, detail="At least one row is required.")
 
     lead_ids: list[str] = []
+    to_generate_lead_ids: list[str] = []
+    pre_generated_count = 0
     ts = now_iso()
+    campaign_id = new_id()
     for row in body.rows:
         lead_id = db.create_lead(
             id=new_id(),
@@ -328,7 +338,18 @@ async def create_campaign_from_csv(
             db.add_email_ignore_duplicate(new_id(), lead_id, row.email, "csv_import", ts)
         lead_ids.append(lead_id)
 
-    campaign_id = new_id()
+        # Row was already previewed under the exact same generation settings
+        # (frontend only sends these when its signature still matches) —
+        # reuse that result as-is instead of paying for research + email
+        # generation again for the same company.
+        if row.preview_subject.strip() and row.preview_body.strip():
+            db.upsert_win_back_email(
+                campaign_id, lead_id, new_id(), row.preview_subject, row.preview_body, ts,
+            )
+            pre_generated_count += 1
+        else:
+            to_generate_lead_ids.append(lead_id)
+
     db.create_win_back_campaign(
         id=campaign_id,
         name=body.name,
@@ -344,7 +365,12 @@ async def create_campaign_from_csv(
         campaign_link_text=body.campaign_link_text.strip(),
         signature=body.signature.strip(),
     )
-    asyncio.create_task(_generate_campaign(campaign_id, lead_ids, current_user.id, body.depth, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), campaign_link_text=body.campaign_link_text.strip(), signature=body.signature.strip()))
+    if pre_generated_count:
+        db.update_win_back_campaign_progress(
+            campaign_id, pre_generated_count, "ready" if not to_generate_lead_ids else "generating",
+        )
+    if to_generate_lead_ids:
+        asyncio.create_task(_generate_campaign(campaign_id, to_generate_lead_ids, current_user.id, body.depth, already_done=pre_generated_count, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), campaign_link_text=body.campaign_link_text.strip(), signature=body.signature.strip()))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
