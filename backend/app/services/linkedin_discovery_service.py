@@ -48,9 +48,19 @@ EXTRACTION_SCHEMA = {
     "additionalProperties": False,
 }
 
+# web_fetch removed: the sales-intelligence research call had the identical
+# tool setup (web_search + web_fetch, no max_content_tokens) and cost $1.20
+# on a real run despite max_content_tokens being set afterward — that
+# parameter did not bound the fetch the way Anthropic's docs describe, so
+# it's not trusted here either. web_search alone is kept (this function's
+# whole purpose requires live search; there's no "no tools" fallback for a
+# specific-person lookup the way there is for general company research) —
+# capped at a small max_uses on the cheaper Haiku model (extraction_model,
+# ~4-5x cheaper per token than the Sonnet call that blew up), with no
+# continuation loop, to keep the blast radius small even if search result
+# content turns out to be larger than expected.
 RESEARCH_TOOLS = [
-    {"type": "web_search_20260209", "name": "web_search", "max_uses": 4},
-    {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 2},
+    {"type": "web_search_20260209", "name": "web_search", "max_uses": 2},
 ]
 
 
@@ -123,25 +133,17 @@ async def _search_person_linkedin(person_name: str, company_name: str) -> Option
     messages = [original_message]
 
     try:
+        # No continuation loop: a single search-only call, capped tightly, so
+        # cost can't compound across turns the way it did in the Sonnet
+        # research call that blew up. If the model needs more than one
+        # pause_turn round to find a match, it just doesn't find one.
         response = await client.messages.create(
             model=settings.extraction_model,
-            max_tokens=2048,
+            max_tokens=1024,
             system=system_prompt,
             messages=messages,
             tools=RESEARCH_TOOLS,
         )
-
-        continuations = 0
-        while response.stop_reason == "pause_turn" and continuations < 2:
-            messages = [original_message, {"role": "assistant", "content": response.content}]
-            response = await client.messages.create(
-                model=settings.extraction_model,
-                max_tokens=2048,
-                system=system_prompt,
-                messages=messages,
-                tools=RESEARCH_TOOLS,
-            )
-            continuations += 1
 
         if response.stop_reason in ("refusal", "pause_turn"):
             return None
