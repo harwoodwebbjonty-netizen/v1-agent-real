@@ -39,12 +39,17 @@ MAX_EXTRACTION_ATTEMPTS = 2  # initial attempt + 1 retry against the same resear
 # turn, so the turn already in flight when the ceiling is crossed still gets
 # billed — and because each turn resends everything before it, that one
 # extra turn can cost roughly as much as everything accumulated so far
-# (worst case, close to doubling the running total). Set low enough that
-# 2x the ceiling plus the ~$0.06-worst-case extraction call still lands
-# under a $0.50/lead hard requirement with real margin, not by accident.
-# Sonnet pricing ($3/MTok in, $15/MTok out) per https://platform.claude.com/docs
+# (worst case, close to doubling the running total). Tightened from $0.20 to
+# $0.04 to hit a real $0.19-0.20/lead TOTAL requirement (not just research):
+# worst case is research (2x ceiling = ~$0.08) + extraction (~$0.023) +
+# win_back email gen (~$0.004) + LinkedIn scrape+discovery both applying to
+# the same lead (~$0.06) = ~$0.167, leaving real margin. At this budget
+# research will typically get only 1-2 tool-use turns before stopping,
+# regardless of the quick/standard/deep max_uses selected — the dollar
+# ceiling, not max_uses, is now almost always what actually binds. Sonnet
+# pricing ($3/MTok in, $15/MTok out) per https://platform.claude.com/docs
 # (checked this session) — revisit if pricing changes.
-RESEARCH_COST_CEILING_USD = 0.20
+RESEARCH_COST_CEILING_USD = 0.04
 SONNET_INPUT_COST_PER_TOKEN = 3 / 1_000_000
 SONNET_OUTPUT_COST_PER_TOKEN = 15 / 1_000_000
 WEB_SEARCH_COST_PER_QUERY = 10 / 1_000  # $10 per 1,000 searches, billed flat per query

@@ -42,17 +42,20 @@ const WINBACK_COST_PER_EMAIL =
 // backend/app/services/sales_intelligence_service.py added a hard, code-
 // enforced cost ceiling (RESEARCH_COST_CEILING_USD) that tracks actual
 // dollars via the API's own usage data turn-by-turn and stops research
-// before exceeding budget — this number is no longer a token-count estimate,
-// it's the real enforced maximum (research ceiling + worst-case one-more-
-// turn overshoot + the extraction call), so it's now the SAME for all three
-// depths: max_uses still controls how many tool calls are attempted, but the
-// dollar ceiling is what actually gets enforced regardless of depth. "quick"
-// will typically cost less in practice (fewer tool calls needed to finish
-// naturally), "deep" is more likely to actually hit the ceiling.
+// before exceeding budget. This is now the real enforced maximum for
+// research+extraction (ceiling + worst-case one-more-turn overshoot +
+// extraction), PLUS LinkedIn scrape+discovery worst case (both can apply to
+// the same lead — see linkedin_activity_service.py), so it's an honest
+// all-in per-lead ceiling, not just the AI-generation piece. Same for all
+// three depths: max_uses still controls how many tool calls are attempted,
+// but the dollar ceiling is what actually binds almost always at this
+// budget — "quick"/"standard"/"deep" will behave very similarly in
+// practice, typically getting only 1-2 research turns before stopping.
+const LINKEDIN_WORST_CASE_USD = 0.02 + 0.04; // scrape (Apify, ~10 posts) + discovery (AI fallback), both can apply
 const DEPTH_COST: Record<string, number> = {
-  quick: 0.40,
-  standard: 0.40,
-  deep: 0.40,
+  quick: 0.16 + LINKEDIN_WORST_CASE_USD,
+  standard: 0.16 + LINKEDIN_WORST_CASE_USD,
+  deep: 0.16 + LINKEDIN_WORST_CASE_USD,
 };
 
 function totalCostPerEmail(depth: string): number {
@@ -64,21 +67,17 @@ function formatCost(n: number): string {
   return `$${n.toFixed(2)}`;
 }
 
-// Separate from the $ Haiku estimate above because it's a genuinely different
-// spend: Apify bills per post actually returned (~£1.60/1,000 posts, matching
+// Apify bills per post actually returned (~£1.60/1,000 posts, matching
 // APIFY_COST_PER_1K_POSTS_GBP in backend/app/services/linkedin_activity_service.py),
-// not per lead. This is a ceiling, not a real average — only leads with a
-// LinkedIn URL already on file or discoverable via a free website scrape /
-// Companies House lookup ever reach Apify, and the actor may return fewer
-// than the max. Shown as its own £ figure rather than folded into the $
-// total so we're not silently applying a made-up FX rate.
+// not per lead — this is a ceiling, not a real average, only leads with a
+// LinkedIn URL already on file or discoverable ever reach Apify. Kept in £
+// here specifically because buildRunEstimates below checks it against the
+// backend's £-denominated linkedin_scrape credit limit; the main $ headline
+// total (DEPTH_COST above) already folds in its own separate USD estimate
+// of this same worst case, so this £ figure is not added again anywhere.
 const APIFY_MAX_POSTS_PER_LEAD = 10;
 const APIFY_COST_PER_1K_POSTS_GBP = 1.60;
 const APIFY_MAX_COST_PER_LEAD_GBP = (APIFY_MAX_POSTS_PER_LEAD / 1000) * APIFY_COST_PER_1K_POSTS_GBP;
-
-function formatApifyCeiling(count: number): string {
-  return `£${(count * APIFY_MAX_COST_PER_LEAD_GBP).toFixed(2)}`;
-}
 
 // Matches backend/app/db.py CREDIT_COST — the £ figures actually enforced by
 // db.check_credit_limit() per feature, as opposed to the $ Haiku estimate
@@ -103,7 +102,7 @@ function buildRunEstimates(count: number): RunEstimate[] {
   ];
 }
 
-async function showCostConfirm(count: number, totalCost: string, apifyCeiling: string): Promise<boolean> {
+async function showCostConfirm(count: number, totalCost: string): Promise<boolean> {
   const runEstimates = buildRunEstimates(count);
 
   let usage: { spend: Record<string, number>; limits: CreditLimits } | null = null;
@@ -150,11 +149,7 @@ async function showCostConfirm(count: number, totalCost: string, apifyCeiling: s
         </div>
         <div class="conflict-modal-question">
           Estimated cost: <strong>${totalCost}</strong>
-          <span class="cost-confirm-note">(web research + AI email generation via Haiku)</span>
-        </div>
-        <div class="conflict-modal-question">
-          Up to <strong>${apifyCeiling}</strong> more on Apify
-          <span class="cost-confirm-note">(LinkedIn lookup — only spent on leads where a LinkedIn page is found; often less)</span>
+          <span class="cost-confirm-note">(all-in ceiling: web research, AI email generation, and LinkedIn lookup — usually less in practice)</span>
         </div>
         ${limitRowsHtml}
         <div class="conflict-modal-actions">
@@ -432,7 +427,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
               ${rows.map((row, index) => `<option value="${index}">${escapeHtml(row.company)}${row.contact_name ? ` — ${escapeHtml(row.contact_name)}` : ""}</option>`).join("")}
             </select>
             <button id="wb-preview-btn" class="btn btn-secondary">Preview one email</button>
-            <button id="wb-generate-btn" class="btn btn-primary">Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail("standard"))} + up to ${formatApifyCeiling(rows.length)} est.)</button>
+            <button id="wb-generate-btn" class="btn btn-primary">Generate Campaign (${rows.length} emails · up to ${formatCost(rows.length * totalCostPerEmail("standard"))} all-in)</button>
           </div>
           <p class="card-subtitle">Preview runs the same enrichment and email generation as one campaign lead, but does not save or send a campaign. It uses one lead's Win-back credit.</p>
           <div id="wb-preview-result" class="wb-preview-result hidden"></div>
@@ -472,7 +467,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
   const briefSignature = (brief: Awaited<ReturnType<typeof getBrief>>, depth: string) =>
     JSON.stringify([brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature, depth]);
   const updateBtnLabel = () => {
-    generateBtn.textContent = `Generate Campaign (${rows.length} emails · ${formatCost(rows.length * totalCostPerEmail(depthSelect.value))} + up to ${formatApifyCeiling(rows.length)} est.)`;
+    generateBtn.textContent = `Generate Campaign (${rows.length} emails · up to ${formatCost(rows.length * totalCostPerEmail(depthSelect.value))} all-in)`;
   };
   depthSelect.addEventListener("change", updateBtnLabel);
 
@@ -549,7 +544,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
         : row;
     });
     const toGenerateCount = rowsWithReuse.filter((row) => !row.preview_subject || !row.preview_body).length;
-    const confirmed = await showCostConfirm(toGenerateCount, formatCost(toGenerateCount * totalCostPerEmail(depthSelect.value)), formatApifyCeiling(toGenerateCount));
+    const confirmed = await showCostConfirm(toGenerateCount, formatCost(toGenerateCount * totalCostPerEmail(depthSelect.value)));
     if (!confirmed) return;
     generateBtn.disabled = true;
     generateBtn.textContent = "Creating...";
