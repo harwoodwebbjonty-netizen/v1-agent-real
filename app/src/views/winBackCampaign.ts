@@ -467,10 +467,47 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
   };
   depthSelect.addEventListener("change", updateBtnLabel);
 
-  container.querySelector<HTMLButtonElement>("#wb-preview-btn")!.addEventListener("click", async () => {
-    const previewBtn = container.querySelector<HTMLButtonElement>("#wb-preview-btn")!;
+  // Preview intentionally skips the persisted lead cache (so it can never
+  // affect what a real campaign generation later sees), which means every
+  // click re-runs a fully-charged Apify + AI request. A slow or failed
+  // attempt is easy to mistake for "it didn't work" and retry — but the
+  // server-side request may still be running and may already have spent
+  // real money. This cooldown blocks same-lead retries for a short window
+  // after a failure so an impatient retry can't double-charge.
+  const PREVIEW_RETRY_COOLDOWN_MS = 90_000;
+  const previewCooldownUntil = new Map<number, number>();
+  const leadSelect = container.querySelector<HTMLSelectElement>("#wb-preview-lead-select")!;
+  const previewBtn = container.querySelector<HTMLButtonElement>("#wb-preview-btn")!;
+  let cooldownTimer: ReturnType<typeof setTimeout> | undefined;
+
+  const refreshPreviewButtonState = () => {
+    clearTimeout(cooldownTimer);
+    const index = Number(leadSelect.value);
+    const until = previewCooldownUntil.get(index);
+    const remainingSec = until ? Math.ceil((until - Date.now()) / 1000) : 0;
+    if (remainingSec > 0) {
+      previewBtn.disabled = true;
+      previewBtn.textContent = `Retry in ${remainingSec}s...`;
+      cooldownTimer = setTimeout(refreshPreviewButtonState, 1000);
+    } else {
+      previewCooldownUntil.delete(index);
+      previewBtn.disabled = false;
+      previewBtn.textContent = "Preview one email";
+    }
+  };
+  leadSelect.addEventListener("change", refreshPreviewButtonState);
+
+  previewBtn.addEventListener("click", async () => {
     const result = container.querySelector<HTMLDivElement>("#wb-preview-result")!;
-    const index = Number(container.querySelector<HTMLSelectElement>("#wb-preview-lead-select")!.value);
+    const index = Number(leadSelect.value);
+
+    const until = previewCooldownUntil.get(index);
+    if (until && Date.now() < until) {
+      result.textContent = `Please wait ${Math.ceil((until - Date.now()) / 1000)}s before retrying this lead — the previous attempt may still be processing on the server and could already have used real Apify/AI credits. Retrying now risks paying twice for the same preview.`;
+      result.classList.remove("hidden");
+      return;
+    }
+
     const brief = await getBrief();
     previewBtn.disabled = true;
     previewBtn.textContent = "Creating preview...";
@@ -478,12 +515,14 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
       const email = await previewWinBackCampaignEmail(rows[index], brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature, depthSelect.value);
       result.innerHTML = `<strong>Preview: ${escapeHtml(email.subject)}</strong><pre class="wb-modal-body">${escapeHtml(email.body)}</pre>`;
       result.classList.remove("hidden");
+      previewCooldownUntil.delete(index);
+      previewBtn.disabled = false;
+      previewBtn.textContent = "Preview one email";
     } catch (err) {
       result.textContent = `Could not create preview: ${String(err)}`;
       result.classList.remove("hidden");
-    } finally {
-      previewBtn.disabled = false;
-      previewBtn.textContent = "Preview one email";
+      previewCooldownUntil.set(index, Date.now() + PREVIEW_RETRY_COOLDOWN_MS);
+      refreshPreviewButtonState();
     }
   });
 

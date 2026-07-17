@@ -934,6 +934,11 @@ pub struct CreditLimits {
     pub limit_sales_intel: f64,
     pub limit_win_back: f64,
     pub limit_ai_prospecting: f64,
+    pub limit_email_writer: f64,
+    pub limit_enrichment: f64,
+    pub limit_lead_chat: f64,
+    pub limit_linkedin_scrape: f64,
+    pub limit_linkedin_discovery: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
