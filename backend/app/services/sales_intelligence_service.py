@@ -29,6 +29,26 @@ RESEARCH_MAX_TOKENS = 8192
 EXTRACTION_MAX_TOKENS = 4096
 MAX_EXTRACTION_ATTEMPTS = 2  # initial attempt + 1 retry against the same research text
 
+# Real per-lead cost was measured at $2+ at "standard" depth (max_uses=5) —
+# each pause_turn continuation resends the ENTIRE accumulated conversation
+# (every prior tool-call result, including full fetched-page content) as
+# fresh input tokens, so cost compounds with turns, not just tool-call count.
+# max_uses alone can't guarantee a dollar ceiling, so _research() tracks real
+# spend via response.usage after every turn and stops issuing further
+# continuations once this is hit. The check only runs BEFORE starting a new
+# turn, so the turn already in flight when the ceiling is crossed still gets
+# billed — and because each turn resends everything before it, that one
+# extra turn can cost roughly as much as everything accumulated so far
+# (worst case, close to doubling the running total). Set low enough that
+# 2x the ceiling plus the ~$0.06-worst-case extraction call still lands
+# under a $0.50/lead hard requirement with real margin, not by accident.
+# Sonnet pricing ($3/MTok in, $15/MTok out) per https://platform.claude.com/docs
+# (checked this session) — revisit if pricing changes.
+RESEARCH_COST_CEILING_USD = 0.20
+SONNET_INPUT_COST_PER_TOKEN = 3 / 1_000_000
+SONNET_OUTPUT_COST_PER_TOKEN = 15 / 1_000_000
+WEB_SEARCH_COST_PER_QUERY = 10 / 1_000  # $10 per 1,000 searches, billed flat per query
+
 SYSTEM_PREAMBLE = (
     "You are performing the 'AI Sales Intelligence Research' workflow below "
     "exactly as specified, including its deterministic scoring rubric. Work "
@@ -84,13 +104,20 @@ EXTRACTION_SCHEMA = {
         "pitch_angle": {"type": "string"},
         "call_brief": {"type": "string"},
         "score_breakdown": {
+            # No minimum/maximum on the integer fields below: Anthropic's
+            # structured-output schema does not support numeric constraints
+            # at all (rejected outright with a 400, same failure mode as the
+            # discovery_questions minItems issue above) — the 0-20 range is
+            # stated in the extraction system prompt instead, and the real
+            # 0-100/sum-matches-lead_score rubric is enforced for real by
+            # SalesIntelligenceResult's model_validator after parsing.
             "type": "object",
             "properties": {
-                "company_maturity": {"type": "integer", "minimum": 0, "maximum": 20},
-                "hiring_intensity": {"type": "integer", "minimum": 0, "maximum": 20},
-                "growth_signals": {"type": "integer", "minimum": 0, "maximum": 20},
-                "buying_intent": {"type": "integer", "minimum": 0, "maximum": 20},
-                "accessibility_fit": {"type": "integer", "minimum": 0, "maximum": 20},
+                "company_maturity": {"type": "integer"},
+                "hiring_intensity": {"type": "integer"},
+                "growth_signals": {"type": "integer"},
+                "buying_intent": {"type": "integer"},
+                "accessibility_fit": {"type": "integer"},
             },
             "required": [
                 "company_maturity",
@@ -101,7 +128,7 @@ EXTRACTION_SCHEMA = {
             ],
             "additionalProperties": False,
         },
-        "lead_score": {"type": "integer", "minimum": 0, "maximum": 100},
+        "lead_score": {"type": "integer"},
         "lead_temperature": {"type": "string", "enum": ["Hot", "Warm", "Cold"]},
         "confidence_note": {"type": "string"},
     },
@@ -139,12 +166,28 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text()
 
 
+def _response_cost_usd(response) -> float:
+    """Real $ cost of one research turn from the API's own reported usage —
+    not an estimate. Token cost captures the dominant compounding driver
+    (each pause_turn continuation resends the whole conversation, including
+    prior fetched-page content, as fresh input tokens); usage.server_tool_use
+    gives the exact web_search query count for its separate flat per-query
+    fee (web_fetch has no flat fee, only token cost, already covered above)."""
+    usage = response.usage
+    cost = usage.input_tokens * SONNET_INPUT_COST_PER_TOKEN + usage.output_tokens * SONNET_OUTPUT_COST_PER_TOKEN
+    if usage.server_tool_use:
+        cost += usage.server_tool_use.web_search_requests * WEB_SEARCH_COST_PER_QUERY
+    return cost
+
+
 async def _research(company: str, website: str, max_uses: int = 5, linkedin_context: str = "") -> str:
     """Phase 1: agentic research with web_search/web_fetch. Raises
-    IntelligenceExtractionError on a terminal failure (refusal / continuation
-    limit exhausted / no text produced) — there's no sensible "not found"
-    placeholder for a whole sales dossier the way there is for a single
-    phone number or email address."""
+    IntelligenceExtractionError only on a true dead end (refusal / no text
+    produced at all) — there's no sensible "not found" placeholder for a
+    whole sales dossier the way there is for a single phone number or email
+    address. Hitting the continuation limit or the cost ceiling is NOT
+    treated as failure: whatever text has been produced so far is salvaged
+    and used, rather than discarding real spend for zero output."""
     settings = get_settings()
     client = _client()
     system_prompt = SYSTEM_PREAMBLE + _workflow_text()
@@ -171,9 +214,14 @@ async def _research(company: str, website: str, max_uses: int = 5, linkedin_cont
         messages=messages,
         tools=research_tools,
     )
+    running_cost = _response_cost_usd(response)
 
     continuations = 0
-    while response.stop_reason == "pause_turn" and continuations < MAX_RESEARCH_CONTINUATIONS:
+    while (
+        response.stop_reason == "pause_turn"
+        and continuations < MAX_RESEARCH_CONTINUATIONS
+        and running_cost < RESEARCH_COST_CEILING_USD
+    ):
         messages = [original_message, {"role": "assistant", "content": response.content}]
         response = await client.messages.create(
             model=settings.model,
@@ -182,12 +230,11 @@ async def _research(company: str, website: str, max_uses: int = 5, linkedin_cont
             messages=messages,
             tools=research_tools,
         )
+        running_cost += _response_cost_usd(response)
         continuations += 1
 
     if response.stop_reason == "refusal":
         raise IntelligenceExtractionError("Request was declined by the model's safety classifiers.")
-    if response.stop_reason == "pause_turn":
-        raise IntelligenceExtractionError("Research did not complete within the continuation limit.")
 
     text = "\n".join(block.text for block in response.content if block.type == "text")
     if not text:
@@ -210,9 +257,12 @@ async def _extract(research_text: str) -> SalesIntelligenceResult:
         max_tokens=EXTRACTION_MAX_TOKENS,
         system=(
             "Extract the structured sales-intelligence result from the research notes "
-            "below, following the deterministic scoring rubric exactly: lead_score must "
-            "equal the sum of score_breakdown's five categories, and lead_temperature "
-            "must match the score band (80-100 Hot, 50-79 Warm, 0-49 Cold). "
+            "below, following the deterministic scoring rubric exactly: each of "
+            "score_breakdown's five categories (company_maturity, hiring_intensity, "
+            "growth_signals, buying_intent, accessibility_fit) must be an integer "
+            "0-20, lead_score must be an integer 0-100 equal to the sum of those "
+            "five categories, and lead_temperature must match the score band "
+            "(80-100 Hot, 50-79 Warm, 0-49 Cold). "
             "discovery_questions must contain exactly 10 to 15 items."
         ),
         messages=[{"role": "user", "content": research_text}],

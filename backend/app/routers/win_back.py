@@ -120,31 +120,39 @@ async def _generate_campaign(
                     intel = db.get_latest_lead_intelligence(lead_id)
                     if not intel or days_since(intel["created_at"]) > 30:
                         try:
-                            linkedin_posts = await get_or_fetch_linkedin_posts(lead, user_id)
-                            result = await generate_sales_intelligence(
-                                lead["company"], lead["website"] or "", max_uses=max_uses,
-                                linkedin_context=format_posts_for_prompt(linkedin_posts),
-                            )
-                            db.add_lead_intelligence_version(
-                                new_id(), lead_id,
-                                {
-                                    "executive_summary": result.executive_summary,
-                                    "sales_summary": result.sales_summary,
-                                    "pain_points": json.dumps(result.pain_points.model_dump()),
-                                    "buying_signals": json.dumps(result.buying_signals),
-                                    "conversation_starters": json.dumps(result.conversation_starters),
-                                    "discovery_questions": json.dumps(result.discovery_questions),
-                                    "objection_handling": json.dumps([o.model_dump() for o in result.objection_handling]),
-                                    "pitch_angle": result.pitch_angle,
-                                    "call_brief": result.call_brief,
-                                    "score_breakdown": json.dumps(result.score_breakdown.model_dump()),
-                                    "lead_score": result.lead_score,
-                                    "lead_temperature": result.lead_temperature,
-                                    "confidence_note": result.confidence_note,
-                                },
-                                now_iso(),
-                            )
-                            intel = db.get_latest_lead_intelligence(lead_id)
+                            allowed, spent, limit = db.check_credit_limit(user_id, "sales_intel")
+                            if not allowed:
+                                logger.warning(
+                                    "Win-back: sales_intel credit limit £%.2f reached (spent £%.2f) — skipping intelligence for %s",
+                                    limit, spent, lead_id,
+                                )
+                            else:
+                                linkedin_posts = await get_or_fetch_linkedin_posts(lead, user_id)
+                                result = await generate_sales_intelligence(
+                                    lead["company"], lead["website"] or "", max_uses=max_uses,
+                                    linkedin_context=format_posts_for_prompt(linkedin_posts),
+                                )
+                                db.add_lead_intelligence_version(
+                                    new_id(), lead_id,
+                                    {
+                                        "executive_summary": result.executive_summary,
+                                        "sales_summary": result.sales_summary,
+                                        "pain_points": json.dumps(result.pain_points.model_dump()),
+                                        "buying_signals": json.dumps(result.buying_signals),
+                                        "conversation_starters": json.dumps(result.conversation_starters),
+                                        "discovery_questions": json.dumps(result.discovery_questions),
+                                        "objection_handling": json.dumps([o.model_dump() for o in result.objection_handling]),
+                                        "pitch_angle": result.pitch_angle,
+                                        "call_brief": result.call_brief,
+                                        "score_breakdown": json.dumps(result.score_breakdown.model_dump()),
+                                        "lead_score": result.lead_score,
+                                        "lead_temperature": result.lead_temperature,
+                                        "confidence_note": result.confidence_note,
+                                    },
+                                    now_iso(),
+                                )
+                                db.record_credit_spend(new_id(), user_id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
+                                intel = db.get_latest_lead_intelligence(lead_id)
                         except Exception:
                             logger.exception("Win-back: intelligence generation failed for %s", lead_id)
 
@@ -353,6 +361,12 @@ async def preview_campaign_email(
     allowed, spent, limit = db.check_credit_limit(current_user.id, "win_back")
     if not allowed:
         raise HTTPException(status_code=402, detail=f"Win-back credit limit reached (spent £{spent:.2f} of £{limit:.2f}).")
+    intel_allowed, intel_spent, intel_limit = db.check_credit_limit(current_user.id, "sales_intel")
+    if not intel_allowed:
+        raise HTTPException(
+            status_code=402,
+            detail=f"Monthly credit limit reached for Sales Intelligence (spent £{intel_spent:.2f} of £{intel_limit:.2f}). Update your limit in Settings → Credit Limits.",
+        )
     linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id)
     # Research/generation failures (refusal, extraction-schema mismatch after
     # retrying, a transient Anthropic API error) are expected, retryable
@@ -364,6 +378,7 @@ async def preview_campaign_email(
             row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
             linkedin_context=format_posts_for_prompt(linkedin_posts),
         )
+        db.record_credit_spend(new_id(), current_user.id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
         context = {
             "company": row.company,
             "first_name": contact_parts[0] if contact_parts else "",
