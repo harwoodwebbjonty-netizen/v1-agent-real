@@ -119,12 +119,23 @@ async def get_or_fetch_linkedin_posts(lead: sqlite3.Row, user_id: str) -> list[d
     return posts
 
 
-async def fetch_linkedin_posts_preview(linkedin_url: str, user_id: str) -> Optional[list[dict]]:
+async def fetch_linkedin_posts_preview(linkedin_url: str, user_id: str, website: str = "") -> Optional[list[dict]]:
     """For one-off previews with no persisted lead (e.g. the win-back
     "Preview one email" flow) — same credit-tracked fetch, but never reads
     or writes the per-lead cache table, so it can never affect what a real
-    campaign generation later sees for that lead."""
+    campaign generation later sees for that lead.
+
+    Falls back to the free website-scrape discovery method when no LinkedIn
+    URL is given, matching what a real win-back campaign lead actually gets
+    (get_or_fetch_linkedin_posts -> _discover_and_save_linkedin_url). The
+    other, credit-gated discovery fallback (Companies House officer lookup +
+    AI search) is intentionally NOT replicated here: win-back leads are
+    CSV-imported and CsvLeadRow has no company_number field at all, so that
+    path can never fire for a win-back lead in real generation either — this
+    matches real behavior exactly, not a preview-specific shortcut."""
     linkedin_url = linkedin_url.strip()
+    if not linkedin_url:
+        linkedin_url = await scrape_website_for_linkedin(website.strip()) or ""
     if not linkedin_url:
         return []
     return await _fetch_and_charge(linkedin_url, user_id)

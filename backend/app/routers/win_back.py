@@ -393,7 +393,7 @@ async def preview_campaign_email(
             status_code=402,
             detail=f"Monthly credit limit reached for Sales Intelligence (spent £{intel_spent:.2f} of £{intel_limit:.2f}). Update your limit in Settings → Credit Limits.",
         )
-    linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id)
+    linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id, row.website)
     # Research/generation failures (refusal, extraction-schema mismatch after
     # retrying, a transient Anthropic API error) are expected, retryable
     # outcomes elsewhere in the app (see leads.py's IntelligenceExtractionError
