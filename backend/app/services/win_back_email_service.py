@@ -3,6 +3,7 @@ import json
 import pathlib
 import re
 from functools import lru_cache
+from typing import Optional
 
 import anthropic
 
@@ -88,8 +89,13 @@ def _format_lead_sources(lead_context: dict) -> str:
     return "\n".join(lines)
 
 
-def _parse_subject_email(raw: str) -> dict:
-    """Parses the Subject: / Email: response format."""
+def _parse_subject_email(raw: str) -> Optional[dict]:
+    """Parses the Subject: / Email: response format. Returns None if either
+    marker is missing after all parsing attempts — a strong signal the model
+    didn't produce an email at all (e.g. it declined, citing insufficient
+    research signal to justify a specific business case), rather than a
+    minor formatting slip worth guessing at with a truncated raw-text
+    fallback. The caller substitutes a safe generic email in that case."""
     subject = ""
     body = ""
     subject_match = re.search(r"Subject:\s*(.+?)(?:\n\n|\nEmail:)", raw, re.DOTALL | re.IGNORECASE)
@@ -106,7 +112,32 @@ def _parse_subject_email(raw: str) -> dict:
             elif line.lower().startswith("email:"):
                 body = "\n".join(lines[i + 1:]).strip()
                 break
-    return {"subject": subject or raw[:80], "body": body or raw}
+    if not subject or not body:
+        return None
+    return {"subject": subject, "body": body}
+
+
+def _fallback_email(lead_context: dict) -> dict:
+    """A safe, deterministic email used whenever the model declines to write
+    a personalised one — a simple relationship check-in with no invented
+    pain points or business claims, instead of showing the model's refusal
+    text as if it were the email. Ends with the same bare-URL CTA line the
+    prompt itself uses, so apply_campaign_link's normal find-and-replace
+    still works exactly as it would on a model-written email."""
+    company = (lead_context.get("company") or "").strip()
+    first_name = (lead_context.get("first_name") or "").strip()
+    greeting = f"Hi {first_name}," if first_name else "Hi,"
+    company_line = f" at {company}" if company else ""
+    subject = f"Checking in, {company}" if company else "Checking in"
+    body = (
+        f"{greeting}\n\n"
+        f"It's been a while since we last worked together at Winchester Corporate Finance, "
+        f"and I wanted to check in and see how things are going{company_line}.\n\n"
+        f"If it would be useful to talk through your current funding options, "
+        f"I'm happy to set up a short call.\n\n"
+        f"{FALLBACK_CALENDLY_URL}"
+    )
+    return {"subject": subject, "body": body}
 
 
 def _strip_fallback_calendly_link(body: str) -> str:
@@ -162,7 +193,12 @@ def append_signature(email: dict, signature: str) -> dict:
 
 async def generate_win_back_email(lead_context: dict) -> dict:
     """Generates a win-back email using the Winchester CF prompt.
-    Returns {"subject": str, "body": str}."""
+    Returns {"subject": str, "body": str}. Falls back to a safe, generic
+    relationship check-in (_fallback_email) if the model doesn't produce the
+    expected Subject:/Email: structure at all — most commonly because it
+    declined to write a personalised email, e.g. citing insufficient
+    research signal to justify a specific business case. That refusal text
+    must never surface as if it were the email itself."""
     system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
     user_message = _format_lead_sources(lead_context)
     client = _client()
@@ -173,4 +209,4 @@ async def generate_win_back_email(lead_context: dict) -> dict:
         max_tokens=MAX_TOKENS,
     )
     raw = response.content[0].text.strip() if response.content else ""
-    return _parse_subject_email(raw)
+    return _parse_subject_email(raw) or _fallback_email(lead_context)
