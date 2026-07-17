@@ -38,24 +38,23 @@ const WINBACK_COST_PER_EMAIL =
   WINBACK_OUTPUT_TOKENS_MAX * (4 / 1_000_000);
 
 // Research depth cost (Sales Intelligence, which runs before every win-back
-// email). Real spend was measured at $2 for a single "standard" call before
-// backend/app/services/sales_intelligence_service.py added a hard, code-
-// enforced cost ceiling (RESEARCH_COST_CEILING_USD) that tracks actual
-// dollars via the API's own usage data turn-by-turn and stops research
-// before exceeding budget. This is now the real enforced maximum for
-// research+extraction (ceiling + worst-case one-more-turn overshoot +
-// extraction), PLUS LinkedIn scrape+discovery worst case (both can apply to
-// the same lead — see linkedin_activity_service.py), so it's an honest
-// all-in per-lead ceiling, not just the AI-generation piece. Same for all
-// three depths: max_uses still controls how many tool calls are attempted,
-// but the dollar ceiling is what actually binds almost always at this
-// budget — "quick"/"standard"/"deep" will behave very similarly in
-// practice, typically getting only 1-2 research turns before stopping.
+// email). Real spend was measured at $2 for a single "standard" call.
+// backend/app/services/sales_intelligence_service.py now enforces a real
+// structural bound, not just a heuristic: web_fetch's max_content_tokens is
+// set explicitly (previously unset — per Anthropic's docs, an unbounded
+// fetch of a large page/PDF alone can be ~125,000 tokens, ~$0.375, in ONE
+// tool call), RESEARCH_MAX_TOKENS is capped, and max_uses is clamped to
+// RESEARCH_MAX_USES_CAP (3) for ALL depths regardless of what's requested —
+// a genuine dollar guarantee doesn't fit "deep"'s larger tool budget, so
+// quick/standard/deep now all get the same real research scope (previously
+// "quick"'s). This is the real, honest tradeoff of a hard budget: 1-2
+// research rounds, not thorough digging, for every depth setting.
 const LINKEDIN_WORST_CASE_USD = 0.02 + 0.04; // scrape (Apify, ~10 posts) + discovery (AI fallback), both can apply
+const RESEARCH_EXTRACTION_WORST_CASE_USD = 0.11; // matches sales_intelligence_service.py's computed worst case (~$0.11), with margin
 const DEPTH_COST: Record<string, number> = {
-  quick: 0.16 + LINKEDIN_WORST_CASE_USD,
-  standard: 0.16 + LINKEDIN_WORST_CASE_USD,
-  deep: 0.16 + LINKEDIN_WORST_CASE_USD,
+  quick: RESEARCH_EXTRACTION_WORST_CASE_USD + LINKEDIN_WORST_CASE_USD,
+  standard: RESEARCH_EXTRACTION_WORST_CASE_USD + LINKEDIN_WORST_CASE_USD,
+  deep: RESEARCH_EXTRACTION_WORST_CASE_USD + LINKEDIN_WORST_CASE_USD,
 };
 
 function totalCostPerEmail(depth: string): number {
@@ -416,11 +415,12 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
           <p class="card-subtitle">If filled in, the link above appears as clickable text with this label instead of a plain web address.</p>
 
           <label class="form-label" for="wb-depth-select">Research depth</label>
-          <select id="wb-depth-select" class="search-input" title="Research depth controls how many web searches are run per lead">
-            <option value="quick">Quick scan (up to 3 searches + 3 fetches) — usually cheapest, capped at $0.50/lead</option>
-            <option value="standard" selected>Standard (up to 5 searches + 5 fetches) — capped at $0.50/lead</option>
-            <option value="deep">Deep research (up to 10 searches + 10 fetches) — capped at $0.50/lead</option>
+          <select id="wb-depth-select" class="search-input" title="All depths currently use the same research scope (up to 3 searches + 3 fetches) to guarantee a $0.20/lead hard cap">
+            <option value="quick">Quick scan — up to 3 searches + 3 fetches, capped at $0.20/lead</option>
+            <option value="standard" selected>Standard — up to 3 searches + 3 fetches, capped at $0.20/lead</option>
+            <option value="deep">Deep research — up to 3 searches + 3 fetches, capped at $0.20/lead</option>
           </select>
+          <p class="card-subtitle">All three currently research the same amount — capped uniformly so the total cost stays guaranteed at $0.20/lead.</p>
 
           <div class="wb-picker-bar">
             <select id="wb-preview-lead-select" class="search-input" title="Choose the imported lead used for the preview">

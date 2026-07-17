@@ -25,30 +25,49 @@ RESEARCH_TOOLS = [
     {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": 10},
 ]
 MAX_RESEARCH_CONTINUATIONS = 6
-RESEARCH_MAX_TOKENS = 8192
-EXTRACTION_MAX_TOKENS = 4096
 MAX_EXTRACTION_ATTEMPTS = 2  # initial attempt + 1 retry against the same research text
 
-# Real per-lead cost was measured at $2+ at "standard" depth (max_uses=5) —
-# each pause_turn continuation resends the ENTIRE accumulated conversation
-# (every prior tool-call result, including full fetched-page content) as
-# fresh input tokens, so cost compounds with turns, not just tool-call count.
-# max_uses alone can't guarantee a dollar ceiling, so _research() tracks real
-# spend via response.usage after every turn and stops issuing further
-# continuations once this is hit. The check only runs BEFORE starting a new
-# turn, so the turn already in flight when the ceiling is crossed still gets
-# billed — and because each turn resends everything before it, that one
-# extra turn can cost roughly as much as everything accumulated so far
-# (worst case, close to doubling the running total). Tightened from $0.20 to
-# $0.04 to hit a real $0.19-0.20/lead TOTAL requirement (not just research):
-# worst case is research (2x ceiling = ~$0.08) + extraction (~$0.023) +
-# win_back email gen (~$0.004) + LinkedIn scrape+discovery both applying to
-# the same lead (~$0.06) = ~$0.167, leaving real margin. At this budget
-# research will typically get only 1-2 tool-use turns before stopping,
-# regardless of the quick/standard/deep max_uses selected — the dollar
-# ceiling, not max_uses, is now almost always what actually binds. Sonnet
-# pricing ($3/MTok in, $15/MTok out) per https://platform.claude.com/docs
-# (checked this session) — revisit if pricing changes.
+# --- Hard per-lead cost bound (target: real, guaranteed $0.19-0.20 all-in) ---
+#
+# Real per-lead cost was measured at $2+ at "standard" depth (max_uses=5).
+# Root cause had TWO parts, not one:
+#
+# 1. web_fetch had no max_content_tokens set. Per Anthropic's own docs, a
+#    single fetch is UNBOUNDED without it — their own example: a 500kB PDF
+#    fetch alone is ~125,000 tokens (~$0.375 at Sonnet's input rate), in ONE
+#    tool call, before any turn-by-turn check could ever run. This is now
+#    set explicitly below, which is the actual structural fix — without it,
+#    no amount of "check cost between turns" logic can catch a single huge
+#    fetch, because it's already fully billed within one API response.
+# 2. Each pause_turn continuation resends the ENTIRE accumulated conversation
+#    (every prior tool-call result) as fresh input tokens, so cost compounds
+#    with turns on top of that. _research() tracks real spend via
+#    response.usage and stops issuing further continuations once
+#    RESEARCH_COST_CEILING_USD is hit — a backstop for multi-turn
+#    accumulation, not the primary defense (see max_uses/RESEARCH_MAX_TOKENS/
+#    MAX_CONTENT_TOKENS_PER_FETCH below for the bound on any single turn,
+#    including the first one, which no between-turn check can protect).
+#
+# max_uses is clamped to RESEARCH_MAX_USES_CAP regardless of what a caller
+# requests (previously quick=3/standard=5/deep=10) — at a real dollar
+# guarantee, "deep" research's larger tool budget doesn't fit the target
+# total, so all three now get the same (small) effective scope. This is a
+# real trade: research gets 1-2 tool-use rounds, not deep, thorough digging.
+#
+# Worst-case single turn (deep in flight, nothing yet stopped by the
+# ceiling): (RESEARCH_MAX_USES_CAP * MAX_CONTENT_TOKENS_PER_FETCH fetch
+# tokens + RESEARCH_MAX_USES_CAP * ~500 search-snippet tokens) * $3/MTok +
+# RESEARCH_MAX_TOKENS * $15/MTok + RESEARCH_MAX_USES_CAP * $0.01 search fee
+# ≈ $0.092. Plus extraction (~$0.018, now bounded by the smaller research
+# text) + win_back email gen (~$0.004) + LinkedIn scrape+discovery both
+# applying to the same lead (~$0.06) ≈ $0.174 total, with real margin under
+# $0.19-0.20. Sonnet pricing ($3/MTok in, $15/MTok out) and web_fetch/
+# web_search mechanics per https://platform.claude.com/docs (checked this
+# session) — revisit if pricing or tool behavior changes.
+RESEARCH_MAX_USES_CAP = 3
+MAX_CONTENT_TOKENS_PER_FETCH = 3000
+RESEARCH_MAX_TOKENS = 2000
+EXTRACTION_MAX_TOKENS = 4096
 RESEARCH_COST_CEILING_USD = 0.04
 SONNET_INPUT_COST_PER_TOKEN = 3 / 1_000_000
 SONNET_OUTPUT_COST_PER_TOKEN = 15 / 1_000_000
@@ -192,7 +211,12 @@ async def _research(company: str, website: str, max_uses: int = 5, linkedin_cont
     whole sales dossier the way there is for a single phone number or email
     address. Hitting the continuation limit or the cost ceiling is NOT
     treated as failure: whatever text has been produced so far is salvaged
-    and used, rather than discarding real spend for zero output."""
+    and used, rather than discarding real spend for zero output.
+
+    max_uses is clamped to RESEARCH_MAX_USES_CAP regardless of what the
+    caller requests — see the module-level comment above for why a real
+    dollar guarantee can't accommodate the old quick/standard/deep spread."""
+    max_uses = min(max_uses, RESEARCH_MAX_USES_CAP)
     settings = get_settings()
     client = _client()
     system_prompt = SYSTEM_PREAMBLE + _workflow_text()
@@ -209,7 +233,10 @@ async def _research(company: str, website: str, max_uses: int = 5, linkedin_cont
     messages = [original_message]
     research_tools = [
         {"type": "web_search_20260209", "name": "web_search", "max_uses": max_uses},
-        {"type": "web_fetch_20260209", "name": "web_fetch", "max_uses": max_uses},
+        {
+            "type": "web_fetch_20260209", "name": "web_fetch", "max_uses": max_uses,
+            "max_content_tokens": MAX_CONTENT_TOKENS_PER_FETCH,
+        },
     ]
 
     response = await client.messages.create(
