@@ -275,9 +275,15 @@ Never end with a question that sounds uncertain or apologetic.
 
 Be direct. Be specific. Assume they are worth contacting.
 
-After the CTA sentence, always add the Calendly booking link on its own line:
+After the CTA sentence, add a booking link on its own line.
+
+If an approved link was supplied in the source data above, use that exact URL and do not add any other link.
+
+If no approved link was supplied, use this default Calendly link:
 
 https://calendly.com/hello-dk8/30min
+
+Only ever include ONE link. Never include both the approved link and the default Calendly link.
 
 This line appears after the CTA. No label. No "click here". Just the URL on its own line.
 

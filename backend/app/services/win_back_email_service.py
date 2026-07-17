@@ -16,6 +16,10 @@ from app.core.config import get_settings
 PROMPT_PATH = pathlib.Path(__file__).resolve().parents[3] / "workflows" / "win_back_email_prompt.md"
 MAX_TOKENS = 400
 
+# Hardcoded fallback CTA link baked into win_back_email_prompt.md — used only
+# when the operator supplies no campaign link. Must stay in sync with that file.
+FALLBACK_CALENDLY_URL = "https://calendly.com/hello-dk8/30min"
+
 
 @lru_cache(maxsize=1)
 def _client() -> anthropic.AsyncAnthropic:
@@ -105,20 +109,45 @@ def _parse_subject_email(raw: str) -> dict:
     return {"subject": subject or raw[:80], "body": body or raw}
 
 
+def _strip_fallback_calendly_link(body: str) -> str:
+    """Removes the win-back prompt's hardcoded Calendly fallback link (whole
+    line) if the model added it despite an approved campaign link being
+    supplied — the entered link must always win and the email must never
+    show two CTA links."""
+    lines = [line for line in body.split("\n") if FALLBACK_CALENDLY_URL not in line]
+    return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
+
+
 def apply_campaign_link(email: dict, campaign_links: str, link_text: str) -> dict:
-    """Swaps a bare URL the model already placed in the body for a real
-    <a href> hyperlink, using the operator's chosen display text. Deterministic
-    on purpose — the model is trusted to copy the URL exactly (per the prompt)
-    but not to hand-author HTML markup itself."""
-    link_text = link_text.strip()
+    """Guarantees the operator's approved campaign link — not the prompt's
+    hardcoded Calendly fallback — is the one and only CTA link in the body.
+    Deterministic on purpose: the model is trusted to copy the URL exactly
+    and prefer it over the fallback (per the prompt), but this does not rely
+    on that compliance. If the model used the approved URL verbatim, it is
+    hyperlinked in place; if the model ignored it, it is appended; either
+    way any leftover fallback Calendly line is removed so there is never a
+    duplicate CTA."""
     campaign_links = campaign_links.strip()
-    if not link_text or not campaign_links:
+    urls = [u.rstrip(".,;)") for u in re.findall(r"https?://\S+", campaign_links)]
+    if not urls:
         return email
-    urls = re.findall(r"https?://\S+", campaign_links)
-    for url in urls:
-        url = url.rstrip(".,;)")
+
+    if FALLBACK_CALENDLY_URL not in urls:
+        email["body"] = _strip_fallback_calendly_link(email["body"])
+
+    link_text = link_text.strip()
+    primary_url = urls[0]
+    display = f'<a href="{primary_url}">{html.escape(link_text)}</a>' if link_text else primary_url
+    if primary_url in email["body"]:
+        email["body"] = email["body"].replace(primary_url, display)
+    else:
+        email["body"] = f"{email['body'].rstrip()}\n\n{display}"
+
+    for url in urls[1:]:
         if url in email["body"]:
-            email["body"] = email["body"].replace(url, f'<a href="{url}">{html.escape(link_text)}</a>')
+            url_display = f'<a href="{url}">{html.escape(link_text)}</a>' if link_text else url
+            email["body"] = email["body"].replace(url, url_display)
+
     return email
 
 

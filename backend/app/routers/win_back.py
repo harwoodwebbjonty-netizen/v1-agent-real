@@ -527,7 +527,11 @@ async def export_mailchimp(
         raise HTTPException(status_code=403, detail="Access denied")
 
     account = db.get_email_oauth_account(current_user.id, body.provider)
-    from_name = current_user.name
+    # Sender display name is the broker team, not whichever operator happens
+    # to click export — recipients don't know the logged-in user's name, and
+    # a consistent team identity reads as legitimate rather than as a random
+    # personal name attached to a cold win-back email.
+    from_name = "WCF Broker Team"
     from_email = account["email_address"] if account else ""
 
     emails = db.get_win_back_emails(campaign_id)

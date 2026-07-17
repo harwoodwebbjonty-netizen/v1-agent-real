@@ -35,11 +35,13 @@ async def run_linkedin_post_scrape(
     target_urls: list[str],
     max_posts: int = 10,
     posted_limit_date: Optional[str] = None,
-) -> list[dict]:
+) -> Optional[list[dict]]:
     """Runs the actor synchronously and returns its dataset items directly —
-    no separate poll/fetch step needed. Returns [] on any failure; the caller
-    decides what "no data" means. Raises ApifyRateLimitError on a 429 so the
-    caller can back off rather than silently treat a rate limit as "no posts"."""
+    no separate poll/fetch step needed. Returns None on failure (bad token,
+    insufficient Apify balance, network error, etc.) — distinct from a
+    genuinely successful run that found zero posts ([]) — so the caller can
+    avoid caching a failure as if it were a real "no posts" result. Raises
+    ApifyRateLimitError on a 429 so the caller can back off instead."""
     body: dict = {"targetUrls": target_urls, "maxPosts": max_posts}
     if posted_limit_date:
         body["postedLimitDate"] = posted_limit_date
@@ -56,10 +58,10 @@ async def run_linkedin_post_scrape(
                 raise ApifyRateLimitError("Apify actor run rate limited")
             if r.status_code not in (200, 201):
                 logger.warning("Apify: actor run returned %d: %s", r.status_code, r.text[:200])
-                return []
+                return None
             return r.json()
     except ApifyRateLimitError:
         raise
     except Exception as exc:
         logger.warning("Apify: LinkedIn post scrape failed for %s: %s", target_urls, exc)
-        return []
+        return None

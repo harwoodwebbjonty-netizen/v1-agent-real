@@ -8,6 +8,7 @@ formatted string, the same shape as its existing `website` param)."""
 import json
 import logging
 import sqlite3
+from typing import Optional
 
 from app import db
 from app.core.config import get_settings
@@ -25,12 +26,16 @@ DEFAULT_MAX_POSTS = 10
 APIFY_COST_PER_1K_POSTS_GBP = 1.60
 
 
-async def _fetch_and_charge(linkedin_url: str, user_id: str) -> list[dict]:
+async def _fetch_and_charge(linkedin_url: str, user_id: str) -> Optional[list[dict]]:
     """Credit-checked Apify fetch, no DB read/write — shared by the cached
-    per-lead path and the no-cache preview path below."""
+    per-lead path and the no-cache preview path below. Returns None whenever
+    no real attempt completed (missing config, credit limit reached, rate
+    limited, or the Apify call itself failed — e.g. balance exhausted) so
+    the caller never confuses "didn't fetch" with a genuine "fetched, found
+    zero posts" result."""
     settings = get_settings()
     if not settings.apify_api_token or not settings.apify_linkedin_actor_id:
-        return []
+        return None
 
     allowed, spent, limit = db.check_credit_limit(user_id, "linkedin_scrape")
     if not allowed:
@@ -38,7 +43,7 @@ async def _fetch_and_charge(linkedin_url: str, user_id: str) -> list[dict]:
             "LinkedIn scrape: credit limit £%.2f reached (spent £%.2f) — skipping %s",
             limit, spent, linkedin_url,
         )
-        return []
+        return None
 
     try:
         posts = await run_linkedin_post_scrape(
@@ -47,7 +52,10 @@ async def _fetch_and_charge(linkedin_url: str, user_id: str) -> list[dict]:
         )
     except ApifyRateLimitError:
         logger.warning("LinkedIn scrape: rate limited for %s", linkedin_url)
-        return []
+        return None
+
+    if posts is None:
+        return None
 
     if posts:
         cost = (len(posts) / 1000) * APIFY_COST_PER_1K_POSTS_GBP
@@ -102,11 +110,16 @@ async def get_or_fetch_linkedin_posts(lead: sqlite3.Row, user_id: str) -> list[d
             pass  # corrupt cache row — fall through and refetch
 
     posts = await _fetch_and_charge(linkedin_url, user_id)
+    if posts is None:
+        # No real attempt completed (balance exhausted, rate limited, credit
+        # limit reached, etc.) — do NOT cache, so this lead is retried next
+        # time instead of being locked out as "no posts" for CACHE_DAYS.
+        return []
     db.add_lead_linkedin_posts(new_id(), lead["id"], linkedin_url, json.dumps(posts), now_iso())
     return posts
 
 
-async def fetch_linkedin_posts_preview(linkedin_url: str, user_id: str) -> list[dict]:
+async def fetch_linkedin_posts_preview(linkedin_url: str, user_id: str) -> Optional[list[dict]]:
     """For one-off previews with no persisted lead (e.g. the win-back
     "Preview one email" flow) — same credit-tracked fetch, but never reads
     or writes the per-lead cache table, so it can never affect what a real
@@ -117,7 +130,7 @@ async def fetch_linkedin_posts_preview(linkedin_url: str, user_id: str) -> list[
     return await _fetch_and_charge(linkedin_url, user_id)
 
 
-def format_posts_for_prompt(posts: list[dict]) -> str:
+def format_posts_for_prompt(posts: Optional[list[dict]]) -> str:
     """Short bullet lines for the sales-intelligence prompt. Empty string for
     no posts — generate_sales_intelligence() treats a blank linkedin_context
     as "nothing extra to add" and researches exactly as it does today."""

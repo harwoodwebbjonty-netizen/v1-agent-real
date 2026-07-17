@@ -248,9 +248,19 @@ async def export_outreach_campaign(
         campaign_id = r.json()["id"]
         web_id = r.json().get("web_id", "")
 
+        # *|UNSUB|* and *|LIST:ADDRESS|* are required by Mailchimp/CAN-SPAM/PECR
+        # for any regular campaign with custom HTML — Mailchimp does not inject
+        # them automatically outside its own template builder. Omitting them
+        # previously meant recipients had no opt-out link, which drives up
+        # spam-complaint rates and damages sender reputation over time.
         html_body = (
             "<html><body style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
             "*|EMAILBODY|*"
+            "<div style='margin-top:24px;padding-top:16px;border-top:1px solid #e0e0e0;"
+            "font-size:11px;color:#888888;text-align:center'>"
+            "*|LIST:ADDRESS|*<br>"
+            "<a href='*|UNSUB|*' style='color:#888888'>Unsubscribe</a>"
+            "</div>"
             "</body></html>"
         )
         await client.put(
