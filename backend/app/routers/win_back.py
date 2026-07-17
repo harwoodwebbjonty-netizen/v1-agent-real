@@ -19,6 +19,7 @@ from app.services.mailchimp_service import (
 )
 from app.services.sales_intelligence_service import IntelligenceExtractionError, generate_sales_intelligence
 from app.services.template_variables import build_lead_context
+from app.services.website_content_service import fetch_website_text
 from app.services.win_back_email_service import apply_campaign_link, append_signature, generate_win_back_email
 
 logger = logging.getLogger("app.win_back")
@@ -135,9 +136,11 @@ async def _generate_campaign(
                                 )
                             else:
                                 linkedin_posts = await get_or_fetch_linkedin_posts(lead, user_id)
+                                website_content = await fetch_website_text(lead["website"] or "")
                                 result = await generate_sales_intelligence(
                                     lead["company"], lead["website"] or "", max_uses=max_uses,
                                     linkedin_context=format_posts_for_prompt(linkedin_posts),
+                                    website_content=website_content,
                                 )
                                 db.add_lead_intelligence_version(
                                     new_id(), lead_id,
@@ -394,6 +397,7 @@ async def preview_campaign_email(
             detail=f"Monthly credit limit reached for Sales Intelligence (spent £{intel_spent:.2f} of £{intel_limit:.2f}). Update your limit in Settings → Credit Limits.",
         )
     linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id, row.website)
+    website_content = await fetch_website_text(row.website)
     # Research/generation failures (refusal, extraction-schema mismatch after
     # retrying, a transient Anthropic API error) are expected, retryable
     # outcomes elsewhere in the app (see leads.py's IntelligenceExtractionError
@@ -403,6 +407,7 @@ async def preview_campaign_email(
         intel = await generate_sales_intelligence(
             row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
             linkedin_context=format_posts_for_prompt(linkedin_posts),
+            website_content=website_content,
         )
         db.record_credit_spend(new_id(), current_user.id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
         context = {

@@ -47,12 +47,15 @@ MAX_EXTRACTION_ATTEMPTS = 2  # initial attempt + 1 retry against the same resear
 SYSTEM_PREAMBLE = (
     "You are performing the 'AI Sales Intelligence Research' workflow below "
     "exactly as specified, including its deterministic scoring rubric. You "
-    "have no web search or browsing tool available for this — work from "
-    "your own knowledge of the company and the information given in the "
-    "user message only. Do not claim to have searched, fetched, or browsed "
-    "anything; write findings as reasoned inferences from what you know, "
-    "and say plainly where you're uncertain rather than guessing at "
-    "specifics like recent news or headcount.\n\n"
+    "have no live web search or browsing tool — you cannot fetch anything "
+    "yourself. The user message may already include real, current text "
+    "pulled from the company's own website and/or their recent LinkedIn "
+    "posts; when present, treat that as ground truth and prioritise it over "
+    "general industry-level inference. When it is absent for a given "
+    "company, work from your own knowledge and say plainly where you're "
+    "uncertain rather than guessing at specifics like recent news or "
+    "headcount. Never claim to have searched, fetched, or browsed anything "
+    "yourself — only reference what's explicitly provided.\n\n"
 )
 
 EXTRACTION_SCHEMA = {
@@ -165,20 +168,30 @@ def _workflow_text() -> str:
     return WORKFLOW_PATH.read_text()
 
 
-async def _research(company: str, website: str, max_uses: int = 5, linkedin_context: str = "") -> str:
+async def _research(
+    company: str, website: str, max_uses: int = 5, linkedin_context: str = "", website_content: str = "",
+) -> str:
     """Phase 1: a single, tool-free Sonnet call. No web_search, no
     web_fetch — see the module-level comment for why. `max_uses` is accepted
     for backward compatibility with every caller (win_back.py's depth
     selector, leads.py, ai_prospecting_service.py) but has no effect; it's
     not removed from the signature so none of them need a matching change.
-    Cost is now fixed and known ahead of time: system prompt (workflow file,
-    fixed size) + user message + RESEARCH_MAX_TOKENS output cap, nothing
-    else can ever enter this call. Raises IntelligenceExtractionError only
-    on a true dead end (refusal / no text produced at all)."""
+    `linkedin_context`/`website_content` are real data, pre-fetched and
+    pre-truncated by the caller (website_content_service.fetch_website_text,
+    linkedin_activity_service) — this function never fetches anything
+    itself. Cost is fixed and known ahead of time: system prompt + user
+    message (bounded by those callers' own hard truncation, not a remote
+    parameter) + RESEARCH_MAX_TOKENS output cap, nothing else can ever enter
+    this call. Raises IntelligenceExtractionError only on a true dead end
+    (refusal / no text produced at all)."""
     settings = get_settings()
     client = _client()
     system_prompt = SYSTEM_PREAMBLE + _workflow_text()
     website_line = f" Known website: {website}." if website else ""
+    website_block = (
+        f"\n\nText from the company's own website (already fetched):\n{website_content}"
+        if website_content else ""
+    )
     linkedin_block = (
         f"\n\nKnown recent LinkedIn posts (already fetched):\n{linkedin_context}"
         if linkedin_context else ""
@@ -186,8 +199,9 @@ async def _research(company: str, website: str, max_uses: int = 5, linkedin_cont
     original_message = {
         "role": "user",
         "content": (
-            f"Research this company for sales call preparation, using your own knowledge only "
-            f"(no web access is available for this step): {company}.{website_line}{linkedin_block}"
+            f"Research this company for sales call preparation, using your own knowledge plus "
+            f"the real data already fetched below (no live web access is available for this "
+            f"step beyond what's given here): {company}.{website_line}{website_block}{linkedin_block}"
         ),
     }
 
@@ -241,9 +255,13 @@ async def _extract(research_text: str) -> SalesIntelligenceResult:
     return SalesIntelligenceResult(**data)
 
 
-async def generate_sales_intelligence(company: str, website: str, max_uses: int = 5, linkedin_context: str = "") -> SalesIntelligenceResult:
+async def generate_sales_intelligence(
+    company: str, website: str, max_uses: int = 5, linkedin_context: str = "", website_content: str = "",
+) -> SalesIntelligenceResult:
     try:
-        research_text = await _research(company, website, max_uses=max_uses, linkedin_context=linkedin_context)
+        research_text = await _research(
+            company, website, max_uses=max_uses, linkedin_context=linkedin_context, website_content=website_content,
+        )
     except anthropic.APIError as exc:
         raise IntelligenceExtractionError(f"Anthropic API error during research: {exc}") from exc
 
