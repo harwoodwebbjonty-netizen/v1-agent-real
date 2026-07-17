@@ -17,7 +17,7 @@ from app.services.mailchimp_service import (
     MailchimpNotConfiguredError,
     export_win_back_campaign,
 )
-from app.services.sales_intelligence_service import generate_sales_intelligence
+from app.services.sales_intelligence_service import IntelligenceExtractionError, generate_sales_intelligence
 from app.services.template_variables import build_lead_context
 from app.services.win_back_email_service import apply_campaign_link, append_signature, generate_win_back_email
 
@@ -354,27 +354,38 @@ async def preview_campaign_email(
     if not allowed:
         raise HTTPException(status_code=402, detail=f"Win-back credit limit reached (spent £{spent:.2f} of £{limit:.2f}).")
     linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id)
-    intel = await generate_sales_intelligence(
-        row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
-        linkedin_context=format_posts_for_prompt(linkedin_posts),
-    )
-    context = {
-        "company": row.company,
-        "first_name": contact_parts[0] if contact_parts else "",
-        "job_title": "",
-        "website": row.website,
-        "linkedin": row.linkedin,
-        "industry": row.industry,
-        "email": row.email,
-        "lead_notes": row.notes,
-        "ai_summary": intel.sales_summary,
-        "recent_activity": "",
-        "email_instruction": body.email_instruction.strip(),
-        "offer_context": body.offer_context.strip(),
-        "additional_context": body.additional_context.strip(),
-        "campaign_links": body.campaign_links.strip(),
-    }
-    result = append_signature(apply_campaign_link(await generate_win_back_email(context), body.campaign_links, body.campaign_link_text), body.signature)
+    # Research/generation failures (refusal, extraction-schema mismatch after
+    # retrying, a transient Anthropic API error) are expected, retryable
+    # outcomes elsewhere in the app (see leads.py's IntelligenceExtractionError
+    # handling) — without this try/except they crashed straight into an
+    # unhandled 500 here, AFTER the (billed) research call already ran.
+    try:
+        intel = await generate_sales_intelligence(
+            row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
+            linkedin_context=format_posts_for_prompt(linkedin_posts),
+        )
+        context = {
+            "company": row.company,
+            "first_name": contact_parts[0] if contact_parts else "",
+            "job_title": "",
+            "website": row.website,
+            "linkedin": row.linkedin,
+            "industry": row.industry,
+            "email": row.email,
+            "lead_notes": row.notes,
+            "ai_summary": intel.sales_summary,
+            "recent_activity": "",
+            "email_instruction": body.email_instruction.strip(),
+            "offer_context": body.offer_context.strip(),
+            "additional_context": body.additional_context.strip(),
+            "campaign_links": body.campaign_links.strip(),
+        }
+        result = append_signature(apply_campaign_link(await generate_win_back_email(context), body.campaign_links, body.campaign_link_text), body.signature)
+    except IntelligenceExtractionError as exc:
+        raise HTTPException(status_code=502, detail=f"AI research failed: {exc} Please try again.")
+    except Exception as exc:
+        logger.exception("Win-back: preview generation failed for %s", row.company)
+        raise HTTPException(status_code=502, detail=f"Email generation failed: {exc} Please try again.")
     db.record_credit_spend(new_id(), current_user.id, "win_back", db.CREDIT_COST["win_back"], now_iso())
     return result
 
