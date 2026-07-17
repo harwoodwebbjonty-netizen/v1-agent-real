@@ -54,10 +54,16 @@ EXTRACTION_SCHEMA = {
         "buying_signals": {"type": "array", "items": {"type": "string"}},
         "conversation_starters": {"type": "array", "items": {"type": "string"}},
         "discovery_questions": {
+            # No minItems/maxItems here: Anthropic's structured-output schema
+            # only supports minItems of 0 or 1, so a literal 10/15 constraint
+            # gets rejected outright (400 invalid_request_error) rather than
+            # just being ignored. The 10-15 count is still enforced for real
+            # by SalesIntelligenceResult's model_validator after parsing,
+            # which already triggers the existing extraction retry loop —
+            # see the explicit instruction in the extraction system prompt
+            # below for how the model is told the count without the schema.
             "type": "array",
             "items": {"type": "string"},
-            "minItems": 10,
-            "maxItems": 15,
         },
         "objection_handling": {
             "type": "array",
@@ -206,7 +212,8 @@ async def _extract(research_text: str) -> SalesIntelligenceResult:
             "Extract the structured sales-intelligence result from the research notes "
             "below, following the deterministic scoring rubric exactly: lead_score must "
             "equal the sum of score_breakdown's five categories, and lead_temperature "
-            "must match the score band (80-100 Hot, 50-79 Warm, 0-49 Cold)."
+            "must match the score band (80-100 Hot, 50-79 Warm, 0-49 Cold). "
+            "discovery_questions must contain exactly 10 to 15 items."
         ),
         messages=[{"role": "user", "content": research_text}],
         output_config={"format": {"type": "json_schema", "schema": EXTRACTION_SCHEMA}},
