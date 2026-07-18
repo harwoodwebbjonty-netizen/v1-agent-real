@@ -559,6 +559,13 @@ def _migration_022_lead_linkedin_posts(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_023_win_back_deal_owner(conn: sqlite3.Connection) -> None:
+    """Persist the CSV broker so resumed campaigns keep the same sender."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "deal_owner" not in cols:
+        conn.execute("ALTER TABLE leads ADD COLUMN deal_owner TEXT NOT NULL DEFAULT ''")
+
+
 def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
     """Add password_hash to users. NULL means a legacy account that predates
     passwords — the next successful identify for that name sets its password
@@ -593,8 +600,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (20, _migration_020_win_back_links_and_signature),
     (21, _migration_021_win_back_link_text),
     (22, _migration_022_lead_linkedin_posts),
+    (23, _migration_023_win_back_deal_owner),
 ]
-CURRENT_SCHEMA_VERSION = 22
+CURRENT_SCHEMA_VERSION = 23
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1941,7 +1949,16 @@ CREDIT_FEATURES = ["phone_lookup", "sales_intel", "win_back", "ai_prospecting", 
 CREDIT_COST = {
     "phone_lookup": 0.03,
     "sales_intel": 0.15,
-    "win_back": 0.03,
+    # Flat ~$0.20 per generated win-back email, expressed in GBP: £0.16 at
+    # ~$1.25/£. Deliberately covers the WHOLE per-email pipeline — research
+    # (sales intelligence), the LinkedIn scrape, and the email write — which
+    # win_back.py folds into this single charge instead of recording
+    # sales_intel / linkedin_scrape separately, so the cost per generated
+    # email is an exact, predictable figure and nothing else. Real underlying
+    # API/Apify cost sits well under this (~£0.07-0.10), so it's a safe fixed
+    # ceiling with margin, not a metered figure. If the USD/GBP rate drifts,
+    # adjust this one number.
+    "win_back": 0.16,
     "ai_prospecting": 0.15,
     "email_writer": 0.03,
     "enrichment": 0.05,
@@ -1956,7 +1973,13 @@ CREDIT_COST = {
 DEFAULT_CREDIT_LIMIT_GBP = {
     "phone_lookup": 20.0,
     "sales_intel": 20.0,
-    "win_back": 20.0,
+    # Raised to cover a large single-campaign run: at £0.16/email this is
+    # ~1560 emails/month (a 1149-lead campaign = ~£184). Win-back is
+    # admin-only, so this higher ceiling only ever applies to admins. Note
+    # this DEFAULT is overridden by any explicit per-user limit set in
+    # Settings → Credit Limits — if an admin has an old £20 override there,
+    # they must raise it too.
+    "win_back": 250.0,
     "ai_prospecting": 50.0,
     "email_writer": 20.0,
     "enrichment": 20.0,

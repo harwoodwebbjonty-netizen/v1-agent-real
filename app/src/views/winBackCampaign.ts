@@ -6,7 +6,6 @@ import {
   type WinBackEmail,
   createWinBackCampaignFromCsv,
   exportWinBackMailchimp,
-  getBrandVoice,
   getCreditUsage,
   getWinBackCampaign,
   getWinBackCampaigns,
@@ -437,14 +436,6 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
 
   container.querySelector<HTMLButtonElement>("#wb-back-review-btn")!.addEventListener("click", () => showLeadPicker(container));
 
-  // Signature is no longer editable per campaign — it always comes from the
-  // one assigned in Settings -> Brand Voice. getBrief() is async and awaits
-  // this promise so a fast click right after the view loads can't race the
-  // fetch and silently generate emails with no signature.
-  const brandVoiceSignaturePromise = getBrandVoice()
-    .then((brandVoice) => brandVoice.signature.trim())
-    .catch(() => ""); // No saved brand voice yet — generate without one.
-
   const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
   const generateBtn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
   const getBrief = async () => ({
@@ -454,7 +445,8 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     additionalContext: container.querySelector<HTMLTextAreaElement>("#wb-additional-context-input")!.value.trim(),
     campaignLinks: container.querySelector<HTMLTextAreaElement>("#wb-campaign-links-input")!.value.trim(),
     campaignLinkText: container.querySelector<HTMLInputElement>("#wb-campaign-link-text-input")!.value.trim(),
-    signature: await brandVoiceSignaturePromise,
+    // The backend signs each Win-back email using that row's Deal Owner.
+    signature: "",
   });
 
   // Caches a successful preview's exact output alongside a signature of the

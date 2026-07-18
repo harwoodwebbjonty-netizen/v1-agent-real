@@ -2166,6 +2166,8 @@ pub struct WinBackCsvRow {
     #[serde(default)]
     pub industry: String,
     #[serde(default)]
+    pub deal_owner: String,
+    #[serde(default)]
     pub preview_subject: String,
     #[serde(default)]
     pub preview_body: String,

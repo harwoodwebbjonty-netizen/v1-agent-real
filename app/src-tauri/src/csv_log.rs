@@ -385,6 +385,8 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
             "linkedin_profile", "li_url",
         ]);
         let industry_col = find_col(&["industry", "sector", "sic", "vertical"]);
+        // deal owner — the broker who originally arranged the deal (CRM export)
+        let deal_owner_col = find_col(&["deal owner", "deal_owner", "deal owner name", "dealowner"]);
 
         // last-name column — used alongside first_name if contact_name not found
         let last_name_col = find_col(&["last name", "lastname", "last_name", "surname"]);
@@ -415,6 +417,7 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
                 "email": get(&record, email_col),
                 "linkedin": get(&record, linkedin_col),
                 "industry": get(&record, industry_col),
+                "deal_owner": get(&record, deal_owner_col),
             }));
         }
     }
@@ -429,4 +432,3 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
 
     Ok(rows)
 }
-

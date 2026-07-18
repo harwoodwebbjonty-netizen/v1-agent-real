@@ -29,7 +29,7 @@ from app.services.mailchimp_service import (
 from app.services.sales_intelligence_service import IntelligenceExtractionError, generate_sales_intelligence
 from app.services.template_variables import build_lead_context
 from app.services.website_content_service import fetch_website_text
-from app.services.win_back_email_service import apply_campaign_link, append_signature, generate_win_back_email
+from app.services.win_back_email_service import apply_campaign_link, append_signature, build_signature, ensure_sender_subject, generate_win_back_email
 
 logger = logging.getLogger("app.win_back")
 
@@ -43,6 +43,12 @@ router = APIRouter(prefix="/win-back", tags=["win-back"], dependencies=[Depends(
 
 DEPTH_TO_MAX_USES: dict[str, int] = {"quick": 3, "standard": 5, "deep": 10}
 CAMPAIGN_CONCURRENCY = 8
+
+# Win-back reads fewer LinkedIn posts than the calling tools' default (10):
+# the email only needs a handful of recent-activity signals, and Apify bills
+# per post, so a tighter cap is a direct per-lead cost saving. Threaded into
+# the shared fetchers as an override, leaving leads.py / prospecting at 10.
+WIN_BACK_MAX_LINKEDIN_POSTS = 5
 
 
 class CreateCampaignRequest(BaseModel):
@@ -66,6 +72,7 @@ class CsvLeadRow(BaseModel):
     linkedin: str = ""
     notes: str = ""
     industry: str = ""
+    deal_owner: str = ""  # the broker who originally arranged this deal (CSV "Deal Owner")
     # If both are set, this row was already previewed under the exact same
     # generation settings — reuse it as-is in create_campaign_from_csv
     # instead of paying for research + email generation again for the same
@@ -111,6 +118,7 @@ class MailchimpExportRequest(BaseModel):
 async def _generate_campaign(
     campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0,
     email_instruction: str = "", offer_context: str = "", additional_context: str = "", campaign_links: str = "", campaign_link_text: str = "", signature: str = "",
+    owner_by_lead: Optional[dict] = None,
 ) -> None:
     """already_done offsets the progress counter when resuming a campaign that
     stopped partway (credit ceiling, crash) — only the missing leads are in
@@ -134,46 +142,60 @@ async def _generate_campaign(
                         logger.warning("Win-back: lead %s not found, skipping", lead_id)
                         return
 
+                    # One credit gate for the whole per-email pipeline. The flat
+                    # win_back charge (£0.20) covers research + LinkedIn + the
+                    # email write, so we check it once here and, past this point,
+                    # never record sales_intel or linkedin_scrape separately.
+                    allowed, spent, limit = db.check_credit_limit(user_id, "win_back")
+                    if not allowed:
+                        logger.warning(
+                            "Win-back: credit limit £%.2f reached (spent £%.2f) — skipping %s",
+                            limit, spent, lead_id,
+                        )
+                        return
+
+                    # Companies House data is fetched for EVERY lead (free,
+                    # government-verified, works with no website/LinkedIn) so
+                    # the email can always be personalised — falling back to CH
+                    # facts and industry when there is no other signal. Prefer
+                    # data already stored on the lead to avoid a redundant call.
+                    ch_context = _format_ch_data(lead) or await _fetch_ch_data_for_company(lead["company"])
+
                     intel = db.get_latest_lead_intelligence(lead_id)
                     if not intel or days_since(intel["created_at"]) > 30:
                         try:
-                            allowed, spent, limit = db.check_credit_limit(user_id, "sales_intel")
-                            if not allowed:
-                                logger.warning(
-                                    "Win-back: sales_intel credit limit £%.2f reached (spent £%.2f) — skipping intelligence for %s",
-                                    limit, spent, lead_id,
-                                )
-                            else:
-                                linkedin_posts = await get_or_fetch_linkedin_posts(lead, user_id)
-                                website_content = await fetch_website_text(lead["website"] or "")
-                                ch_context = await _fetch_ch_data_for_company(lead["company"])
-                                result = await generate_sales_intelligence(
-                                    lead["company"], lead["website"] or "", max_uses=max_uses,
-                                    linkedin_context=format_posts_for_prompt(linkedin_posts),
-                                    website_content=website_content, ch_context=ch_context,
-                                )
-                                db.add_lead_intelligence_version(
-                                    new_id(), lead_id,
-                                    {
-                                        "executive_summary": result.executive_summary,
-                                        "sales_summary": result.sales_summary,
-                                        "pain_points": json.dumps(result.pain_points.model_dump()),
-                                        "buying_signals": json.dumps(result.buying_signals),
-                                        "conversation_starters": json.dumps(result.conversation_starters),
-                                        "discovery_questions": json.dumps(result.discovery_questions),
-                                        "objection_handling": json.dumps([o.model_dump() for o in result.objection_handling]),
-                                        "pitch_angle": result.pitch_angle,
-                                        "call_brief": result.call_brief,
-                                        "score_breakdown": json.dumps(result.score_breakdown.model_dump()),
-                                        "lead_score": result.lead_score,
-                                        "lead_temperature": result.lead_temperature,
-                                        "confidence_note": result.confidence_note,
-                                    },
-                                    now_iso(),
-                                )
-                                db.record_credit_spend(new_id(), user_id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
-                                intel = db.get_latest_lead_intelligence(lead_id)
+                            linkedin_posts = await get_or_fetch_linkedin_posts(
+                                lead, user_id, max_posts=WIN_BACK_MAX_LINKEDIN_POSTS, charge=False,
+                            )
+                            website_content = await fetch_website_text(lead["website"] or "")
+                            result = await generate_sales_intelligence(
+                                lead["company"], lead["website"] or "", max_uses=max_uses,
+                                linkedin_context=format_posts_for_prompt(linkedin_posts),
+                                website_content=website_content, ch_context=ch_context,
+                            )
+                            db.add_lead_intelligence_version(
+                                new_id(), lead_id,
+                                {
+                                    "executive_summary": result.executive_summary,
+                                    "sales_summary": result.sales_summary,
+                                    "pain_points": json.dumps(result.pain_points.model_dump()),
+                                    "buying_signals": json.dumps(result.buying_signals),
+                                    "conversation_starters": json.dumps(result.conversation_starters),
+                                    "discovery_questions": json.dumps(result.discovery_questions),
+                                    "objection_handling": json.dumps([o.model_dump() for o in result.objection_handling]),
+                                    "pitch_angle": result.pitch_angle,
+                                    "call_brief": result.call_brief,
+                                    "score_breakdown": json.dumps(result.score_breakdown.model_dump()),
+                                    "lead_score": result.lead_score,
+                                    "lead_temperature": result.lead_temperature,
+                                    "confidence_note": result.confidence_note,
+                                },
+                                now_iso(),
+                            )
+                            intel = db.get_latest_lead_intelligence(lead_id)
                         except Exception:
+                            # Research failing must NOT stop the email — it is
+                            # still written, personalised from CH data + industry.
                             logger.exception("Win-back: intelligence generation failed for %s", lead_id)
 
                     phones = db.list_phones(lead_id)
@@ -183,23 +205,21 @@ async def _generate_campaign(
                     ctx["offer_context"] = offer_context
                     ctx["additional_context"] = additional_context
                     ctx["campaign_links"] = campaign_links
-                    if intel:
-                        ctx["ch_data"] = _format_ch_data(lead)
+                    ctx["ch_data"] = ch_context
+                    imported_owner = (owner_by_lead.get(lead_id) if owner_by_lead else "") or (lead["deal_owner"] if "deal_owner" in lead.keys() else "")
+                    lead_sender = imported_owner.strip() or sender_name
+                    ctx["sender_name"] = lead_sender
 
                     try:
-                        allowed, spent, limit = db.check_credit_limit(user_id, "win_back")
-                        if not allowed:
-                            logger.warning(
-                                "Win-back: credit limit £%.2f reached (spent £%.2f) — skipping %s",
-                                limit, spent, lead_id,
-                            )
-                        else:
-                            email_result = append_signature(apply_campaign_link(await generate_win_back_email(ctx), campaign_links, campaign_link_text), signature)
-                            db.upsert_win_back_email(
-                                campaign_id, lead_id, new_id(),
-                                email_result["subject"], email_result["body"], now_iso(),
-                            )
-                            db.record_credit_spend(new_id(), user_id, "win_back", db.CREDIT_COST["win_back"], now_iso())
+                        # The imported broker owns this relationship. Do not let
+                        # the global Brand Voice signature overwrite their name.
+                        email_result = ensure_sender_subject(await generate_win_back_email(ctx), lead_sender)
+                        email_result = append_signature(apply_campaign_link(email_result, campaign_links, campaign_link_text), build_signature(lead_sender))
+                        db.upsert_win_back_email(
+                            campaign_id, lead_id, new_id(),
+                            email_result["subject"], email_result["body"], now_iso(),
+                        )
+                        db.record_credit_spend(new_id(), user_id, "win_back", db.CREDIT_COST["win_back"], now_iso())
                     except Exception:
                         logger.exception("Win-back: email generation failed for %s", lead_id)
 
@@ -361,6 +381,7 @@ async def create_campaign_from_csv(
 
     lead_ids: list[str] = []
     to_generate_lead_ids: list[str] = []
+    owner_by_lead: dict = {}
     pre_generated_count = 0
     ts = now_iso()
     campaign_id = new_id()
@@ -376,11 +397,13 @@ async def create_campaign_from_csv(
             owner_user_id=current_user.id,
             created_at=ts,
         )
+        owner_by_lead[lead_id] = row.deal_owner.strip()
         extra = {k: v for k, v in {
             "contact_name": row.contact_name,
             "website": row.website,
             "linkedin": row.linkedin,
             "industry": row.industry,
+            "deal_owner": row.deal_owner,
         }.items() if v}
         if extra:
             db.update_lead_fields(lead_id, extra, ts)
@@ -420,7 +443,7 @@ async def create_campaign_from_csv(
             campaign_id, pre_generated_count, "ready" if not to_generate_lead_ids else "generating",
         )
     if to_generate_lead_ids:
-        asyncio.create_task(_generate_campaign(campaign_id, to_generate_lead_ids, current_user.id, body.depth, already_done=pre_generated_count, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), campaign_link_text=body.campaign_link_text.strip(), signature=body.signature.strip()))
+        asyncio.create_task(_generate_campaign(campaign_id, to_generate_lead_ids, current_user.id, body.depth, already_done=pre_generated_count, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), campaign_link_text=body.campaign_link_text.strip(), signature=body.signature.strip(), owner_by_lead=owner_by_lead))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
@@ -434,52 +457,64 @@ async def preview_campaign_email(
     generation as a campaign lead, without creating or sending a campaign."""
     row = body.row
     contact_parts = row.contact_name.strip().split(maxsplit=1)
+    # Single gate: the flat win_back charge covers the whole preview pipeline
+    # (research + LinkedIn + email), so there's no separate sales_intel check.
     allowed, spent, limit = db.check_credit_limit(current_user.id, "win_back")
     if not allowed:
-        raise HTTPException(status_code=402, detail=f"Win-back credit limit reached (spent £{spent:.2f} of £{limit:.2f}).")
-    intel_allowed, intel_spent, intel_limit = db.check_credit_limit(current_user.id, "sales_intel")
-    if not intel_allowed:
-        raise HTTPException(
-            status_code=402,
-            detail=f"Monthly credit limit reached for Sales Intelligence (spent £{intel_spent:.2f} of £{intel_limit:.2f}). Update your limit in Settings → Credit Limits.",
-        )
-    linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id, row.website)
+        raise HTTPException(status_code=402, detail=f"Win-back credit limit reached (spent £{spent:.2f} of £{limit:.2f}). Raise it in Settings → Credit Limits.")
+
+    linkedin_posts = await fetch_linkedin_posts_preview(row.linkedin, current_user.id, row.website, max_posts=WIN_BACK_MAX_LINKEDIN_POSTS, charge=False)
     website_content = await fetch_website_text(row.website)
     ch_context = await _fetch_ch_data_for_company(row.company)
-    # Research/generation failures (refusal, extraction-schema mismatch after
-    # retrying, a transient Anthropic API error) are expected, retryable
-    # outcomes elsewhere in the app (see leads.py's IntelligenceExtractionError
-    # handling) — without this try/except they crashed straight into an
-    # unhandled 500 here, AFTER the (billed) research call already ran.
+
+    sender_name = row.deal_owner.strip()
+    if not sender_name:
+        preview_user = db.get_user_by_id(current_user.id)
+        sender_name = (preview_user["name"] if preview_user else "") or ""
+
+    context = {
+        "company": row.company,
+        "sender_name": sender_name,
+        "first_name": contact_parts[0] if contact_parts else "",
+        "job_title": "",
+        "website": row.website,
+        "linkedin": row.linkedin,
+        "industry": row.industry,
+        "email": row.email,
+        "lead_notes": row.notes,
+        "ai_summary": "",
+        "ch_data": ch_context,
+        "recent_activity": "",
+        "email_instruction": body.email_instruction.strip(),
+        "offer_context": body.offer_context.strip(),
+        "additional_context": body.additional_context.strip(),
+        "campaign_links": body.campaign_links.strip(),
+    }
+
+    # Research enriches the email but is not required for it: if it fails
+    # (refusal, extraction mismatch, transient API error), we still write a
+    # personalised email from Companies House data + industry rather than
+    # dead-ending the preview with a 502.
     try:
         intel = await generate_sales_intelligence(
             row.company, row.website, max_uses=DEPTH_TO_MAX_USES.get(body.depth, 5),
             linkedin_context=format_posts_for_prompt(linkedin_posts),
             website_content=website_content, ch_context=ch_context,
         )
-        db.record_credit_spend(new_id(), current_user.id, "sales_intel", db.CREDIT_COST["sales_intel"], now_iso())
-        context = {
-            "company": row.company,
-            "first_name": contact_parts[0] if contact_parts else "",
-            "job_title": "",
-            "website": row.website,
-            "linkedin": row.linkedin,
-            "industry": row.industry,
-            "email": row.email,
-            "lead_notes": row.notes,
-            "ai_summary": intel.sales_summary,
-            "recent_activity": "",
-            "email_instruction": body.email_instruction.strip(),
-            "offer_context": body.offer_context.strip(),
-            "additional_context": body.additional_context.strip(),
-            "campaign_links": body.campaign_links.strip(),
-        }
-        result = append_signature(apply_campaign_link(await generate_win_back_email(context), body.campaign_links, body.campaign_link_text), body.signature)
-    except IntelligenceExtractionError as exc:
-        raise HTTPException(status_code=502, detail=f"AI research failed: {exc} Please try again.")
+        context["ai_summary"] = intel.sales_summary
+    except IntelligenceExtractionError:
+        logger.warning("Win-back: preview research failed for %s — writing from CH/industry instead", row.company)
+    except Exception:
+        logger.exception("Win-back: preview research errored for %s — writing from CH/industry instead", row.company)
+
+    try:
+        # Preview follows the exact same sender rules as final generation.
+        result = ensure_sender_subject(await generate_win_back_email(context), sender_name)
+        result = append_signature(apply_campaign_link(result, body.campaign_links, body.campaign_link_text), build_signature(sender_name))
     except Exception as exc:
-        logger.exception("Win-back: preview generation failed for %s", row.company)
+        logger.exception("Win-back: preview email generation failed for %s", row.company)
         raise HTTPException(status_code=502, detail=f"Email generation failed: {exc} Please try again.")
+
     db.record_credit_spend(new_id(), current_user.id, "win_back", db.CREDIT_COST["win_back"], now_iso())
     return result
 

@@ -1,5 +1,6 @@
 import html
 import json
+import logging
 import pathlib
 import re
 from functools import lru_cache
@@ -8,11 +9,14 @@ from typing import Optional
 import anthropic
 
 from app.core.config import get_settings
+from app.services.companies_house_service import _SIC_DESCRIPTIONS
 
 # Deliberately isolated from every other AI service — uses the Winchester CF
 # win-back prompt from the workflows directory, not the generic email writer.
 # The prompt embeds a 5-step decision framework; Claude runs it internally and
 # returns ONLY "Subject:\n...\n\nEmail:\n..." — no scores, no reasoning.
+
+logger = logging.getLogger("app.win_back_email")
 
 PROMPT_PATH = pathlib.Path(__file__).resolve().parents[3] / "workflows" / "win_back_email_prompt.md"
 MAX_TOKENS = 400
@@ -25,6 +29,108 @@ FALLBACK_CALENDLY_URL = "https://calendly.com/hello-dk8/30min"
 @lru_cache(maxsize=1)
 def _client() -> anthropic.AsyncAnthropic:
     return anthropic.AsyncAnthropic(api_key=get_settings().anthropic_api_key)
+
+
+# Length caps — mirror win_back_email_prompt.md's EMAIL LENGTH / SUBJECT LINE
+# sections. Enforced deterministically here (the prompt states them; this is the
+# guarantee), so output is always within limits regardless of model drift.
+MAX_WORDS = 100
+MAX_SENTENCES = 4
+# Subject caps are a little wider than a bare topic line so the personalised
+# "<dealmaker> from WCF — <topic>" opener fits (e.g. "Cameron from WCF, cash flow").
+SUBJECT_MAX_WORDS = 7
+SUBJECT_MAX_CHARS = 55
+
+# Phrases a genuine, warm WCF finance email would essentially never contain —
+# their presence means the model wrote a diagnostic / refusal / "what's missing"
+# note instead of an email. Such an output is rejected and routed to a retry,
+# then the deterministic fallback, so it never ships. Kept tight to avoid false
+# positives on real copy.
+_DIAGNOSTIC_MARKERS = (
+    "no information", "insufficient information", "not enough data", "not enough information",
+    "no data available", "limited data", "unable to personalise", "unable to personalize",
+    "cannot personalise", "cannot personalize", "can't personalise", "can't personalize",
+    "as an ai", "language model", "i don't have enough", "i do not have enough",
+    "don't have enough information", "zero posts", "no linkedin", "no website", "apify",
+    "scraping", "data source", "i'm sorry", "i am sorry", "what's missing", "whats missing",
+    "placeholder text", "lorem ipsum", "based on general assumptions", "without more information",
+    "couldn't find any", "could not find any",
+)
+
+_URL_LINE_RE = re.compile(r"^\s*https?://\S+\s*$")
+_BULLET_RE = re.compile(r"^([-*•]|\d+[.)])\s")
+
+
+def _count_words(text: str) -> int:
+    return len(re.findall(r"\S+", text))
+
+
+def _split_sentences(text: str) -> list:
+    return [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+
+
+def _split_body(body: str):
+    """Separate the bare-URL booking line(s) from the prose so length trimming
+    never eats the link. Runs before apply_campaign_link, so links are bare URLs."""
+    prose_lines, links = [], []
+    for line in body.splitlines():
+        if _URL_LINE_RE.match(line):
+            links.append(line.strip())
+        else:
+            prose_lines.append(line)
+    return "\n".join(prose_lines).strip(), links
+
+
+def _within_caps(email: dict) -> bool:
+    prose, _ = _split_body(email["body"])
+    if _count_words(prose) > MAX_WORDS or len(_split_sentences(prose)) > MAX_SENTENCES:
+        return False
+    subject = email["subject"].strip()
+    return len(subject.split()) <= SUBJECT_MAX_WORDS and len(subject) <= SUBJECT_MAX_CHARS
+
+
+def _enforce_limits(email: dict) -> dict:
+    """Deterministic backstop: guarantees the caps. Subject and body are handled
+    independently — an over-length subject never reflows an otherwise-fine body,
+    and a compliant body keeps its original paragraph formatting."""
+    subject = email["subject"].strip()
+    words = subject.split()
+    if len(words) > SUBJECT_MAX_WORDS:
+        subject = " ".join(words[:SUBJECT_MAX_WORDS])
+    if len(subject) > SUBJECT_MAX_CHARS:
+        subject = subject[:SUBJECT_MAX_CHARS].rstrip(" ,;:-—–")
+
+    prose, links = _split_body(email["body"])
+    if _count_words(prose) > MAX_WORDS or len(_split_sentences(prose)) > MAX_SENTENCES:
+        prose = " ".join(_split_sentences(prose)[:MAX_SENTENCES])
+        if _count_words(prose) > MAX_WORDS:
+            prose = " ".join(re.findall(r"\S+", prose)[:MAX_WORDS]).rstrip(",;:-—– ")
+            if prose and prose[-1] not in ".!?":
+                prose += "."
+        body = f"{prose}\n\n{links[0]}" if links else prose
+    else:
+        body = email["body"].rstrip()  # already within caps — keep formatting
+
+    return {"subject": subject.strip(), "body": body.strip()}
+
+
+def _is_real_email(subject: str, body: str) -> bool:
+    """True only if this looks like an actual email, not a diagnostic / refusal /
+    'what's missing' list that happens to sit behind Subject:/Email: markers."""
+    text = f"{subject}\n{body}".lower()
+    if any(marker in text for marker in _DIAGNOSTIC_MARKERS):
+        return False
+    prose, links = _split_body(body)
+    if _count_words(prose) < 20:
+        return False
+    if not links and "call" not in prose.lower():  # must have a CTA (link or "call")
+        return False
+    lines = [l.strip() for l in body.splitlines() if l.strip()]
+    if lines:
+        bullets = sum(1 for l in lines if _BULLET_RE.match(l))
+        if bullets / len(lines) > 0.4:  # mostly a list, not prose
+            return False
+    return True
 
 
 def _format_lead_sources(lead_context: dict) -> str:
@@ -64,6 +170,12 @@ def _format_lead_sources(lead_context: dict) -> str:
         ])
     if lead_context.get("company"):
         lines.append(f"Company: {lead_context['company']}")
+    if lead_context.get("sender_name"):
+        lines.append(
+            f"Sender (YOU — the Winchester Corporate Finance broker sending this, who originally "
+            f"arranged this company's deal): {lead_context['sender_name']}. Refer to Winchester "
+            f"Corporate Finance as 'WCF' in the subject line."
+        )
     contact_parts = [p for p in [lead_context.get("first_name"), lead_context.get("last_name")] if p]
     contact_str = " ".join(contact_parts)
     if lead_context.get("job_title"):
@@ -118,26 +230,60 @@ def _parse_subject_email(raw: str) -> Optional[dict]:
 
 
 def _fallback_email(lead_context: dict) -> dict:
-    """A safe, deterministic email used whenever the model declines to write
-    a personalised one — a simple relationship check-in with no invented
-    pain points or business claims, instead of showing the model's refusal
-    text as if it were the email. Ends with the same bare-URL CTA line the
-    prompt itself uses, so apply_campaign_link's normal find-and-replace
-    still works exactly as it would on a model-written email."""
+    """Last-resort deterministic email, used only if the model fails to produce a
+    real Subject:/Email: across BOTH attempts (should be effectively never now the
+    prompt is instructed to always write). It is NOT the old stiff 'just checking
+    in' template — it blends the sector-anchored copy with any real data the lead
+    has: the contact first name, the sector (from `industry` or the Companies
+    House SIC code), an 'established since <year>' line if CH gives an
+    incorporation date, and a light refinance nudge if CH shows a registered
+    charge. Warm register to match the model path; no invented company specifics
+    (sector-level only). Ends with the bare-URL CTA so apply_campaign_link's
+    find-and-replace works exactly as on a model-written email."""
     company = (lead_context.get("company") or "").strip()
     first_name = (lead_context.get("first_name") or "").strip()
+    industry = (lead_context.get("industry") or "").strip()
+    ch = lead_context.get("ch_data") or ""
+
+    sector = industry
+    if not sector:
+        sic = re.search(r"SIC codes?:\s*([0-9]{2,5})", ch)
+        if sic:
+            sector = _SIC_DESCRIPTIONS.get(sic.group(1)[:2], "")
+    inc = re.search(r"Incorporated:\s*(\d{4})", ch)
+    charges = re.search(r"Charges registered:\s*([1-9]\d*)", ch)
+
     greeting = f"Hi {first_name}," if first_name else "Hi,"
-    company_line = f" at {company}" if company else ""
-    subject = f"Checking in, {company}" if company else "Checking in"
+    target = company or "your business"
+    sector_clause = f" that work in {sector.lower()}" if sector else " like yours"
+    if charges:
+        middle = ("Since you've already got funding in place, it's worth a quick look at whether "
+                  "the terms still stack up or could be freed up.")
+    elif inc:
+        middle = (f"You've been going since {inc.group(1)}, so you'll know how much timing matters "
+                  "when cash flow gets tight.")
+    else:
+        middle = ("Whether it's working capital, asset finance or bridging, the right facility in "
+                  "place makes the timing a lot easier.")
+
+    sender_first = (lead_context.get("sender_name") or "").strip().split()[0] if lead_context.get("sender_name") else ""
+    if sender_first and company:
+        subject = f"{sender_first} from WCF, {company}"
+    elif sender_first:
+        subject = f"{sender_first} from WCF"
+    elif company:
+        subject = f"Funding options for {company}"
+    else:
+        subject = "Funding options"
     body = (
         f"{greeting}\n\n"
-        f"It's been a while since we last worked together at Winchester Corporate Finance, "
-        f"and I wanted to check in and see how things are going{company_line}.\n\n"
-        f"If it would be useful to talk through your current funding options, "
-        f"I'm happy to set up a short call.\n\n"
+        f"I help businesses{sector_clause} get the right funding sorted through a panel of over "
+        f"250 lenders. {middle}\n\n"
+        f"If you can spare ten minutes this week, I'd be happy to run through what might fit "
+        f"{target} on a quick call.\n\n"
         f"{FALLBACK_CALENDLY_URL}"
     )
-    return {"subject": subject, "body": body}
+    return _enforce_limits({"subject": subject, "body": body})
 
 
 def _strip_fallback_calendly_link(body: str) -> str:
@@ -183,30 +329,90 @@ def apply_campaign_link(email: dict, campaign_links: str, link_text: str) -> dic
 
 
 def append_signature(email: dict, signature: str) -> dict:
-    """Appends the operator's exact campaign signature after generation so it
-    is present in every draft and cannot be omitted by the model."""
+    """Appends the supplied signature after generation."""
     signature = signature.strip()
     if signature:
         email["body"] = f"{email['body'].rstrip()}\n\n{signature}"
     return email
 
 
+def build_signature(sender_name: str) -> str:
+    """Compose the Win-back sign-off from the original deal broker's name."""
+    sender_name = (sender_name or "").strip()
+    if not sender_name:
+        return ""
+    return f"Best regards,\n{sender_name}\nWinchester Corporate Finance"
+
+
+def ensure_sender_subject(email: dict, sender_name: str) -> dict:
+    """Make the original broker visibly own every Win-back email subject.
+
+    The existing prompt already asks for this. This only provides a
+    deterministic backstop if a model response omits the named broker.
+    """
+    sender_first = (sender_name or "").strip().split()[0] if sender_name else ""
+    if not sender_first:
+        return email
+
+    prefix = f"{sender_first} from WCF"
+    subject = (email.get("subject") or "").strip()
+    if re.match(rf"^{re.escape(sender_first)}\s+from\s+WCF\b", subject, re.IGNORECASE):
+        return email
+
+    available_chars = SUBJECT_MAX_CHARS - len(prefix) - 3
+    available_words = SUBJECT_MAX_WORDS - len(prefix.split())
+    topic = " ".join(subject.split()[:available_words])[:available_chars].rstrip(" ,;:-—–")
+    email["subject"] = f"{prefix} — {topic}" if topic else prefix
+    return email
+
+
+# Firmer instruction appended on the second attempt if the first didn't parse
+# into a real Subject:/Email: or overran the length caps. The prompt already
+# forbids declining and overrunning, so this is belt-and-braces to hold the
+# "always a real, in-caps email, never a diagnostic" guarantee.
+_RETRY_REMINDER = (
+    "\n\nReturn the email now, in exactly this format and nothing else:\n"
+    "Subject: <max 5 words, under 40 characters>\n\n"
+    "Email: <60-90 word personalised email, 4 sentences or fewer, ending with the link on its own line>\n\n"
+    "Write a warm, confident, human email using this company's specifics if present, otherwise its "
+    "Companies House filing data, otherwise its industry/sector. There is always enough to write a "
+    "genuine email. Do NOT explain, apologise, hedge, refuse, mention missing data or tools, or list "
+    "what you don't know — just write the email."
+)
+
+
 async def generate_win_back_email(lead_context: dict) -> dict:
-    """Generates a win-back email using the Winchester CF prompt.
-    Returns {"subject": str, "body": str}. Falls back to a safe, generic
-    relationship check-in (_fallback_email) if the model doesn't produce the
-    expected Subject:/Email: structure at all — most commonly because it
-    declined to write a personalised email, e.g. citing insufficient
-    research signal to justify a specific business case. That refusal text
-    must never surface as if it were the email itself."""
+    """Generates a personalised win-back email using the Winchester CF prompt.
+    Returns {"subject": str, "body": str} and NEVER raises — every path yields a
+    real, in-caps email. A model reply is accepted only if it parses AND looks
+    like a genuine email (`_is_real_email`); a real-but-overlong reply triggers
+    one firmer retry and is then deterministically trimmed (`_enforce_limits`); a
+    diagnostic/refusal reply, two failures, or an API error route to the
+    sector-anchored `_fallback_email`. So it can never emit an explanation,
+    apology, or "what's missing" list."""
     system_prompt = PROMPT_PATH.read_text(encoding="utf-8")
-    user_message = _format_lead_sources(lead_context)
+    base_message = _format_lead_sources(lead_context)
     client = _client()
-    response = await client.messages.create(
-        model=get_settings().extraction_model,
-        system=system_prompt,
-        messages=[{"role": "user", "content": user_message}],
-        max_tokens=MAX_TOKENS,
-    )
-    raw = response.content[0].text.strip() if response.content else ""
-    return _parse_subject_email(raw) or _fallback_email(lead_context)
+    candidate: Optional[dict] = None
+    for attempt in range(2):
+        user_message = base_message if attempt == 0 else base_message + _RETRY_REMINDER
+        try:
+            response = await client.messages.create(
+                model=get_settings().extraction_model,
+                system=system_prompt,
+                messages=[{"role": "user", "content": user_message}],
+                max_tokens=MAX_TOKENS,
+            )
+        except Exception:
+            logger.exception("Win-back email: model call failed — using deterministic fallback")
+            break
+        raw = response.content[0].text.strip() if response.content else ""
+        parsed = _parse_subject_email(raw)
+        if parsed and _is_real_email(parsed["subject"], parsed["body"]):
+            candidate = parsed
+            if _within_caps(parsed):
+                return _enforce_limits(parsed)
+            # real email but over the caps — retry once for a naturally shorter one
+    if candidate:
+        return _enforce_limits(candidate)
+    return _fallback_email(lead_context)
