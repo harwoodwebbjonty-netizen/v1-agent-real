@@ -1041,8 +1041,31 @@ export async function parseWinBackCsv(path: string): Promise<WinBackCsvRow[]> {
   return invoke<WinBackCsvRow[]>("parse_win_back_csv", { path });
 }
 
-export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard", emailInstruction = "", offerContext = "", additionalContext = "", campaignLinks = "", campaignLinkText = "", signature = ""): Promise<WinBackCampaign> {
-  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, depth, emailInstruction, offerContext, additionalContext, campaignLinks, campaignLinkText, signature });
+export async function createWinBackCampaignFromCsv(name: string, rows: WinBackCsvRow[], depth = "standard", emailInstruction = "", offerContext = "", additionalContext = "", campaignLinks = "", campaignLinkText = "", signature = "", sourceRows: WinBackCsvRow[] = []): Promise<WinBackCampaign> {
+  return invoke<WinBackCampaign>("create_win_back_campaign_from_csv", { name, rows, sourceRows, depth, emailInstruction, offerContext, additionalContext, campaignLinks, campaignLinkText, signature });
+}
+
+export interface WinBackRerunDefaults {
+  name: string;
+  depth: string;
+  email_instruction: string;
+  offer_context: string;
+  additional_context: string;
+  campaign_links: string;
+  campaign_link_text: string;
+}
+
+export interface WinBackCampaignRows {
+  available: boolean;
+  rows: WinBackCsvRow[];
+  defaults: WinBackRerunDefaults;
+}
+
+/** The original uploaded CSV + generation settings for a campaign, so it can be
+ * re-run ("Run again") from the same source list. `available` is false for
+ * campaigns created before source rows were stored. */
+export async function getWinBackCampaignRows(campaignId: string): Promise<WinBackCampaignRows> {
+  return invoke<WinBackCampaignRows>("get_win_back_campaign_rows", { campaignId });
 }
 
 export async function previewWinBackCampaignEmail(row: WinBackCsvRow, emailInstruction = "", offerContext = "", additionalContext = "", campaignLinks = "", campaignLinkText = "", signature = "", depth = "standard"): Promise<{ subject: string; body: string }> {

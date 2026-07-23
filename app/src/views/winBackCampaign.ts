@@ -4,10 +4,12 @@ import {
   type WinBackCampaignDetail,
   type WinBackCsvRow,
   type WinBackEmail,
+  type WinBackRerunDefaults,
   createWinBackCampaignFromCsv,
   exportWinBackMailchimp,
   getCreditUsage,
   getWinBackCampaign,
+  getWinBackCampaignRows,
   getWinBackCampaigns,
   parseWinBackCsv,
   previewWinBackCampaignEmail,
@@ -322,32 +324,43 @@ function isOpenStage(stage?: string): boolean {
 }
 
 async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<void> {
-  let rows: WinBackCsvRow[] = [];
-  let droppedNoEmail = 0;
-  let droppedOpen = 0;
+  let allRows: WinBackCsvRow[] = [];
   try {
-    rows = await parseWinBackCsv(csvPath);
-    const total = rows.length;
-    // Open (in-progress) deals are live opportunities, not lost/dormant leads —
-    // never win-back them, so drop them from the list entirely up front.
-    const notOpen = rows.filter((r) => !isOpenStage(r.stage));
-    droppedOpen = total - notOpen.length;
-    // Email campaigns can only reach leads with an email — drop the rest up
-    // front so they don't cost generation money for an unsendable draft.
-    rows = notOpen.filter((r) => (r.email || "").trim().length > 0);
-    droppedNoEmail = notOpen.length - rows.length;
+    allRows = await parseWinBackCsv(csvPath);
   } catch (err) {
     container.innerHTML = `<main class="container"><p class="status-error">Could not parse CSV: ${escapeHtml(String(err))}</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
     container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
     return;
   }
+  presentLeadReview(container, allRows, { onBack: () => showLeadPicker(container) });
+}
+
+// Shared review screen for both a fresh CSV upload and a campaign "Run again".
+// `allRows` is the full source list; open-deal and no-email rows are dropped for
+// display, but the full list is carried forward as the new campaign's source
+// rows so it can be re-run again later.
+function presentLeadReview(
+  container: HTMLElement,
+  allRows: WinBackCsvRow[],
+  opts?: { defaults?: WinBackRerunDefaults; onBack?: () => void },
+): void {
+  const onBack = opts?.onBack ?? (() => showLeadPicker(container));
+  const total = allRows.length;
+  // Open (in-progress) deals are live opportunities, not lost/dormant leads —
+  // never win-back them, so drop them from the review entirely.
+  const notOpen = allRows.filter((r) => !isOpenStage(r.stage));
+  const droppedOpen = total - notOpen.length;
+  // Email campaigns can only reach leads with an email — drop the rest up front
+  // so they don't cost generation money for an unsendable draft.
+  const rows = notOpen.filter((r) => (r.email || "").trim().length > 0);
+  const droppedNoEmail = notOpen.length - rows.length;
 
   if (rows.length === 0) {
     const reason = droppedOpen > 0
       ? `No sendable leads left — ${droppedOpen} open (in-progress) deal${droppedOpen !== 1 ? "s" : ""} excluded and ${droppedNoEmail} with no email address. A win-back targets lost or dormant leads that have an email.`
-      : "No rows with an email address found in this CSV — a win-back campaign needs emails to send to.";
+      : "No rows with an email address found — a win-back campaign needs emails to send to.";
     container.innerHTML = `<main class="container"><p class="status-error">${escapeHtml(reason)}</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
-    container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
+    container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", onBack);
     return;
   }
 
@@ -538,13 +551,16 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
     renderBody();
   });
 
-  container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", () => {
-    showLeadPicker(container);
-  });
+  container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", onBack);
 
   configureBtn.addEventListener("click", () => {
     if (selected.size === 0) return;
-    showGenerationConfig(container, rows.filter((_, i) => selected.has(i)));
+    // Only the ticked rows are generated; the FULL list is stored as the new
+    // campaign's source rows so it can be re-run again later.
+    showGenerationConfig(container, rows.filter((_, i) => selected.has(i)), {
+      defaults: opts?.defaults,
+      sourceRows: allRows,
+    });
   });
 
   renderBody();
@@ -552,8 +568,20 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
 
 // --- Campaign configuration sub-view ---
 
-function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): void {
+function showGenerationConfig(
+  container: HTMLElement,
+  rows: WinBackCsvRow[],
+  opts?: { defaults?: WinBackRerunDefaults; sourceRows?: WinBackCsvRow[] },
+): void {
   const defaultRelationshipContext = "These are past Winchester Corporate Finance contacts being re-engaged about funding. Only treat someone as an existing customer where their record shows a completed (Closed Won) deal — otherwise write as re-opening an earlier funding conversation. Never imply WCF has funded a company unless its data confirms it.";
+  // On a re-run, pre-fill from the original campaign's settings; otherwise fresh defaults.
+  const d = opts?.defaults;
+  const nameValue = d ? `${d.name} (re-run)` : "";
+  const briefValue = d ? d.additional_context : `${defaultRelationshipContext}\n\nReconnect warmly and invite a short review of current funding needs.`;
+  const offerValue = d ? d.offer_context : "";
+  const linksValue = d ? d.campaign_links : "";
+  const linkTextValue = d ? d.campaign_link_text : "";
+  const depthValue = d?.depth || "standard";
   container.innerHTML = `
     <main class="container">
       <section class="card">
@@ -566,19 +594,19 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
         </div>
         <div class="wb-generation-form">
           <label class="form-label" for="wb-name-input">Campaign name</label>
-          <input id="wb-name-input" class="search-input" type="text" placeholder="e.g. Q3 customer re-engagement" />
+          <input id="wb-name-input" class="search-input" type="text" placeholder="e.g. Q3 customer re-engagement" value="${escapeHtml(nameValue)}" />
 
           <label class="form-label" for="wb-additional-context-input">Campaign brief</label>
-          <textarea id="wb-additional-context-input" class="search-input wb-brief-textarea" rows="4">${escapeHtml(defaultRelationshipContext)}\n\nReconnect warmly and invite a short review of current funding needs.</textarea>
+          <textarea id="wb-additional-context-input" class="search-input wb-brief-textarea" rows="4">${escapeHtml(briefValue)}</textarea>
 
           <label class="form-label" for="wb-offer-context-input">Current offers or deals</label>
-          <textarea id="wb-offer-context-input" class="search-input wb-brief-textarea" rows="3" placeholder="e.g. Unsecured business lending from 6.9% (subject to status and underwriting)."></textarea>
+          <textarea id="wb-offer-context-input" class="search-input wb-brief-textarea" rows="3" placeholder="e.g. Unsecured business lending from 6.9% (subject to status and underwriting).">${escapeHtml(offerValue)}</textarea>
           <p class="card-subtitle">Only enter approved, current terms. The email will mention them only where relevant.</p>
 
           <label class="form-label" for="wb-campaign-links-input">Campaign links</label>
-          <textarea id="wb-campaign-links-input" class="search-input wb-brief-textarea" rows="2" placeholder="Paste a Calendly booking link or a reapplication link."></textarea>
+          <textarea id="wb-campaign-links-input" class="search-input wb-brief-textarea" rows="2" placeholder="Paste a Calendly booking link or a reapplication link.">${escapeHtml(linksValue)}</textarea>
           <label class="form-label" for="wb-campaign-link-text-input">Link display text (optional)</label>
-          <input id="wb-campaign-link-text-input" class="search-input" type="text" placeholder="Book a call here — leave blank to send the link as plain text" />
+          <input id="wb-campaign-link-text-input" class="search-input" type="text" placeholder="Book a call here — leave blank to send the link as plain text" value="${escapeHtml(linkTextValue)}" />
           <p class="card-subtitle">If filled in, the link above appears as clickable text with this label instead of a plain web address.</p>
 
           <label class="form-label" for="wb-depth-select">Research depth</label>
@@ -602,9 +630,14 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
       </section>
     </main>`;
 
-  container.querySelector<HTMLButtonElement>("#wb-back-review-btn")!.addEventListener("click", () => showLeadPicker(container));
+  // Back returns to the review screen (rebuilt from the full source list) so
+  // filter/selection can be adjusted without losing the imported leads.
+  container.querySelector<HTMLButtonElement>("#wb-back-review-btn")!.addEventListener("click", () =>
+    presentLeadReview(container, opts?.sourceRows ?? rows, { defaults: opts?.defaults }),
+  );
 
   const depthSelect = container.querySelector<HTMLSelectElement>("#wb-depth-select")!;
+  depthSelect.value = depthValue;
   const generateBtn = container.querySelector<HTMLButtonElement>("#wb-generate-btn")!;
   const getBrief = async () => ({
     name: container.querySelector<HTMLInputElement>("#wb-name-input")!.value.trim() || `Win-back ${new Date().toLocaleDateString()}`,
@@ -709,7 +742,7 @@ function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): vo
     generateBtn.disabled = true;
     generateBtn.textContent = "Creating...";
     try {
-      const campaign = await createWinBackCampaignFromCsv(brief.name, rowsWithReuse, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature);
+      const campaign = await createWinBackCampaignFromCsv(brief.name, rowsWithReuse, depthSelect.value, brief.emailInstruction, brief.offerContext, brief.additionalContext, brief.campaignLinks, brief.campaignLinkText, brief.signature, opts?.sourceRows ?? rows);
       await showCampaignDetail(container, campaign.id);
     } catch (err) {
       generateBtn.disabled = false;
@@ -766,6 +799,7 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
                 ? `<button id="wb-resume-btn" class="btn btn-primary btn-sm">Resume (${campaign.total - campaign.generated} remaining)</button>`
                 : ""
             }
+            ${!generating ? `<button id="wb-run-again-btn" class="btn btn-secondary btn-sm">Run again</button>` : ""}
             <button id="wb-back-btn" class="btn btn-ghost">Back</button>
           </div>
         </div>
@@ -847,6 +881,32 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
       status.textContent = String(err);
       btn.disabled = false;
       btn.textContent = `Resume (${campaign.total - campaign.generated} remaining)`;
+    }
+  });
+
+  // Run again: re-load this campaign's original CSV into the review→configure
+  // flow to create a fresh (renamed) campaign, re-filtering who to send to.
+  container.querySelector<HTMLButtonElement>("#wb-run-again-btn")?.addEventListener("click", async () => {
+    const btn = container.querySelector<HTMLButtonElement>("#wb-run-again-btn")!;
+    btn.disabled = true;
+    btn.textContent = "Loading…";
+    try {
+      const data = await getWinBackCampaignRows(campaign.id);
+      if (!data.available || data.rows.length === 0) {
+        btn.disabled = false;
+        btn.textContent = "Run again";
+        alert("This campaign predates re-run support — its uploaded list wasn't saved. Upload the CSV again to start a new campaign.");
+        return;
+      }
+      clearPoll();
+      presentLeadReview(container, data.rows, {
+        defaults: data.defaults,
+        onBack: () => showCampaignDetail(container, campaign.id),
+      });
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = "Run again";
+      alert(`Could not load the campaign's leads: ${err}`);
     }
   });
 

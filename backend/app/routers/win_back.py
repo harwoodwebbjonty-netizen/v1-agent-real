@@ -74,6 +74,11 @@ class CsvLeadRow(BaseModel):
     industry: str = ""
     deal_owner: str = ""  # the broker who originally arranged this deal (CSV "Deal Owner")
     stage: str = ""  # CRM deal stage — drives the relationship framing (Closed Won = funded)
+    # Recipient-filter fields — persisted with the campaign's source rows so a
+    # re-run ("Run again") can re-filter by deal age / amount. Client-side only
+    # otherwise; generation does not use them directly.
+    closing_date: str = ""
+    amount: str = ""
     # If both are set, this row was already previewed under the exact same
     # generation settings — reuse it as-is in create_campaign_from_csv
     # instead of paying for research + email generation again for the same
@@ -86,6 +91,9 @@ class CsvLeadRow(BaseModel):
 class CreateCampaignFromCsvRequest(BaseModel):
     name: str
     rows: List[CsvLeadRow]
+    # Full uploaded CSV (all parsed rows, pre-filter) — stored on the campaign so
+    # it can be re-run from the same source list. Falls back to `rows` if omitted.
+    source_rows: List[CsvLeadRow] = []
     depth: str = "standard"
     email_instruction: str = ""
     offer_context: str = ""
@@ -431,6 +439,13 @@ async def create_campaign_from_csv(
         else:
             to_generate_lead_ids.append(lead_id)
 
+    # Persist the full uploaded CSV (minus per-run preview reuse fields) so the
+    # campaign can be re-run from the same source list. Fall back to the
+    # generated rows when the client didn't send a separate source set.
+    source_rows = body.source_rows or body.rows
+    source_rows_json = json.dumps([
+        r.model_dump(exclude={"preview_subject", "preview_body"}) for r in source_rows
+    ])
     db.create_win_back_campaign(
         id=campaign_id,
         name=body.name,
@@ -445,6 +460,7 @@ async def create_campaign_from_csv(
         campaign_links=body.campaign_links.strip(),
         campaign_link_text=body.campaign_link_text.strip(),
         signature=body.signature.strip(),
+        source_rows_json=source_rows_json,
     )
     if pre_generated_count:
         db.update_win_back_campaign_progress(
@@ -587,6 +603,41 @@ def get_campaign(campaign_id: str, current_user: CurrentUser = Depends(get_curre
     return {
         "campaign": _campaign_dict(campaign),
         "emails": [_email_dict(e) for e in emails],
+    }
+
+
+@router.get("/campaigns/{campaign_id}/rows")
+def get_campaign_rows(campaign_id: str, current_user: CurrentUser = Depends(get_current_user)) -> dict:
+    """Returns the original uploaded CSV rows + the campaign's generation settings
+    so the app can re-run the campaign ('Run again') from the same source list.
+    `available` is False for campaigns created before source rows were stored."""
+    campaign = db.get_win_back_campaign(campaign_id)
+    if campaign is None:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+    if campaign["created_by"] != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    raw = campaign["source_rows_json"] if "source_rows_json" in campaign.keys() else ""
+    try:
+        rows = json.loads(raw) if raw else []
+    except (json.JSONDecodeError, TypeError):
+        rows = []
+
+    def field(name: str) -> str:
+        return (campaign[name] if name in campaign.keys() else "") or ""
+
+    return {
+        "available": bool(rows),
+        "rows": rows,
+        "defaults": {
+            "name": field("name"),
+            "depth": field("depth") or "standard",
+            "email_instruction": field("email_instruction"),
+            "offer_context": field("offer_context"),
+            "additional_context": field("additional_context"),
+            "campaign_links": field("campaign_links"),
+            "campaign_link_text": field("campaign_link_text"),
+        },
     }
 
 

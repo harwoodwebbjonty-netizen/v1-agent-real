@@ -1109,6 +1109,7 @@ async fn create_win_back_campaign_from_csv(
     app_handle: tauri::AppHandle,
     name: String,
     rows: Vec<backend_client::WinBackCsvRow>,
+    source_rows: Option<Vec<backend_client::WinBackCsvRow>>,
     depth: String,
     email_instruction: String,
     offer_context: String,
@@ -1119,7 +1120,15 @@ async fn create_win_back_campaign_from_csv(
 ) -> Result<WinBackCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, &depth, &email_instruction, &offer_context, &additional_context, &campaign_links, &campaign_link_text, &signature).await
+    let source_rows = source_rows.unwrap_or_default();
+    backend_client::create_win_back_campaign_from_csv(&base_url, &session.token, &name, rows, source_rows, &depth, &email_instruction, &offer_context, &additional_context, &campaign_links, &campaign_link_text, &signature).await
+}
+
+#[tauri::command]
+async fn get_win_back_campaign_rows(app_handle: tauri::AppHandle, campaign_id: String) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_win_back_campaign_rows(&base_url, &session.token, &campaign_id).await
 }
 
 #[tauri::command]
@@ -1258,6 +1267,7 @@ pub fn run() {
       create_win_back_campaign,
       get_win_back_campaigns,
       get_win_back_campaign,
+      get_win_back_campaign_rows,
       send_win_back_email,
       send_all_win_back_emails,
       resume_win_back_campaign,

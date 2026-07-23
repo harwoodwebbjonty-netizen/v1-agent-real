@@ -566,6 +566,15 @@ def _migration_023_win_back_deal_owner(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leads ADD COLUMN deal_owner TEXT NOT NULL DEFAULT ''")
 
 
+def _migration_024_win_back_source_rows(conn: sqlite3.Connection) -> None:
+    """Store the uploaded CSV rows (as JSON) on the campaign so it can be
+    re-run ('Run again') from the same source list — including the filter
+    fields (stage/closing_date/amount) that are otherwise only client-side."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(win_back_campaigns)")}
+    if "source_rows_json" not in cols:
+        conn.execute("ALTER TABLE win_back_campaigns ADD COLUMN source_rows_json TEXT NOT NULL DEFAULT ''")
+
+
 def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
     """Add password_hash to users. NULL means a legacy account that predates
     passwords — the next successful identify for that name sets its password
@@ -601,8 +610,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (21, _migration_021_win_back_link_text),
     (22, _migration_022_lead_linkedin_posts),
     (23, _migration_023_win_back_deal_owner),
+    (24, _migration_024_win_back_source_rows),
 ]
-CURRENT_SCHEMA_VERSION = 23
+CURRENT_SCHEMA_VERSION = 24
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1870,12 +1880,13 @@ def create_win_back_campaign(
     id: str, name: str, created_by: str, total: int, created_at: str,
     lead_ids_json: Optional[str] = None, depth: str = "standard", email_instruction: str = "",
     offer_context: str = "", additional_context: str = "", campaign_links: str = "", campaign_link_text: str = "", signature: str = "",
+    source_rows_json: str = "",
 ) -> None:
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at, lead_ids, depth, email_instruction, offer_context, additional_context, campaign_links, campaign_link_text, signature) "
-            "VALUES (?, ?, ?, 'generating', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (id, name, created_by, total, created_at, lead_ids_json, depth, email_instruction, offer_context, additional_context, campaign_links, campaign_link_text, signature),
+            "INSERT INTO win_back_campaigns (id, name, created_by, status, total, generated, created_at, lead_ids, depth, email_instruction, offer_context, additional_context, campaign_links, campaign_link_text, signature, source_rows_json) "
+            "VALUES (?, ?, ?, 'generating', ?, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+            (id, name, created_by, total, created_at, lead_ids_json, depth, email_instruction, offer_context, additional_context, campaign_links, campaign_link_text, signature, source_rows_json),
         )
 
 
