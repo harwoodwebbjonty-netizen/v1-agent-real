@@ -73,6 +73,7 @@ class CsvLeadRow(BaseModel):
     notes: str = ""
     industry: str = ""
     deal_owner: str = ""  # the broker who originally arranged this deal (CSV "Deal Owner")
+    stage: str = ""  # CRM deal stage — drives the relationship framing (Closed Won = funded)
     # If both are set, this row was already previewed under the exact same
     # generation settings — reuse it as-is in create_campaign_from_csv
     # instead of paying for research + email generation again for the same
@@ -119,6 +120,7 @@ async def _generate_campaign(
     campaign_id: str, lead_ids: list, user_id: str, depth: str = "standard", already_done: int = 0,
     email_instruction: str = "", offer_context: str = "", additional_context: str = "", campaign_links: str = "", campaign_link_text: str = "", signature: str = "",
     owner_by_lead: Optional[dict] = None,
+    stage_by_lead: Optional[dict] = None,
 ) -> None:
     """already_done offsets the progress counter when resuming a campaign that
     stopped partway (credit ceiling, crash) — only the missing leads are in
@@ -209,6 +211,10 @@ async def _generate_campaign(
                     imported_owner = (owner_by_lead.get(lead_id) if owner_by_lead else "") or (lead["deal_owner"] if "deal_owner" in lead.keys() else "")
                     lead_sender = imported_owner.strip() or sender_name
                     ctx["sender_name"] = lead_sender
+                    # CRM deal stage decides whether the email may reference a
+                    # completed funding deal. Absent on resume → safe default
+                    # (never claims funding). See _relationship_note.
+                    ctx["deal_stage"] = (stage_by_lead.get(lead_id) if stage_by_lead else "") or ""
 
                     try:
                         # The imported broker owns this relationship. Do not let
@@ -382,6 +388,7 @@ async def create_campaign_from_csv(
     lead_ids: list[str] = []
     to_generate_lead_ids: list[str] = []
     owner_by_lead: dict = {}
+    stage_by_lead: dict = {}
     pre_generated_count = 0
     ts = now_iso()
     campaign_id = new_id()
@@ -398,6 +405,7 @@ async def create_campaign_from_csv(
             created_at=ts,
         )
         owner_by_lead[lead_id] = row.deal_owner.strip()
+        stage_by_lead[lead_id] = row.stage.strip()
         extra = {k: v for k, v in {
             "contact_name": row.contact_name,
             "website": row.website,
@@ -443,7 +451,7 @@ async def create_campaign_from_csv(
             campaign_id, pre_generated_count, "ready" if not to_generate_lead_ids else "generating",
         )
     if to_generate_lead_ids:
-        asyncio.create_task(_generate_campaign(campaign_id, to_generate_lead_ids, current_user.id, body.depth, already_done=pre_generated_count, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), campaign_link_text=body.campaign_link_text.strip(), signature=body.signature.strip(), owner_by_lead=owner_by_lead))
+        asyncio.create_task(_generate_campaign(campaign_id, to_generate_lead_ids, current_user.id, body.depth, already_done=pre_generated_count, email_instruction=body.email_instruction.strip(), offer_context=body.offer_context.strip(), additional_context=body.additional_context.strip(), campaign_links=body.campaign_links.strip(), campaign_link_text=body.campaign_link_text.strip(), signature=body.signature.strip(), owner_by_lead=owner_by_lead, stage_by_lead=stage_by_lead))
     campaign = db.get_win_back_campaign(campaign_id)
     return _campaign_dict(campaign)
 
@@ -482,6 +490,7 @@ async def preview_campaign_email(
         "industry": row.industry,
         "email": row.email,
         "lead_notes": row.notes,
+        "deal_stage": row.stage,
         "ai_summary": "",
         "ch_data": ch_context,
         "recent_activity": "",
@@ -672,7 +681,12 @@ async def export_mailchimp(
     # a consistent team identity reads as legitimate rather than as a random
     # personal name attached to a cold win-back email.
     from_name = "WCF Broker Team"
-    from_email = account["email_address"] if account else ""
+    from_email = (account["email_address"] if account else "") or get_settings().mailchimp_from_email.strip()
+    if not from_email:
+        raise HTTPException(
+            status_code=422,
+            detail="No sender email address available. Connect a Gmail or Outlook account, or set a verified Mailchimp 'from' address (MAILCHIMP_FROM_EMAIL) in Settings, before exporting to Mailchimp.",
+        )
 
     emails = db.get_win_back_emails(campaign_id)
     email_dicts = [_email_dict(e) for e in emails]

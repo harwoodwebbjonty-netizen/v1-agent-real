@@ -373,7 +373,7 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
 
         // Win-back / CRM export fields
         let contact_name_col = find_col(&[
-            "contact_name", "contact name", "full name", "fullname",
+            "contact_name", "contact name", "contact", "full name", "fullname",
             "first name", "firstname", "first_name",
         ]);
         let email_col = find_col(&[
@@ -387,6 +387,18 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
         let industry_col = find_col(&["industry", "sector", "sic", "vertical"]);
         // deal owner — the broker who originally arranged the deal (CRM export)
         let deal_owner_col = find_col(&["deal owner", "deal_owner", "deal owner name", "dealowner"]);
+
+        // Win-back recipient filters (deal age / stage / amount) — CRM export cols.
+        // Closing date is emitted as the raw string; the frontend parses both
+        // DD/MM/YYYY (raw Zoho export) and YYYY-MM-DD (our filterable CSV).
+        let closing_date_col = find_col(&[
+            "closing date", "closing_date", "closing date (iso)", "close date",
+            "deal date", "date won", "won date",
+        ]);
+        let stage_col = find_col(&["stage", "deal stage", "deal_stage"]);
+        let amount_col = find_col(&[
+            "amount", "amount (gbp)", "deal amount", "deal value", "value", "funded amount",
+        ]);
 
         // last-name column — used alongside first_name if contact_name not found
         let last_name_col = find_col(&["last name", "lastname", "last_name", "surname"]);
@@ -409,8 +421,12 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
 
             rows.push(serde_json::json!({
                 "company": company,
+                // Both key spellings are emitted: general lead import reads
+                // phone_number/source_url, WinBackCsvRow reads phone/website.
                 "phone_number": get(&record, phone_col),
+                "phone": get(&record, phone_col),
                 "source_url": get(&record, source_col),
+                "website": get(&record, source_col),
                 "notes": get(&record, notes_col),
                 "company_number": get(&record, company_number_col),
                 "contact_name": contact_name,
@@ -418,6 +434,9 @@ pub fn parse_uploaded_csv(path: &str) -> Result<Vec<serde_json::Value>, String> 
                 "linkedin": get(&record, linkedin_col),
                 "industry": get(&record, industry_col),
                 "deal_owner": get(&record, deal_owner_col),
+                "closing_date": get(&record, closing_date_col),
+                "stage": get(&record, stage_col),
+                "amount": get(&record, amount_col),
             }));
         }
     }

@@ -133,6 +133,26 @@ def _is_real_email(subject: str, body: str) -> bool:
     return True
 
 
+def _relationship_note(stage: Optional[str]) -> str:
+    """Tells the model whether a real funding relationship exists, based on the
+    CRM deal stage. Only a genuinely won deal licenses 'we funded you' language;
+    a lost or still-open deal means they only ever enquired, so the email must
+    never imply WCF has funded them. A blank/unknown stage stays on the safe
+    side — don't assert any past deal at all."""
+    s = (stage or "").strip().lower()
+    if not s:
+        return ("RELATIONSHIP: Do not claim or imply WCF has funded, financed, or arranged a facility "
+                "for this company unless their data clearly shows it. If unsure, write a warm re-approach "
+                "about their funding needs without asserting any past deal.")
+    if "won" in s:
+        return ("RELATIONSHIP: This is a past client — WCF previously arranged funding for them. You may "
+                "naturally acknowledge that existing funding relationship.")
+    return ("RELATIONSHIP: WCF has NOT funded this company — they previously enquired about funding but no "
+            "deal completed. Never say or imply we funded them, arranged their facility, or that they are an "
+            "existing funding customer. Write as a broker picking that earlier funding conversation back up, "
+            "not continuing a funding relationship.")
+
+
 def _format_lead_sources(lead_context: dict) -> str:
     """Formats lead data as a structured brief matching the Step 1 source
     categories referenced in the Winchester CF win-back prompt."""
@@ -172,10 +192,11 @@ def _format_lead_sources(lead_context: dict) -> str:
         lines.append(f"Company: {lead_context['company']}")
     if lead_context.get("sender_name"):
         lines.append(
-            f"Sender (YOU — the Winchester Corporate Finance broker sending this, who originally "
-            f"arranged this company's deal): {lead_context['sender_name']}. Refer to Winchester "
+            f"Sender (YOU — the Winchester Corporate Finance broker sending this, who dealt with "
+            f"this company originally): {lead_context['sender_name']}. Refer to Winchester "
             f"Corporate Finance as 'WCF' in the subject line."
         )
+    lines.append(_relationship_note(lead_context.get("deal_stage")))
     contact_parts = [p for p in [lead_context.get("first_name"), lead_context.get("last_name")] if p]
     contact_str = " ".join(contact_parts)
     if lead_context.get("job_title"):
@@ -254,7 +275,10 @@ def _fallback_email(lead_context: dict) -> dict:
     charges = re.search(r"Charges registered:\s*([1-9]\d*)", ch)
 
     greeting = f"Hi {first_name}," if first_name else "Hi,"
-    target = company or "your business"
+    # Always address the reader directly — never stamp the company's registered
+    # name into the body (reads as automated mail-merge). Company still allowed
+    # in the subject line, which is composed separately below.
+    target = "your business"
     sector_clause = f" that work in {sector.lower()}" if sector else " like yours"
     if charges:
         middle = ("Since you've already got funding in place, it's worth a quick look at whether "

@@ -1025,6 +1025,11 @@ export interface WinBackCsvRow {
   notes: string;
   industry: string;
   deal_owner?: string; // broker who originally arranged the deal (CSV "Deal Owner")
+  // Recipient-filter fields (client-side only). closing_date is the raw CSV
+  // string (DD/MM/YYYY or YYYY-MM-DD); amount is the raw £ string.
+  closing_date?: string;
+  stage?: string;
+  amount?: string;
   // If both are set, create_win_back_campaign_from_csv reuses this instead of
   // paying for research + email generation again — only set when this row was
   // already previewed under the exact same generation settings.

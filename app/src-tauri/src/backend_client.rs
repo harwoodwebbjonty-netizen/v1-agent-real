@@ -2167,6 +2167,13 @@ pub struct WinBackCsvRow {
     pub industry: String,
     #[serde(default)]
     pub deal_owner: String,
+    // Win-back recipient filters (client-side only; backend ignores them).
+    #[serde(default)]
+    pub closing_date: String,
+    #[serde(default)]
+    pub stage: String,
+    #[serde(default)]
+    pub amount: String,
     #[serde(default)]
     pub preview_subject: String,
     #[serde(default)]

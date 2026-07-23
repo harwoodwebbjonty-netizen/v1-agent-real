@@ -583,7 +583,7 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
         if not company:
             continue
         lead_id = new_id()
-        db.create_lead(
+        actual_lead_id = db.create_lead(
             id=lead_id,
             timestamp=entry.get("timestamp") or created_at,
             company=company,
@@ -595,10 +595,19 @@ def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depen
             created_at=created_at,
             company_number=entry.get("company_number") or None,
         )
+        imported_details = {
+            key: value.strip()
+            for key, value in {
+                "website": entry.get("website") or entry.get("source_url") or "",
+                "linkedin": entry.get("linkedin") or "",
+            }.items()
+            if isinstance(value, str) and value.strip()
+        }
+        db.update_lead_fields(actual_lead_id, imported_details, created_at)
         phone = (entry.get("phone_number") or "").strip()
         if phone and phone != "not_found":
             db.add_phone_ignore_duplicate(
-                id=new_id(), lead_id=lead_id, phone_number=phone, source="imported", created_at=created_at
+                id=new_id(), lead_id=actual_lead_id, phone_number=phone, source="imported", created_at=created_at
             )
         imported += 1
     return ImportLeadsResponse(imported=imported)

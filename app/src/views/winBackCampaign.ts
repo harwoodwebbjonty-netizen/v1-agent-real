@@ -312,16 +312,30 @@ function showLeadPicker(container: HTMLElement): void {
 
 // --- CSV preview sub-view ---
 
+// A deal is "open" (still in the pipeline) when it has a stage that isn't a
+// Closed (Won/Lost) stage. Open deals are live opportunities and must never be
+// win-backed, so they're removed from the list entirely. A blank stage counts
+// as unknown (kept), so a CSV without a Stage column isn't wiped out.
+function isOpenStage(stage?: string): boolean {
+  const s = (stage || "").trim().toLowerCase();
+  return s !== "" && !s.includes("closed");
+}
+
 async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<void> {
   let rows: WinBackCsvRow[] = [];
   let droppedNoEmail = 0;
+  let droppedOpen = 0;
   try {
     rows = await parseWinBackCsv(csvPath);
+    const total = rows.length;
+    // Open (in-progress) deals are live opportunities, not lost/dormant leads —
+    // never win-back them, so drop them from the list entirely up front.
+    const notOpen = rows.filter((r) => !isOpenStage(r.stage));
+    droppedOpen = total - notOpen.length;
     // Email campaigns can only reach leads with an email — drop the rest up
     // front so they don't cost generation money for an unsendable draft.
-    const total = rows.length;
-    rows = rows.filter((r) => (r.email || "").trim().length > 0);
-    droppedNoEmail = total - rows.length;
+    rows = notOpen.filter((r) => (r.email || "").trim().length > 0);
+    droppedNoEmail = notOpen.length - rows.length;
   } catch (err) {
     container.innerHTML = `<main class="container"><p class="status-error">Could not parse CSV: ${escapeHtml(String(err))}</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
     container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
@@ -329,10 +343,22 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
   }
 
   if (rows.length === 0) {
-    container.innerHTML = `<main class="container"><p class="status-error">No rows with an email address found in this CSV — a win-back campaign needs emails to send to.</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
+    const reason = droppedOpen > 0
+      ? `No sendable leads left — ${droppedOpen} open (in-progress) deal${droppedOpen !== 1 ? "s" : ""} excluded and ${droppedNoEmail} with no email address. A win-back targets lost or dormant leads that have an email.`
+      : "No rows with an email address found in this CSV — a win-back campaign needs emails to send to.";
+    container.innerHTML = `<main class="container"><p class="status-error">${escapeHtml(reason)}</p><button id="wb-back2-btn" class="btn btn-ghost" style="margin-top:12px">Back</button></main>`;
     container.querySelector<HTMLButtonElement>("#wb-back2-btn")!.addEventListener("click", () => showLeadPicker(container));
     return;
   }
+
+  // Distinct values for the filter dropdowns, from the data actually present.
+  const stages = Array.from(new Set(rows.map((r) => (r.stage || "").trim()).filter(Boolean))).sort();
+  const owners = Array.from(new Set(rows.map((r) => (r.deal_owner || "").trim()).filter(Boolean))).sort();
+
+  // Selection state: every imported (emailable) row starts ticked. Only ticked
+  // rows are ever handed to generation, so filtering is purely a way to narrow
+  // the list for bulk select/deselect — ticks persist across filter changes.
+  const selected = new Set<number>(rows.map((_, i) => i));
 
   container.innerHTML = `
     <main class="container">
@@ -340,52 +366,194 @@ async function showCsvPreview(container: HTMLElement, csvPath: string): Promise<
         <div class="card-header-row">
           <div>
             <h2 class="card-title">Review imported leads</h2>
-            <p class="card-subtitle">${rows.length} lead${rows.length !== 1 ? "s" : ""} with an email address${droppedNoEmail > 0 ? ` (${droppedNoEmail} without an email skipped)` : ""}. Review before generating.</p>
+            <p class="card-subtitle">${rows.length} lead${rows.length !== 1 ? "s" : ""} with an email address${droppedNoEmail > 0 ? ` · ${droppedNoEmail} without an email skipped` : ""}${droppedOpen > 0 ? ` · ${droppedOpen} open deal${droppedOpen !== 1 ? "s" : ""} excluded` : ""}. Filter and tick who to email.</p>
           </div>
           <div class="card-header-actions">
             <button id="wb-back-btn" class="btn btn-ghost">Back</button>
           </div>
         </div>
+
+        <div class="wb-filter-bar" style="display:flex;flex-wrap:wrap;gap:16px;align-items:flex-end;margin-bottom:14px">
+          <div>
+            <label class="form-label">Deal age (months)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input id="wb-f-agemin" class="search-input" type="number" min="0" placeholder="min" style="width:76px" />
+              <span>–</span>
+              <input id="wb-f-agemax" class="search-input" type="number" min="0" placeholder="max" style="width:76px" />
+            </div>
+          </div>
+          <div>
+            <label class="form-label">Stage</label>
+            <select id="wb-f-stage" class="search-input" style="min-width:150px">
+              <option value="">Any stage</option>
+              ${stages.map((s) => `<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Deal owner</label>
+            <select id="wb-f-owner" class="search-input" style="min-width:150px">
+              <option value="">Any owner</option>
+              ${owners.map((o) => `<option value="${escapeHtml(o)}">${escapeHtml(o)}</option>`).join("")}
+            </select>
+          </div>
+          <div>
+            <label class="form-label">Amount (£)</label>
+            <div style="display:flex;gap:6px;align-items:center">
+              <input id="wb-f-amtmin" class="search-input" type="number" min="0" placeholder="min" style="width:96px" />
+              <span>–</span>
+              <input id="wb-f-amtmax" class="search-input" type="number" min="0" placeholder="max" style="width:96px" />
+            </div>
+          </div>
+        </div>
+
         <div class="wb-picker-bar">
           <button id="wb-configure-btn" class="btn btn-primary">Configure generation</button>
-          <span class="status-message">Set the email brief, offers and preview a draft before generating.</span>
+          <span class="status-message"><span id="wb-sel-count"></span> · <span id="wb-vis-count"></span> shown of ${rows.length}. Set the brief and preview a draft next.</span>
         </div>
+
         <table class="data-table">
           <thead><tr>
-            <th>Company</th><th>Contact</th><th>Email</th><th>Phone</th><th>Website</th><th>LinkedIn</th>
+            <th style="width:34px"><input type="checkbox" id="wb-select-all" title="Select/clear all shown" /></th>
+            <th>Company</th><th>Contact</th><th>Email</th>
+            <th>Closing date</th><th>Stage</th><th>Amount</th><th>Deal owner</th>
+            <th>Website</th><th>LinkedIn</th>
           </tr></thead>
-          <tbody>
-            ${rows
-              .map(
-                (r) => `
-              <tr>
-                <td>${escapeHtml(r.company)}</td>
-                <td>${escapeHtml(r.contact_name || "—")}</td>
-                <td>${escapeHtml(r.email || "—")}</td>
-                <td>${escapeHtml(r.phone || "—")}</td>
-                <td class="wb-subject-cell">${escapeHtml(r.website || "—")}</td>
-                <td class="wb-subject-cell">${escapeHtml(r.linkedin || "—")}</td>
-              </tr>`
-              )
-              .join("")}
-          </tbody>
+          <tbody id="wb-preview-tbody"></tbody>
         </table>
       </section>
     </main>`;
+
+  const ageMinEl = container.querySelector<HTMLInputElement>("#wb-f-agemin")!;
+  const ageMaxEl = container.querySelector<HTMLInputElement>("#wb-f-agemax")!;
+  const stageSel = container.querySelector<HTMLSelectElement>("#wb-f-stage")!;
+  const ownerSel = container.querySelector<HTMLSelectElement>("#wb-f-owner")!;
+  const amtMinEl = container.querySelector<HTMLInputElement>("#wb-f-amtmin")!;
+  const amtMaxEl = container.querySelector<HTMLInputElement>("#wb-f-amtmax")!;
+  const tbody = container.querySelector<HTMLTableSectionElement>("#wb-preview-tbody")!;
+  const selectAll = container.querySelector<HTMLInputElement>("#wb-select-all")!;
+  const selCountEl = container.querySelector<HTMLSpanElement>("#wb-sel-count")!;
+  const visCountEl = container.querySelector<HTMLSpanElement>("#wb-vis-count")!;
+  const configureBtn = container.querySelector<HTMLButtonElement>("#wb-configure-btn")!;
+
+  // Parses both YYYY-MM-DD (our filterable CSV) and DD/MM/YYYY (raw Zoho export).
+  const parseDate = (s: string): Date | null => {
+    s = (s || "").trim();
+    let m = s.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    let y: number, mo: number, da: number;
+    if (m) {
+      y = +m[1]; mo = +m[2]; da = +m[3];
+    } else {
+      m = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+      if (!m) return null;
+      da = +m[1]; mo = +m[2]; y = +m[3];
+    }
+    const d = new Date(y, mo - 1, da);
+    return isNaN(d.getTime()) ? null : d;
+  };
+  const monthsAgo = (s: string): number | null => {
+    const d = parseDate(s);
+    if (!d) return null;
+    const now = new Date();
+    return (now.getFullYear() - d.getFullYear()) * 12 + (now.getMonth() - d.getMonth());
+  };
+  const parseAmount = (s: string): number => parseFloat((s || "").replace(/[^0-9.]/g, ""));
+  const numOrNull = (el: HTMLInputElement): number | null => (el.value.trim() === "" ? null : Number(el.value));
+
+  const rowMatches = (r: WinBackCsvRow): boolean => {
+    const amin = numOrNull(ageMinEl), amax = numOrNull(ageMaxEl);
+    if (amin !== null || amax !== null) {
+      const m = monthsAgo(r.closing_date || "");
+      if (m === null) return false;
+      if (amin !== null && m < amin) return false;
+      if (amax !== null && m > amax) return false;
+    }
+    if (stageSel.value && (r.stage || "").trim() !== stageSel.value) return false;
+    if (ownerSel.value && (r.deal_owner || "").trim() !== ownerSel.value) return false;
+    const lo = numOrNull(amtMinEl), hi = numOrNull(amtMaxEl);
+    if (lo !== null || hi !== null) {
+      const amt = parseAmount(r.amount || "");
+      if (isNaN(amt)) return false;
+      if (lo !== null && amt < lo) return false;
+      if (hi !== null && amt > hi) return false;
+    }
+    return true;
+  };
+
+  const visibleIndices = (): number[] => rows.map((_, i) => i).filter((i) => rowMatches(rows[i]));
+
+  const updateCounts = (vis: number[]) => {
+    selCountEl.textContent = `${selected.size} selected`;
+    visCountEl.textContent = `${vis.length}`;
+    const selVis = vis.filter((i) => selected.has(i)).length;
+    selectAll.checked = vis.length > 0 && selVis === vis.length;
+    selectAll.indeterminate = selVis > 0 && selVis < vis.length;
+    configureBtn.disabled = selected.size === 0;
+    configureBtn.textContent = `Configure generation (${selected.size})`;
+  };
+
+  const renderBody = () => {
+    const vis = visibleIndices();
+    tbody.innerHTML = vis
+      .map((i) => {
+        const r = rows[i];
+        const m = monthsAgo(r.closing_date || "");
+        const ageCell = !r.closing_date
+          ? "—"
+          : m === null
+            ? escapeHtml(r.closing_date)
+            : `${escapeHtml(r.closing_date)} · ${m < 0 ? "future" : `${m} mo`}`;
+        return `
+          <tr>
+            <td><input type="checkbox" class="wb-row-check" data-i="${i}" ${selected.has(i) ? "checked" : ""} /></td>
+            <td>${escapeHtml(r.company)}</td>
+            <td>${escapeHtml(r.contact_name || "—")}</td>
+            <td>${escapeHtml(r.email || "—")}</td>
+            <td>${ageCell}</td>
+            <td>${escapeHtml(r.stage || "—")}</td>
+            <td>${escapeHtml(r.amount || "—")}</td>
+            <td>${escapeHtml(r.deal_owner || "—")}</td>
+            <td class="wb-subject-cell">${escapeHtml(r.website || "—")}</td>
+            <td class="wb-subject-cell">${escapeHtml(r.linkedin || "—")}</td>
+          </tr>`;
+      })
+      .join("");
+    tbody.querySelectorAll<HTMLInputElement>(".wb-row-check").forEach((cb) => {
+      cb.addEventListener("change", () => {
+        const i = Number(cb.dataset.i);
+        if (cb.checked) selected.add(i);
+        else selected.delete(i);
+        updateCounts(visibleIndices());
+      });
+    });
+    updateCounts(vis);
+  };
+
+  [ageMinEl, ageMaxEl, amtMinEl, amtMaxEl].forEach((el) => el.addEventListener("input", renderBody));
+  [stageSel, ownerSel].forEach((el) => el.addEventListener("change", renderBody));
+
+  selectAll.addEventListener("change", () => {
+    const vis = visibleIndices();
+    if (selectAll.checked) vis.forEach((i) => selected.add(i));
+    else vis.forEach((i) => selected.delete(i));
+    renderBody();
+  });
 
   container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", () => {
     showLeadPicker(container);
   });
 
-  container.querySelector<HTMLButtonElement>("#wb-configure-btn")!.addEventListener("click", () => {
-    showGenerationConfig(container, rows);
+  configureBtn.addEventListener("click", () => {
+    if (selected.size === 0) return;
+    showGenerationConfig(container, rows.filter((_, i) => selected.has(i)));
   });
+
+  renderBody();
 }
 
 // --- Campaign configuration sub-view ---
 
 function showGenerationConfig(container: HTMLElement, rows: WinBackCsvRow[]): void {
-  const defaultRelationshipContext = "These recipients are previous Winchester Corporate Finance customers. Acknowledge the existing funding relationship naturally, without inventing a specific facility, amount or date.";
+  const defaultRelationshipContext = "These are past Winchester Corporate Finance contacts being re-engaged about funding. Only treat someone as an existing customer where their record shows a completed (Closed Won) deal — otherwise write as re-opening an earlier funding conversation. Never imply WCF has funded a company unless its data confirms it.";
   container.innerHTML = `
     <main class="container">
       <section class="card">

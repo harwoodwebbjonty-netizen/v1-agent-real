@@ -1,3 +1,4 @@
+import asyncio
 import hashlib
 import logging
 from datetime import datetime
@@ -129,6 +130,28 @@ def _text_to_html(text: str) -> str:
     return "".join(f"<p>{_html.escape(p).replace(chr(10), '<br>')}</p>" for p in paragraphs)
 
 
+# Mailchimp "text" merge fields hard-cap at 255 characters, so a full email body
+# is split across several fields and re-joined (with NO separator) in the campaign
+# HTML. The join is lossless because chunk[0] + chunk[1] + ... exactly reconstructs
+# the original string before Mailchimp renders it — a mid-word split at a chunk
+# boundary reassembles correctly. Five 250-char fields hold ~1,250 chars, well
+# above the ~100-word (~700-char) cap the generator enforces incl. signature/link.
+_BODY_MERGE_FIELDS = ("EMAILBODY", "EMAILBODY2", "EMAILBODY3", "EMAILBODY4", "EMAILBODY5")
+_BODY_CHUNK_SIZE = 250
+
+
+def _chunk_body(body: str) -> list:
+    """Split an email body into one fixed-size chunk per body merge field.
+
+    Always returns exactly len(_BODY_MERGE_FIELDS) items, padded with empty
+    strings so every field is written on each upsert — that clears any stale
+    value left over from a previous, longer export to the same contact.
+    """
+    body = body or ""
+    chunks = [body[i:i + _BODY_CHUNK_SIZE] for i in range(0, len(body), _BODY_CHUNK_SIZE)]
+    return (chunks + [""] * len(_BODY_MERGE_FIELDS))[:len(_BODY_MERGE_FIELDS)]
+
+
 async def _ensure_merge_field(base: str, api_key: str, audience_id: str, tag: str, name: str, field_type: str) -> None:
     """Create a merge field if it doesn't already exist."""
     async with httpx.AsyncClient(timeout=15.0) as client:
@@ -157,6 +180,20 @@ async def _create_static_segment(base: str, api_key: str, audience_id: str, name
     return r.json()["id"]
 
 
+def _mc_error_detail(resp) -> str:
+    """Pull Mailchimp's field-specific validation errors into a readable string
+    so a 400 says WHICH field failed (e.g. 'settings.reply_to: is not valid')
+    instead of an opaque, truncated 'Invalid Resource'."""
+    try:
+        data = resp.json()
+    except Exception:
+        return resp.text[:400]
+    field_errs = "; ".join(
+        f"{e.get('field', '?')}: {e.get('message', '')}" for e in data.get("errors", [])
+    )
+    return field_errs or data.get("detail", "") or resp.text[:400]
+
+
 async def export_outreach_campaign(
     campaign_name: str,
     from_name: str,
@@ -179,22 +216,25 @@ async def export_outreach_campaign(
     dc = _dc_from_key(api_key)
 
     await _ensure_merge_field(base, api_key, audience_id, "EMAILSUBJ", "Email Subject", "text")
-    await _ensure_merge_field(base, api_key, audience_id, "EMAILBODY", "Email Body", "text")
+    for idx, tag in enumerate(_BODY_MERGE_FIELDS):
+        await _ensure_merge_field(base, api_key, audience_id, tag, f"Email Body {idx + 1}", "text")
 
-    exported = 0
-    skipped = 0
-    exported_emails: list[str] = []
-    for draft in drafts:
+    # Upsert contacts concurrently over a shared connection pool. Mailchimp
+    # allows ~10 simultaneous connections per key, so a semaphore of 8 keeps us
+    # safely under that while turning ~1,100+ sequential round-trips (which blew
+    # past nginx's ~60s upstream timeout → 504) into 8-wide parallelism.
+    sem = asyncio.Semaphore(8)
+
+    async def _upsert(client, draft):
         email_addr = (draft.get("contact_email") or "").strip()
         if not email_addr:
-            skipped += 1
-            continue
+            return None
         full_name = (draft.get("contact_name") or "").strip()
         parts = full_name.split(" ", 1)
         first = parts[0] if parts else ""
         last = parts[1] if len(parts) > 1 else ""
-        try:
-            async with httpx.AsyncClient(timeout=15.0) as client:
+        async with sem:
+            try:
                 resp = await client.put(
                     f"{base}/lists/{audience_id}/members/{_email_hash(email_addr)}",
                     json={
@@ -205,20 +245,24 @@ async def export_outreach_campaign(
                             "LNAME": last,
                             "COMPANY": draft.get("company") or "",
                             "EMAILSUBJ": (draft.get("subject") or "")[:255],
-                            "EMAILBODY": draft.get("body") or "",
+                            **dict(zip(_BODY_MERGE_FIELDS, _chunk_body(draft.get("body") or ""))),
                         },
                     },
                     auth=("anystring", api_key),
                 )
-            if resp.status_code in (200, 201):
-                exported += 1
-                exported_emails.append(email_addr)
-            else:
-                logger.warning("Mailchimp upsert failed for %s: %s", email_addr, resp.text[:120])
-                skipped += 1
-        except Exception:
-            logger.exception("Mailchimp upsert error for %s", email_addr)
-            skipped += 1
+            except Exception:
+                logger.exception("Mailchimp upsert error for %s", email_addr)
+                return None
+        if resp.status_code in (200, 201):
+            return email_addr
+        logger.warning("Mailchimp upsert failed for %s: %s", email_addr, resp.text[:120])
+        return None
+
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        results = await asyncio.gather(*[_upsert(client, d) for d in drafts])
+    exported_emails = [e for e in results if e]
+    exported = len(exported_emails)
+    skipped = len(drafts) - exported
 
     if exported == 0:
         raise MailchimpError("No contacts could be added — check that leads have email addresses on file.")
@@ -244,7 +288,7 @@ async def export_outreach_campaign(
     async with httpx.AsyncClient(timeout=15.0) as client:
         r = await client.post(f"{base}/campaigns", json=campaign_payload, auth=("anystring", api_key))
         if r.status_code not in (200, 201):
-            raise MailchimpError(f"Campaign create failed ({r.status_code}): {r.text[:200]}")
+            raise MailchimpError(f"Campaign create failed ({r.status_code}): {_mc_error_detail(r)}")
         campaign_id = r.json()["id"]
         web_id = r.json().get("web_id", "")
 
@@ -253,9 +297,12 @@ async def export_outreach_campaign(
         # them automatically outside its own template builder. Omitting them
         # previously meant recipients had no opt-out link, which drives up
         # spam-complaint rates and damages sender reputation over time.
+        # Re-join the chunked body fields with no separator so Mailchimp
+        # reconstructs the full email before rendering (see _chunk_body).
+        body_tags = "".join(f"*|{t}|*" for t in _BODY_MERGE_FIELDS)
         html_body = (
             "<html><body style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
-            "*|EMAILBODY|*"
+            f"{body_tags}"
             "<div style='margin-top:24px;padding-top:16px;border-top:1px solid #e0e0e0;"
             "font-size:11px;color:#888888;text-align:center'>"
             "*|LIST:ADDRESS|*<br>"
