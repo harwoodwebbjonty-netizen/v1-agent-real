@@ -892,21 +892,31 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
     btn.textContent = "Loading…";
     try {
       const data = await getWinBackCampaignRows(campaign.id);
-      if (!data.available || data.rows.length === 0) {
-        btn.disabled = false;
-        btn.textContent = "Run again";
-        alert("This campaign predates re-run support — its uploaded list wasn't saved. Upload the CSV again to start a new campaign.");
+      // New campaigns store their uploaded CSV — re-run straight from it.
+      if (data.available && data.rows.length > 0) {
+        clearPoll();
+        presentLeadReview(container, data.rows, {
+          defaults: data.defaults,
+          onBack: () => showCampaignDetail(container, campaign.id),
+        });
         return;
       }
+      // Older campaigns predate CSV storage — re-import the file, but still carry
+      // this campaign's saved settings so Configure comes pre-filled.
+      btn.disabled = false;
+      btn.textContent = "Run again";
+      const path = await openDialog({ multiple: false, filters: [{ name: "CSV files", extensions: ["csv"] }] });
+      if (!path || typeof path !== "string") return;
+      const allRows = await parseWinBackCsv(path);
       clearPoll();
-      presentLeadReview(container, data.rows, {
+      presentLeadReview(container, allRows, {
         defaults: data.defaults,
         onBack: () => showCampaignDetail(container, campaign.id),
       });
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "Run again";
-      alert(`Could not load the campaign's leads: ${err}`);
+      alert(`Could not re-run the campaign: ${String(err)}`);
     }
   });
 
