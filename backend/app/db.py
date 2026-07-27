@@ -1919,6 +1919,19 @@ def get_win_back_emails(campaign_id: str) -> list[sqlite3.Row]:
         ).fetchall()
 
 
+def count_win_back_emails(campaign_id: str) -> int:
+    """Number of emails actually generated (saved) for a campaign — the truthful
+    'generated' count. The stored progress column used to advance even for leads
+    skipped at the credit ceiling, so a partial run could read a full 'X of X';
+    counting real rows here can never over-report."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(*) AS n FROM win_back_emails WHERE campaign_id = ?",
+            (campaign_id,),
+        ).fetchone()
+        return row["n"] if row else 0
+
+
 def upsert_win_back_email(campaign_id: str, lead_id: str, email_id: str, subject: str, body: str, created_at: str) -> None:
     with get_connection() as conn:
         conn.execute(

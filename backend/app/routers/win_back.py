@@ -321,7 +321,11 @@ def _campaign_dict(row: sqlite3.Row) -> dict:
         "name": row["name"],
         "status": row["status"],
         "total": row["total"],
-        "generated": row["generated"],
+        # Report the real number of saved emails, not the stored progress
+        # counter — the counter advances even for leads skipped at the credit
+        # ceiling, so it could read a full "X of X" for a partial run and hide
+        # the Resume button. Counting actual emails can never over-report.
+        "generated": db.count_win_back_emails(row["id"]),
         "created_at": row["created_at"],
         "email_instruction": row["email_instruction"] if "email_instruction" in row.keys() else "",
         "offer_context": row["offer_context"] if "offer_context" in row.keys() else "",
