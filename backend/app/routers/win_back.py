@@ -316,11 +316,21 @@ async def _fetch_ch_data_for_company(company_name: str) -> str:
 # --- Response helpers ---
 
 def _campaign_dict(row: sqlite3.Row) -> dict:
+    # Report the total as DISTINCT leads. A pre-fix campaign's stored lead list
+    # can contain the same lead several times (duplicate CSV rows), which used to
+    # inflate the denominator so "X of Y" could never reach 100%.
+    stored_ids = None
+    if "lead_ids" in row.keys() and row["lead_ids"]:
+        try:
+            stored_ids = json.loads(row["lead_ids"])
+        except (json.JSONDecodeError, TypeError):
+            stored_ids = None
+    total = len(set(stored_ids)) if stored_ids else row["total"]
     return {
         "id": row["id"],
         "name": row["name"],
         "status": row["status"],
-        "total": row["total"],
+        "total": total,
         # Report the real number of saved emails, not the stored progress
         # counter — the counter advances even for leads skipped at the credit
         # ceiling, so it could read a full "X of X" for a partial run and hide
@@ -401,6 +411,7 @@ async def create_campaign_from_csv(
     to_generate_lead_ids: list[str] = []
     owner_by_lead: dict = {}
     stage_by_lead: dict = {}
+    seen_lead_ids: set[str] = set()
     pre_generated_count = 0
     ts = now_iso()
     campaign_id = new_id()
@@ -416,8 +427,6 @@ async def create_campaign_from_csv(
             owner_user_id=current_user.id,
             created_at=ts,
         )
-        owner_by_lead[lead_id] = row.deal_owner.strip()
-        stage_by_lead[lead_id] = row.stage.strip()
         extra = {k: v for k, v in {
             "contact_name": row.contact_name,
             "website": row.website,
@@ -429,6 +438,16 @@ async def create_campaign_from_csv(
             db.update_lead_fields(lead_id, extra, ts)
         if row.email:
             db.add_email_ignore_duplicate(new_id(), lead_id, row.email, "csv_import", ts)
+
+        # A CSV often lists the same company on several deal rows; create_lead
+        # merges those into ONE lead, so queue each distinct lead only once.
+        # Otherwise the same company is generated (and charged £0.20) several
+        # times and ends up with duplicate emails. First row's owner/stage win.
+        if lead_id in seen_lead_ids:
+            continue
+        seen_lead_ids.add(lead_id)
+        owner_by_lead[lead_id] = row.deal_owner.strip()
+        stage_by_lead[lead_id] = row.stage.strip()
         lead_ids.append(lead_id)
 
         # Row was already previewed under the exact same generation settings
@@ -570,7 +589,9 @@ async def resume_campaign(campaign_id: str, current_user: CurrentUser = Depends(
         )
 
     done_lead_ids = {e["lead_id"] for e in db.get_win_back_emails(campaign_id)}
-    missing = [lid for lid in stored if lid not in done_lead_ids]
+    # Dedupe: a pre-fix campaign's stored list can contain the same lead several
+    # times (duplicate CSV rows), and each should only be generated once.
+    missing = list(dict.fromkeys(lid for lid in stored if lid not in done_lead_ids))
     if not missing:
         raise HTTPException(status_code=400, detail="Nothing to resume — every lead already has an email.")
 

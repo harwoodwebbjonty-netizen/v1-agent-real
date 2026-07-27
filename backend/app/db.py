@@ -1906,7 +1906,11 @@ def get_win_back_campaign(campaign_id: str) -> Optional[sqlite3.Row]:
 
 
 def get_win_back_emails(campaign_id: str) -> list[sqlite3.Row]:
-    """Returns win_back_emails joined with lead contact info."""
+    """Returns win_back_emails joined with lead contact info, ONE row per lead —
+    the most recently generated email for that lead. A CSV that lists the same
+    company on several rows could generate several emails for one lead; keeping
+    only the latest here means the detail view, the count, and the Mailchimp
+    export all show/send a single email per company."""
     with get_connection() as conn:
         return conn.execute(
             """SELECT we.*, l.company, l.contact_name, l.contact_title,
@@ -1914,30 +1918,43 @@ def get_win_back_emails(campaign_id: str) -> list[sqlite3.Row]:
                FROM win_back_emails we
                JOIN leads l ON l.id = we.lead_id
                WHERE we.campaign_id = ?
+                 AND we.id = (
+                     SELECT we2.id FROM win_back_emails we2
+                     WHERE we2.campaign_id = we.campaign_id AND we2.lead_id = we.lead_id
+                     ORDER BY we2.created_at DESC, we2.id DESC LIMIT 1
+                 )
                ORDER BY we.created_at""",
             (campaign_id,),
         ).fetchall()
 
 
 def count_win_back_emails(campaign_id: str) -> int:
-    """Number of emails actually generated (saved) for a campaign — the truthful
-    'generated' count. The stored progress column used to advance even for leads
-    skipped at the credit ceiling, so a partial run could read a full 'X of X';
-    counting real rows here can never over-report."""
+    """Number of DISTINCT leads that have an email — the truthful 'generated'
+    count. Counting distinct leads (not rows) means duplicate emails for one
+    company can't inflate it, and a run stopped at the credit ceiling can't read
+    a full 'X of X' (the stored progress column used to advance even for skipped
+    leads)."""
     with get_connection() as conn:
         row = conn.execute(
-            "SELECT COUNT(*) AS n FROM win_back_emails WHERE campaign_id = ?",
+            "SELECT COUNT(DISTINCT lead_id) AS n FROM win_back_emails WHERE campaign_id = ?",
             (campaign_id,),
         ).fetchone()
         return row["n"] if row else 0
 
 
 def upsert_win_back_email(campaign_id: str, lead_id: str, email_id: str, subject: str, body: str, created_at: str) -> None:
+    """One email per (campaign, lead). Any existing email for this lead in this
+    campaign is replaced, so regenerating a lead never stacks a second row (the
+    old INSERT used a fresh id and the ON CONFLICT(id) never fired, which is how
+    a company ended up with several drafts)."""
     with get_connection() as conn:
         conn.execute(
+            "DELETE FROM win_back_emails WHERE campaign_id = ? AND lead_id = ?",
+            (campaign_id, lead_id),
+        )
+        conn.execute(
             """INSERT INTO win_back_emails (id, campaign_id, lead_id, subject, body, send_status, created_at)
-               VALUES (?, ?, ?, ?, ?, 'draft', ?)
-               ON CONFLICT(id) DO UPDATE SET subject = excluded.subject, body = excluded.body""",
+               VALUES (?, ?, ?, ?, ?, 'draft', ?)""",
             (email_id, campaign_id, lead_id, subject, body, created_at),
         )
 
