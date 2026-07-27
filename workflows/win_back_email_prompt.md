@@ -258,59 +258,19 @@ Never use buzzwords.
 
 EMAIL STRUCTURE
 
-Sentence 1
+There is no fixed template. Do not follow a set sequence of sentences. Write it the way a real broker would actually type a quick, genuine note, and let the shape and length vary from one lead to the next, so no two emails read the same.
 
-Personalised opening based on the strongest business trigger.
+In as few sentences as it takes, get across two things, in whatever order feels natural:
 
-Reference something specific about what you're doing or your sector — addressed to them as "you", not their company by name.
+1. The one real reason you're writing to THEM: the specific hook from their data, spoken to "you", not their company by name.
 
-Sentence 2
+2. A genuine, easy invitation to talk.
 
-Explain clearly why Winchester Corporate Finance could help.
+That is it. Do not bolt on extra parts just to hit a structure.
 
-Be specific about the type of finance relevant to this trigger.
+Credibility: you may mention ONE credibility point ONLY if it genuinely fits the thought. Most emails are stronger without it. Never recite company stats ("access to 250+ lenders", "over £150 million sourced") by reflex; dropped in for no reason they read as marketing. If it does not earn its place, leave it out. Never mention more than one.
 
-Sentence 3
-
-Mention one credibility point naturally.
-
-Examples
-
-Access to 250+ lenders
-
-Over £150 million sourced since 2018
-
-Independent advice — not tied to any one lender
-
-Quick decisions
-
-Tailored to each business
-
-Never mention more than one credibility point.
-
-Sentence 4
-
-A confident, time-specific call to action.
-
-It should be direct and low-friction — a specific ask, not a vague suggestion.
-
-Examples
-
-If you have 10 minutes this week, I am happy to run through the options on a call.
-
-Happy to jump on a quick call this week and talk through what is available.
-
-If you can spare 10 minutes, a call this week would give me a clear picture of what might work.
-
-I have availability this week if a quick call makes sense.
-
-The CTA must always be about booking or suggesting a call.
-
-Never write a wishy-washy CTA like "would it be worth a quick chat?" or "would you be open to a call?"
-
-Never end with a question that sounds uncertain or apologetic.
-
-Be direct. Be specific. Assume they are worth contacting.
+The close: end with a natural, low-key invitation to talk, with a clear and easy next step. It does not have to be a confident, time-boxed "10 minutes this week" ask. "Worth a quick chat?", "happy to talk it through whenever suits", or "give me a shout if it's useful" are all fine. Keep it warm and unpushy. Do not end on something uncertain or apologetic, but do not force salesy urgency either.
 
 After the CTA sentence, add a booking link on its own line.
 
@@ -352,7 +312,7 @@ These are hard limits, not guidance. If the email is over 70 words or more than 
 
 PERSONALISATION RULES
 
-Every email must contain at least two genuine personalised references where data allows.
+Every email must hang on ONE genuine, specific reason you're writing to this person. One real hook, spoken naturally, beats a pile of references. Add a second only if it comes up naturally in the same thought; never stack references to prove you did research.
 
 Personalisation should explain WHY you're writing to them.
 

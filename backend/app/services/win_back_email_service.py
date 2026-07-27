@@ -433,7 +433,7 @@ async def generate_win_back_email(lead_context: dict) -> dict:
         user_message = base_message if attempt == 0 else base_message + _RETRY_REMINDER
         try:
             response = await client.messages.create(
-                model=get_settings().extraction_model,
+                model=get_settings().win_back_writer_model,
                 system=system_prompt,
                 messages=[{"role": "user", "content": user_message}],
                 max_tokens=MAX_TOKENS,

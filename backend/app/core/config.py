@@ -13,6 +13,11 @@ class Settings(BaseSettings):
     anthropic_api_key: str
     model: str = "claude-sonnet-4-6"
     extraction_model: str = "claude-haiku-4-5-20251001"
+    # Win-back emails are written by this model specifically. Kept separate from
+    # extraction_model (Haiku, shared by phone-lookup, email/LinkedIn discovery,
+    # enrichment and research extraction) so the win-back copy can use a stronger
+    # writer for a more natural, human voice without changing those cheaper tools.
+    win_back_writer_model: str = "claude-sonnet-4-6"
     rate_limit: str = "10/minute"
     max_pause_turn_continuations: int = 3
 
