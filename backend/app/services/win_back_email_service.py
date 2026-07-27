@@ -319,6 +319,17 @@ def _strip_fallback_calendly_link(body: str) -> str:
     return re.sub(r"\n{3,}", "\n\n", "\n".join(lines)).strip()
 
 
+def _clean_link_text(text: str) -> str:
+    """Normalises operator-supplied link display text before it becomes a live
+    link label. Text wrapped in square brackets (e.g. '[ pick a time here ]')
+    reads as an unfilled placeholder and must never ship as a real CTA label,
+    so strip matched surrounding brackets and any edge whitespace."""
+    text = (text or "").strip()
+    while len(text) >= 2 and text.startswith("[") and text.endswith("]"):
+        text = text[1:-1].strip()
+    return text
+
+
 def apply_campaign_link(email: dict, campaign_links: str, link_text: str) -> dict:
     """Guarantees the operator's approved campaign link — not the prompt's
     hardcoded Calendly fallback — is the one and only CTA link in the body.
@@ -336,7 +347,7 @@ def apply_campaign_link(email: dict, campaign_links: str, link_text: str) -> dic
     if FALLBACK_CALENDLY_URL not in urls:
         email["body"] = _strip_fallback_calendly_link(email["body"])
 
-    link_text = link_text.strip()
+    link_text = _clean_link_text(link_text)
     primary_url = urls[0]
     display = f'<a href="{primary_url}">{html.escape(link_text)}</a>' if link_text else primary_url
     if primary_url in email["body"]:
