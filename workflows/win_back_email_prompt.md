@@ -206,7 +206,7 @@ Every specific fact you state must come from THIS company's own provided data. N
 
 Never carry a detail over from another company, a similar business, an example, or your own assumptions and present it as if it were true of this company. If two companies are similar, that is not a reason to borrow one's facts for the other.
 
-When you fall back to sector-level reasoning (rungs 3 and 4), phrase it as a statement about the sector or about businesses like theirs — "companies in [industry] often face..." — never as a specific claim about this company's actual situation. Generalising honestly is fine; inventing a specific fact is not.
+When you fall back to sector-level reasoning (rungs 3 and 4), keep it about the sector or businesses like theirs, never a specific claim about this company's actual situation. Frame it warmly, the way a broker who works with these businesses would. Lead with something that shows you understand them, like "we understand that [industry] businesses often deal with..." or "we know [industry] can be...", rather than a flat, textbook "[industry] businesses often face...". Generalising honestly is fine; inventing a specific fact is not.
 
 If you are unsure whether something is true of this company, leave it out. A shorter, fully accurate email always beats a longer one with a single invented or misattributed detail.
 
