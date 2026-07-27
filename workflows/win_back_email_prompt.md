@@ -244,6 +244,8 @@ Good: "the right facility for your business" — "with what you're building, cas
 
 Bad: "the right facility for [Company] Ltd" — "[Company] is growing fast".
 
+DON'T STATE, RELATE. Never drop a general or sector observation as a flat fact like "Events businesses often face seasonal cash-flow gaps." Lead with a warm phrase that shows you get it, and vary it so no two emails open the same way: "we understand that...", "we know...", "we often find...", "in our experience...", "a lot of the [industry] firms we work with...". That turns a cold statement into something a real person would actually type. Use a different one each time, never the same opener twice in a batch.
+
 Never sound like marketing.
 
 Never exaggerate.
