@@ -368,9 +368,10 @@ function presentLeadReview(
   const stages = Array.from(new Set(rows.map((r) => (r.stage || "").trim()).filter(Boolean))).sort();
   const owners = Array.from(new Set(rows.map((r) => (r.deal_owner || "").trim()).filter(Boolean))).sort();
 
-  // Selection state: every imported (emailable) row starts ticked. Only ticked
-  // rows are ever handed to generation, so filtering is purely a way to narrow
-  // the list for bulk select/deselect — ticks persist across filter changes.
+  // Selection state: every imported (emailable) row starts ticked. Generation
+  // runs on the rows that are BOTH ticked AND matching the current filter, so
+  // the filter genuinely narrows who gets emailed. Ticks persist across filter
+  // changes (untick within a filter to trim that subset further).
   const selected = new Set<number>(rows.map((_, i) => i));
 
   container.innerHTML = `
@@ -495,13 +496,15 @@ function presentLeadReview(
   const visibleIndices = (): number[] => rows.map((_, i) => i).filter((i) => rowMatches(rows[i]));
 
   const updateCounts = (vis: number[]) => {
-    selCountEl.textContent = `${selected.size} selected`;
-    visCountEl.textContent = `${vis.length}`;
+    // Only rows that are ticked AND currently visible (matching the filter) get
+    // emailed, so every count/label reflects that intersection, not all ticks.
     const selVis = vis.filter((i) => selected.has(i)).length;
+    selCountEl.textContent = `${selVis} selected`;
+    visCountEl.textContent = `${vis.length}`;
     selectAll.checked = vis.length > 0 && selVis === vis.length;
     selectAll.indeterminate = selVis > 0 && selVis < vis.length;
-    configureBtn.disabled = selected.size === 0;
-    configureBtn.textContent = `Configure generation (${selected.size})`;
+    configureBtn.disabled = selVis === 0;
+    configureBtn.textContent = `Configure generation (${selVis})`;
   };
 
   const renderBody = () => {
@@ -554,10 +557,13 @@ function presentLeadReview(
   container.querySelector<HTMLButtonElement>("#wb-back-btn")!.addEventListener("click", onBack);
 
   configureBtn.addEventListener("click", () => {
-    if (selected.size === 0) return;
-    // Only the ticked rows are generated; the FULL list is stored as the new
-    // campaign's source rows so it can be re-run again later.
-    showGenerationConfig(container, rows.filter((_, i) => selected.has(i)), {
+    // Only rows that are ticked AND match the current filter are generated; the
+    // FULL list is stored as the new campaign's source rows so it can be re-run
+    // again later.
+    const vis = new Set(visibleIndices());
+    const chosen = rows.filter((_, i) => selected.has(i) && vis.has(i));
+    if (chosen.length === 0) return;
+    showGenerationConfig(container, chosen, {
       defaults: opts?.defaults,
       sourceRows: allRows,
     });
