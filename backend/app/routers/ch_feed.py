@@ -73,30 +73,28 @@ async def add_charge_as_lead(
         db.mark_ch_charge_added(charge_id, existing_lead_id)
         return {"lead_id": existing_lead_id, "created": False}
 
-    # Create a minimal lead record from the charge data
-    import json
+    # Create a minimal lead record from the charge data. Use the canonical
+    # db.create_lead() helper rather than a hand-rolled INSERT: it fills every
+    # NOT NULL column (timestamp/phone_number/source_url/notes/…) and dedupes by
+    # company. The old raw INSERT wrote a non-existent `source` column and
+    # omitted required columns, so this endpoint 500'd on every click.
     from app.services.auth_service import now_iso as _now_iso
 
-    settings = get_settings()
-    lead_id = new_id()
     company_name = charge.get("company_name") or company_number or "Unknown"
-
-    with db.get_connection() as conn:
-        conn.execute(
-            """
-            INSERT INTO leads
-              (id, company, company_number, status, owner_user_id, created_at, updated_at, source)
-            VALUES (?, ?, ?, 'prospect', ?, ?, ?, 'ch_charge_feed')
-            """,
-            (
-                lead_id,
-                company_name,
-                company_number,
-                current_user.id,
-                _now_iso(),
-                _now_iso(),
-            ),
-        )
+    now = _now_iso()
+    new_lead_id = new_id()
+    lead_id = db.create_lead(
+        id=new_lead_id,
+        timestamp=now,
+        company=company_name,
+        phone_number="",
+        source_url="",
+        status="unverified",
+        notes="Added from Companies House charge feed",
+        owner_user_id=current_user.id,
+        created_at=now,
+        company_number=company_number or None,
+    )
 
     db.mark_ch_charge_added(charge_id, lead_id)
-    return {"lead_id": lead_id, "created": True}
+    return {"lead_id": lead_id, "created": lead_id == new_lead_id}

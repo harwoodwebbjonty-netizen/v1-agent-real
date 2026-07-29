@@ -39,7 +39,12 @@ class LeadOut(BaseModel):
     company: str
     phone_number: str
     source_url: str
-    status: Literal["verified", "unverified", "not_found"]
+    # Phone-verification status for AI-looked-up leads is "verified"/"unverified"/
+    # "not_found", but imported/migrated leads carry whatever their source CSV set
+    # (commonly "New"). Keep this a plain str — a strict Literal here made a single
+    # unexpected value raise ValidationError and 500 the WHOLE /leads list, wiping
+    # every lead from the UI at once.
+    status: str
     notes: str
     industry: str
     contact_status: str
