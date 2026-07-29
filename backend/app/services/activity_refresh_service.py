@@ -1,4 +1,4 @@
-"""Activity refresh service — tiered background scheduler for DataGardener snapshots.
+"""Activity refresh service — tiered background scheduler for Companies House snapshots.
 
 Mirrors the sequences_service pattern: process_due_refreshes() is called from
 main.py's in-process asyncio loop every 30 minutes. One failure per lead never

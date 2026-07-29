@@ -1,4 +1,4 @@
-"""Activity Feed router — serves DataGardener-powered company event streams."""
+"""Activity Feed router — serves Companies House-powered company event streams."""
 
 import asyncio
 import logging
@@ -56,7 +56,7 @@ async def trigger_lead_refresh(
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     if not dict(lead).get("company_number"):
-        raise HTTPException(status_code=422, detail="Lead has no Companies House number — cannot refresh from DataGardener")
+        raise HTTPException(status_code=422, detail="Lead has no Companies House number — cannot refresh its activity feed")
     settings = get_settings()
     if not settings.companies_house_api_key:
         raise HTTPException(status_code=503, detail="Companies House API key not configured")

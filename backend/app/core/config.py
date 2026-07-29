@@ -39,9 +39,10 @@ class Settings(BaseSettings):
     # stream (charge feed). Falls back to companies_house_api_key if not set.
     companies_house_stream_key: str = ""
 
-    # DataGardener API — powers the Recent Activity Feed (charge changes,
-    # director/PSC events, risk alerts). Leave empty to disable the feature
-    # — all activity dots stay grey and no background refreshes run.
+    # Legacy — DataGardener has been replaced by Companies House as the
+    # activity-feed source (see ch_service.py). This key is no longer read by
+    # anything; the feed now runs on COMPANIES_HOUSE_API_KEY. Kept only so an
+    # existing DATAGARDENER_API_KEY in a .env doesn't raise on load.
     datagardener_api_key: str = ""
 
     # Mailchimp — optional, for win-back campaign export. Leave empty to

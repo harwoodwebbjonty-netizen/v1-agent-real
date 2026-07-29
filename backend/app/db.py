@@ -314,7 +314,7 @@ def _migration_007_prospecting_named_lists(conn: sqlite3.Connection) -> None:
 
 
 def _migration_008_activity_feed(conn: sqlite3.Connection) -> None:
-    """DataGardener-powered activity feed. Append-only snapshots + structured
+    """Companies House-powered activity feed. Append-only snapshots + structured
     change events for each lead's Companies House company number. Three new
     columns on leads control the tiered background refresh schedule."""
     conn.executescript(
@@ -1744,7 +1744,7 @@ def delete_email_oauth_account(user_id: str, provider: str) -> None:
         )
 
 
-# --- DataGardener activity feed (append-only snapshots + structured change events) ---
+# --- Companies House activity feed (append-only snapshots + structured change events) ---
 
 def get_latest_snapshot(company_number: str) -> Optional[sqlite3.Row]:
     with get_connection() as conn:
@@ -1854,7 +1854,7 @@ def get_batch_activity_summaries(lead_ids: list[str]) -> dict[str, dict]:
 
 def list_due_dg_refreshes(now_iso: str, limit: int = 20) -> list[sqlite3.Row]:
     """Leads with a Companies House number that are due (or not yet scheduled)
-    for a DataGardener refresh."""
+    for a Companies House activity refresh."""
     with get_connection() as conn:
         return conn.execute(
             """SELECT * FROM leads

@@ -2275,6 +2275,48 @@ body.compact-rows td {
 }
 .p-filter-chip-x:hover { opacity: 1; }
 
+/* Interactive filter chips (activity feed: CH filings + lead-activity toggles).
+   Prospecting's active-filter strip renders <span class="p-filter-chip"> for
+   display only, so scope the clickable behaviour to <button> to leave it alone. */
+button.p-filter-chip {
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+button.p-filter-chip:hover {
+  border-color: var(--accent-core);
+  color: var(--text);
+}
+button.p-filter-chip.active {
+  background: var(--accent-core);
+  border-color: var(--accent-core);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
+/* Time-range presets in the lead-activity feed (single-select) */
+.p-date-preset {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  font-size: var(--text-xs);
+  color: var(--text);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.1s, color 0.1s, border-color 0.1s;
+}
+.p-date-preset:hover {
+  border-color: var(--accent-core);
+}
+.p-date-preset.active {
+  background: var(--accent-core);
+  border-color: var(--accent-core);
+  color: var(--on-accent);
+  font-weight: 500;
+}
+
 /* Section divider inside prospecting form */
 .p-section-label {
   font-size: var(--text-xs);

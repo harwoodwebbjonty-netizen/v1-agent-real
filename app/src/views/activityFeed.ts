@@ -71,7 +71,7 @@ interface State {
   chOffset: number;
   chHasMore: boolean;
   chAddingIds: Set<string>;
-  // DataGardener
+  // Lead activity (Companies House) — dg* names kept for stable data-attr wiring
   dgEvents: ActivityEvent[];
   dgLoading: boolean;
   dgConfigured: boolean;
@@ -193,7 +193,7 @@ function renderChBody(): string {
   return rows + more;
 }
 
-// ── DataGardener rendering ───────────────────────────────────────────────────
+// ── Lead activity (Companies House) rendering ────────────────────────────────
 function renderDgRow(ev: ActivityEvent): string {
   const label = ev.event_type.replace(/_/g, " ");
   return `
@@ -239,7 +239,7 @@ function renderDgBody(): string {
   if (!s.dgConfigured) {
     return `<div class="activity-empty-state">
       <strong>Activity feed not configured</strong>
-      <p class="text-muted">Add <code>DATAGARDENER_API_KEY</code> to the backend <code>.env</code> to enable lead activity signals.</p>
+      <p class="text-muted">Add <code>COMPANIES_HOUSE_API_KEY</code> to the backend <code>.env</code> to enable lead activity signals.</p>
     </div>`;
   }
   if (s.dgLoading) return `<div class="activity-empty-state">Loading activity feed…</div>`;
@@ -262,7 +262,7 @@ function render(): void {
       <p class="text-muted" style="margin:0">
         ${chActive
           ? "Live Companies House filings — all types, streamed in real time"
-          : "Lead activity signals from DataGardener for companies in your CRM"}
+          : "Lead activity signals from Companies House for companies in your CRM"}
       </p>
     </div>
     <div class="af-tab-bar">
@@ -285,12 +285,24 @@ function rebuildBody(): void {
   const body = document.getElementById("af-body");
   if (!body) return;
   body.innerHTML = s.tab === "ch" ? renderChBody() : renderDgBody();
+  // Only the body is re-rendered here, so only re-bind body-level handlers.
+  // The filter chips persist across reloads — re-binding them (as the old
+  // combined bindEvents did on every load, incl. the 30s poll) stacked up
+  // duplicate listeners, so each chip click toggled an even number of times
+  // and cancelled itself out.
   const container = document.getElementById("view-activity-feed");
-  if (container) bindEvents(container);
+  if (container) bindBodyEvents(container);
 }
 
 // ── Event binding ────────────────────────────────────────────────────────────
 function bindEvents(container: HTMLElement): void {
+  bindFilterEvents(container);
+  bindBodyEvents(container);
+}
+
+// Filters live outside #af-body and are only re-created by a full render(),
+// so their handlers are bound once per render — never from rebuildBody().
+function bindFilterEvents(container: HTMLElement): void {
   // Tab switches
   container.querySelectorAll<HTMLButtonElement>(".af-tab[data-tab]").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -299,19 +311,22 @@ function bindEvents(container: HTMLElement): void {
     });
   });
 
-  // CH group chips
+  // CH group chips (multi-select) — toggle .active immediately for feedback
   container.querySelectorAll<HTMLButtonElement>("[data-ch-group]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const g = btn.dataset.chGroup!;
       if (s.chGroups.has(g)) s.chGroups.delete(g); else s.chGroups.add(g);
+      btn.classList.toggle("active", s.chGroups.has(g));
       s.chOffset = 0;
       void loadCh(true);
     });
   });
 
   // CH not-added toggle
-  document.getElementById("cf-not-added")?.addEventListener("click", () => {
+  const notAdded = document.getElementById("cf-not-added");
+  notAdded?.addEventListener("click", () => {
     s.chNotAdded = !s.chNotAdded;
+    notAdded.classList.toggle("active", s.chNotAdded);
     s.chOffset = 0;
     void loadCh(true);
   });
@@ -325,31 +340,24 @@ function bindEvents(container: HTMLElement): void {
     chDebounce = setTimeout(() => { s.chOffset = 0; void loadCh(true); }, 300);
   });
 
-  // CH load more
-  document.getElementById("cf-load-more")?.addEventListener("click", () => {
-    s.chOffset += PAGE_SIZE;
-    void loadCh(false);
-  });
-
-  // CH add to leads
-  container.querySelectorAll<HTMLButtonElement>(".cf-add-btn").forEach((btn) => {
-    btn.addEventListener("click", () => { void handleAddToLeads(btn.dataset.id!); });
-  });
-
-  // DG type chips
+  // DG type chips (multi-select)
   container.querySelectorAll<HTMLButtonElement>("[data-dg-type]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const t = btn.dataset.dgType!;
       if (s.dgTypes.has(t)) s.dgTypes.delete(t); else s.dgTypes.add(t);
+      btn.classList.toggle("active", s.dgTypes.has(t));
       void loadDg();
     });
   });
 
-  // DG time range
+  // DG time range (single-select)
   container.querySelectorAll<HTMLButtonElement>("[data-dg-hours]").forEach((btn) => {
     btn.addEventListener("click", () => {
       const h = btn.dataset.dgHours;
       s.dgHours = h ? parseInt(h, 10) : null;
+      container.querySelectorAll<HTMLButtonElement>("[data-dg-hours]")
+        .forEach((b) => b.classList.remove("active"));
+      btn.classList.add("active");
       void loadDg();
     });
   });
@@ -361,6 +369,21 @@ function bindEvents(container: HTMLElement): void {
     s.dgSearch = dgSearch.value;
     clearTimeout(dgDebounce);
     dgDebounce = setTimeout(() => void loadDg(), 300);
+  });
+}
+
+// Body-level handlers — safe to re-bind after every rebuildBody() because the
+// body is fully re-rendered each time, so no listeners survive to duplicate.
+function bindBodyEvents(container: HTMLElement): void {
+  // CH load more
+  document.getElementById("cf-load-more")?.addEventListener("click", () => {
+    s.chOffset += PAGE_SIZE;
+    void loadCh(false);
+  });
+
+  // CH add to leads
+  container.querySelectorAll<HTMLButtonElement>(".cf-add-btn").forEach((btn) => {
+    btn.addEventListener("click", () => { void handleAddToLeads(btn.dataset.id!); });
   });
 }
 

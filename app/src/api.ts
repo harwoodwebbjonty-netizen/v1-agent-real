@@ -855,7 +855,7 @@ export async function listProspectingRuns(): Promise<ProspectingRun[]> {
   return invoke<ProspectingRun[]>("list_prospecting_runs");
 }
 
-// --- Activity Feed (DataGardener) ---
+// --- Activity Feed (Companies House) ---
 
 export interface ActivityEvent {
   id: string;

@@ -79,9 +79,9 @@ async def _sequence_scheduler_loop() -> None:
 
 
 async def _activity_refresh_loop() -> None:
-    """Tiered background refresh for DataGardener company snapshots.
+    """Tiered background refresh for Companies House company snapshots.
     A-tier leads (hot/engaged) refresh every 6h; B-tier every 2d; C-tier every 7d.
-    The scheduler only runs when DATAGARDENER_API_KEY is configured."""
+    The scheduler only runs when COMPANIES_HOUSE_API_KEY is configured."""
     while True:
         try:
             detected = await process_due_refreshes()
