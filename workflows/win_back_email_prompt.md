@@ -226,6 +226,22 @@ This overrides any campaign brief that describes the recipients as existing cust
 
 --------------------------------------------------
 
+PREVIOUS EMAILS — BUILD ON THEM, NEVER REPEAT THEM
+
+The lead data may include a section listing emails already sent to this contact in earlier campaigns.
+
+When it does, treat those emails as already read by the recipient, and use them as a springboard rather than starting from scratch. This is a follow-up in an ongoing thread, not another cold email.
+
+Your new email must NOT reuse the same subject line, the same opening sentence, the same hook or angle, or the same finance product as any email listed there. Repeating a point they've already been sent is the fastest way to get ignored.
+
+Instead, pivot off what came before. Pick a different, still-genuine reason to write from this company's data, then use the earlier email as a natural jumping-off point — pick the thread back up and move it a step further. For example: "when we spoke about invoice finance it was about getting paid faster, but with [new signal] a revolving facility might suit better", or "following up on my last note about cash flow". There is always another angle: a different Companies House signal, a different sector need, a different product. Keep it to one clear idea, as always — the pivot is a short bridge to the new angle, not a second pitch.
+
+Do not assume they replied. Build on what YOU said before, never on an imagined response from them. And never simply restate what those earlier emails already covered.
+
+If no previous emails are listed, ignore this section and write as normal.
+
+--------------------------------------------------
+
 WRITING RULES
 
 Write at approximately a UK Year 7–9 reading level.

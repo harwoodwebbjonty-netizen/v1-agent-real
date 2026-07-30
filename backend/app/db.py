@@ -1942,6 +1942,32 @@ def count_win_back_emails(campaign_id: str) -> int:
         return row["n"] if row else 0
 
 
+def get_prior_win_back_emails_for_lead(
+    lead_id: str, exclude_campaign_id: Optional[str] = None, limit: int = 3
+) -> list[sqlite3.Row]:
+    """Win-back emails already generated for this lead in OTHER campaigns, most
+    recent first. Feeds the next campaign's writer the earlier emails so it does
+    not repeat the same subject, opening or hook.
+
+    Deliberately NOT gated on send_status = 'sent': the Mailchimp export path (a
+    primary way campaigns go out) never marks its emails 'sent', so filtering on
+    that would hide almost every genuine prior send. An email generated for an
+    earlier campaign is, in practice, one the contact received — and even for a
+    draft that was never sent, steering the new email to a fresh angle costs
+    nothing. The current campaign is excluded so a lead's own in-progress email
+    is never fed back to itself."""
+    with get_connection() as conn:
+        return conn.execute(
+            """SELECT campaign_id, subject, body, send_status, sent_at, created_at
+               FROM win_back_emails
+               WHERE lead_id = ?
+                 AND (? IS NULL OR campaign_id != ?)
+               ORDER BY COALESCE(sent_at, created_at) DESC, id DESC
+               LIMIT ?""",
+            (lead_id, exclude_campaign_id, exclude_campaign_id, limit),
+        ).fetchall()
+
+
 def upsert_win_back_email(campaign_id: str, lead_id: str, email_id: str, subject: str, body: str, created_at: str) -> None:
     """One email per (campaign, lead). Any existing email for this lead in this
     campaign is replaced, so regenerating a lead never stacks a second row (the

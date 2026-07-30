@@ -219,6 +219,21 @@ def _format_lead_sources(lead_context: dict) -> str:
         lines.append(f"\nCRM Notes: {lead_context['lead_notes']}")
     if lead_context.get("recent_activity"):
         lines.append(f"\nPrevious Contact History: {lead_context['recent_activity']}")
+    if lead_context.get("prior_emails"):
+        lines.extend([
+            "",
+            "EMAILS ALREADY SENT TO THIS CONTACT IN EARLIER CAMPAIGNS (most recent first):",
+            lead_context["prior_emails"].strip(),
+            "",
+            "Use these earlier emails as a springboard, not just a list to avoid. This is "
+            "a follow-up in an ongoing thread, not another cold email. Pick a different, "
+            "still-genuine angle from this company's data, then pivot off what you raised "
+            "before — pick the thread back up and take it a step further (e.g. 'when we "
+            "spoke about invoice finance...', 'following up on my last note about cash "
+            "flow, given...'). Do NOT reuse the same subject line, opening sentence, hook "
+            "or finance product, and never simply restate what those emails already said. "
+            "Don't assume they replied — build on what YOU wrote, not an imagined response.",
+        ])
     return "\n".join(lines)
 
 

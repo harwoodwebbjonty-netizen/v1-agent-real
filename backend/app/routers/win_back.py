@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import re
 import sqlite3
 from typing import List, Optional
 
@@ -223,6 +224,9 @@ async def _generate_campaign(
                     # completed funding deal. Absent on resume → safe default
                     # (never claims funding). See _relationship_note.
                     ctx["deal_stage"] = (stage_by_lead.get(lead_id) if stage_by_lead else "") or ""
+                    # Earlier win-back emails to this lead (other campaigns) so
+                    # this one doesn't repeat the same subject/opening/hook.
+                    ctx["prior_emails"] = _format_prior_emails(lead_id, campaign_id)
 
                     try:
                         # The imported broker owns this relationship. Do not let
@@ -311,6 +315,45 @@ async def _fetch_ch_data_for_company(company_name: str) -> str:
     except Exception:
         logger.debug("Win-back: CH lookup failed for '%s'", company_name, exc_info=True)
         return ""
+
+
+# --- Prior-email context ---
+
+_HTML_TAG_RE = re.compile(r"<[^>]+>")
+_URL_ONLY_LINE_RE = re.compile(r"^\s*https?://\S+\s*$")
+# Strips the standard sign-off block (from "Best/Kind regards" to the end) so a
+# prior email's repeated signature isn't fed back as context on every lead.
+_SIGNATURE_RE = re.compile(
+    r"\n+(?:best regards|kind regards|best wishes|many thanks|warm regards|regards|thanks|cheers)\b.*$",
+    re.IGNORECASE | re.DOTALL,
+)
+
+
+def _clean_prior_body(body: str) -> str:
+    """Reduce a stored win-back body to just its message prose for use as
+    context: drop the HTML anchor markup, the bare CTA link line, and the
+    trailing signature — all of which repeat on every email and only add noise
+    (and tokens) to the next email's prompt."""
+    text = _HTML_TAG_RE.sub("", body or "")
+    text = _SIGNATURE_RE.sub("", text)
+    text = "\n".join(l for l in text.splitlines() if not _URL_ONLY_LINE_RE.match(l))
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _format_prior_emails(lead_id: str, exclude_campaign_id: Optional[str]) -> str:
+    """Formats up to three earlier win-back emails for this lead into a compact
+    'already sent' brief the writer uses to avoid repeating itself. Empty string
+    when the lead has no prior emails."""
+    rows = db.get_prior_win_back_emails_for_lead(lead_id, exclude_campaign_id, limit=3)
+    if not rows:
+        return ""
+    blocks = []
+    for i, r in enumerate(rows, 1):
+        when = ((r["sent_at"] if "sent_at" in r.keys() else None) or r["created_at"] or "")[:10]
+        subject = (r["subject"] or "").strip()
+        prose = _clean_prior_body(r["body"] or "")
+        blocks.append(f"[{i}] {when} — Subject: {subject}\n{prose}".strip())
+    return "\n\n".join(blocks)
 
 
 # --- Response helpers ---
