@@ -221,7 +221,10 @@ def _format_lead_sources(lead_context: dict) -> str:
             "win work, their pressures). OPEN the email with a concrete point drawn from here: "
             "it must be the FIRST line the reader sees, straight after the greeting and before "
             "the invitation or anything about you or WCF. Never open with a pleasantry or "
-            "warm-up — lead with the specific detail about their business:\n"
+            "warm-up — lead with the specific detail about their business. It must link "
+            "directly to their actual business and operations (what they do, how they win or "
+            "run their work, their operational pressures), and the funding angle must connect "
+            "straight back to it — never a generic line that could fit any company:\n"
             f"{lead_context['ai_summary']}"
         )
     if lead_context.get("ch_data"):
