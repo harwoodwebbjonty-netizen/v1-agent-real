@@ -169,7 +169,10 @@ def _format_lead_sources(lead_context: dict) -> str:
         lines.extend([
             "Current approved offers or deals:",
             lead_context["offer_context"].strip(),
-            "Only mention these where relevant. Do not alter figures or add terms that are not stated here.",
+            "Only mention these where relevant. Do not alter figures or add terms that are not stated here. "
+            "When you include an approved offer or deal in the email, wrap that exact detail in double "
+            "asterisks so it renders in bold — e.g. **£250,000 pre-approved at 6.9%**. Bold ONLY the offer "
+            "or deal itself (the figures/terms), never a whole sentence and never anything else.",
             "",
         ])
     if lead_context.get("additional_context"):

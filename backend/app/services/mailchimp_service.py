@@ -6,6 +6,7 @@ from datetime import datetime
 import httpx
 
 from app.core.config import get_settings
+from app.services.email_format import markdown_bold_to_html
 
 logger = logging.getLogger("app.mailchimp")
 
@@ -245,7 +246,10 @@ async def export_outreach_campaign(
                             "LNAME": last,
                             "COMPANY": draft.get("company") or "",
                             "EMAILSUBJ": (draft.get("subject") or "")[:255],
-                            **dict(zip(_BODY_MERGE_FIELDS, _chunk_body(draft.get("body") or ""))),
+                            # Merge fields are inserted into the campaign HTML raw
+                            # (that's how the <a> CTA renders), so turn markdown
+                            # **bold** offer markers into <strong> before chunking.
+                            **dict(zip(_BODY_MERGE_FIELDS, _chunk_body(markdown_bold_to_html(draft.get("body") or "")))),
                         },
                     },
                     auth=("anystring", api_key),

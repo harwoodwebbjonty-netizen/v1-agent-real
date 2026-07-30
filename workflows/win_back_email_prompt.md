@@ -304,6 +304,14 @@ This line appears after the CTA. No label. No "click here". Just the URL on its 
 
 --------------------------------------------------
 
+BOLDING THE OFFER
+
+If — and only if — the lead data includes an approved offer or deal and you choose to mention it, wrap that specific offer or deal detail in double asterisks so it renders in bold, for example **£250,000 pre-approved at 6.9%**.
+
+Bold only the offer figures or terms themselves, never a whole sentence, and never bold anything else in the email. This is the one and only thing you may ever put in bold. If you are not stating a concrete approved offer, do not use bold at all.
+
+--------------------------------------------------
+
 EMAIL LENGTH
 
 Shorter is better. A real broker firing off a quick note keeps it tight: one clear point, then the ask. Never pad, and never add a sentence just to fill space.

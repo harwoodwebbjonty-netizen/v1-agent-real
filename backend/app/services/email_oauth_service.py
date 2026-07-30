@@ -9,6 +9,7 @@ import httpx
 from app import db
 from app.core.config import get_settings
 from app.services.auth_service import new_id, now_iso
+from app.services.email_format import markdown_bold_to_html, strip_markdown_bold
 
 # Win-back bodies are plain text by default; apply_campaign_link() (in
 # win_back_email_service.py) may deterministically insert a single <a href>
@@ -20,7 +21,9 @@ HTML_ANCHOR_RE = re.compile(r'<a\s+href="[^"]*"[^>]*>.*?</a>', re.IGNORECASE | r
 
 def _build_html_alternative(body: str) -> str:
     """Escapes everything except the anchor tag(s) already embedded in the
-    body, and converts newlines to <br> so line breaks survive as HTML."""
+    body, converts newlines to <br> so line breaks survive as HTML, and turns
+    markdown **bold** markers into <strong> (done after escaping so the tag is
+    real HTML, not escaped text)."""
     parts = HTML_ANCHOR_RE.split(body)
     anchors = HTML_ANCHOR_RE.findall(body)
     chunks = []
@@ -28,7 +31,7 @@ def _build_html_alternative(body: str) -> str:
         chunks.append(html.escape(part).replace("\n", "<br>"))
         if i < len(anchors):
             chunks.append(anchors[i])
-    return "".join(chunks)
+    return markdown_bold_to_html("".join(chunks))
 
 # Isolated from the Anthropic-based AI services — this module never touches
 # the `anthropic` SDK. OAuth consent always happens in the system browser
@@ -204,8 +207,8 @@ async def send_email(account_row, to: str, subject: str, body: str) -> None:
             message["To"] = to
             message["From"] = account_row["email_address"]
             message["Subject"] = subject
-            message.set_content(body)
-            if HTML_ANCHOR_RE.search(body):
+            message.set_content(strip_markdown_bold(body))
+            if HTML_ANCHOR_RE.search(body) or "**" in body:
                 message.add_alternative(_build_html_alternative(body), subtype="html")
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
             response = await client.post(
@@ -220,7 +223,7 @@ async def send_email(account_row, to: str, subject: str, body: str) -> None:
                 json={
                     "message": {
                         "subject": subject,
-                        "body": {"contentType": "HTML", "content": body},
+                        "body": {"contentType": "HTML", "content": markdown_bold_to_html(body)},
                         "toRecipients": [{"emailAddress": {"address": to}}],
                     }
                 },
