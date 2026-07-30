@@ -218,8 +218,10 @@ def _format_lead_sources(lead_context: dict) -> str:
         lines.append(
             "\nAI Research Summary — THIS IS YOUR RICHEST SOURCE of a specific, personalised "
             "hook. It is real, researched detail about THIS company (their market, how they "
-            "win work, their pressures). Lead the email with a concrete point drawn from here "
-            "whenever one fits, rather than anything generic:\n"
+            "win work, their pressures). OPEN the email with a concrete point drawn from here: "
+            "it must be the FIRST line the reader sees, straight after the greeting and before "
+            "the invitation or anything about you or WCF. Never open with a pleasantry or "
+            "warm-up — lead with the specific detail about their business:\n"
             f"{lead_context['ai_summary']}"
         )
     if lead_context.get("ch_data"):
