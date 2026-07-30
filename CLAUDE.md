@@ -1,5 +1,7 @@
 # Agent Instructions
 
+> **Source of truth.** This file (`CLAUDE.md`) is the single source of truth for how to work in this repo. `AGENTS.md` is only a pointer to it. For the design system, the app source (`app/src/style.css`) is authoritative and this file summarises it. If any other doc, README, or memory disagrees with `CLAUDE.md`, `CLAUDE.md` wins — fix the other doc rather than forking guidance here.
+
 You're working inside the **WAT framework** (Workflows, Agents, Tools). This architecture separates concerns so that probabilistic AI handles reasoning while deterministic code handles execution. That separation is what makes this system reliable.
 
 ## The WAT Architecture
@@ -57,11 +59,17 @@ This loop is how the framework improves over time.
 
 **Directory layout:**
 ```
-.tmp/           # Temporary files (scraped data, intermediate exports). Regenerated as needed.
-tools/          # Python scripts for deterministic execution
-workflows/      # Markdown SOPs defining what to do and how
-.env            # API keys and environment variables (NEVER store secrets anywhere else)
-credentials.json, token.json  # Google OAuth (gitignored)
+.tmp/           # Temporary files (scraped data, intermediate exports). Regenerated as needed. Gitignored.
+tools/          # Python scripts for deterministic execution (chat-based WAT tools)
+workflows/      # Markdown SOPs — chat-tool SOPs AND the live backend prompts (see "Production AI Prompts")
+data/           # Committed logs from chat-based tools (e.g. data/phone_lookups.csv — the manual phone-lookup log)
+outputs/        # Local deliverables / working exports (CSV/XLSX). Gitignored: regenerable, may contain customer data — not committed.
+n8n/            # Standalone n8n automation(s) — see n8n/README.md (lead auto-responder). Independent of app/ and backend/.
+app/            # Tauri desktop app  — see "Desktop App + Backend" below
+backend/        # FastAPI backend    — see "Desktop App + Backend" below
+.env            # API keys and environment variables (NEVER store secrets anywhere else). Gitignored.
+credentials.json, token.json  # Google OAuth, if ever added (gitignored)
+WCF_BDE_Weekly_Scorecard.html  # Legacy one-off deliverable (2026-06); not referenced by code — safe to archive.
 ```
 
 **Core principle:** Local files are just for processing. Anything I need to see or use lives in cloud services. Everything in `.tmp/` is disposable.
@@ -73,7 +81,7 @@ This repo also contains a standalone desktop app, separate from the chat-based W
 - `backend/` — FastAPI service that owns all Anthropic API calls for the "find company phone number" task. Reads `ANTHROPIC_API_KEY` from its own `backend/.env` (never committed). See `backend/README.md`.
 - `app/` — Tauri (Rust + vanilla TypeScript/Vite) desktop app. Contains **no API keys and no direct Anthropic calls** — it only calls the backend over HTTP. Builds installers for macOS/Windows via `.github/workflows/release.yml`.
 
-These two have their own logs: the app writes lookups to the OS app-data directory (not this repo's `data/`), while `tools/log_phone_lookup.py` + `data/phone_lookups.csv` remain the separate log for manual, chat-based lookups using this repo's `workflows/find_company_phone_number.md` SOP directly in a Claude Code session. The desktop app's backend also reads that same SOP file (as its system prompt) so the logic stays in one place.
+These two have their own logs: the app writes lookups to the OS app-data directory (not this repo's `data/`), while `tools/log_phone_lookup.py` + `data/phone_lookups.csv` remain the separate log for manual, chat-based lookups using this repo's `workflows/find_company_phone_number.md` SOP directly in a Claude Code session. The desktop app's backend also reads that same SOP file (as its system prompt) so the logic stays in one place — and it loads four other `workflows/` SOPs the same way (see **Production AI Prompts** below).
 
 ## Desktop App Operations — ALWAYS check this list
 
@@ -99,7 +107,19 @@ give me this command and remind me to run it:
 rsync -az -e "ssh -i ~/.ssh/v1_agent_vps" "/Users/jontyhw/v1 agent/backend/app/" root@213.165.88.45:/opt/v1-agent/backend/app/ && ssh -i ~/.ssh/v1_agent_vps root@213.165.88.45 "systemctl restart phone-lookup-backend"
 ```
 
-Verify after deploy: `curl http://213.165.88.45/health` → `{"status":"ok"}`.
+**Production prompts live OUTSIDE `backend/app/` — the command above does NOT
+deploy them.** The five live prompt files are in `workflows/` (repo root), which
+the backend reads from `/opt/v1-agent/workflows/`. After editing ANY
+`workflows/*.md` production prompt, ALSO run this (no restart needed — the
+prompt is `read_text()` on every call, but restarting is harmless):
+
+```
+rsync -az -e "ssh -i ~/.ssh/v1_agent_vps" "/Users/jontyhw/v1 agent/workflows/" root@213.165.88.45:/opt/v1-agent/workflows/
+```
+
+Verify after deploy: `curl http://213.165.88.45/health` → `{"status":"ok"}` (wait
+~30–40s first — the app has a ~30s startup window where nginx returns a transient
+502; that is not a crash).
 **The backend is served on port 80 via a proxy — port 8000 is firewalled.**
 New DB migrations run automatically on service restart.
 
@@ -152,3 +172,30 @@ New DB migrations run automatically on service restart.
 You sit between what I want (workflows) and what actually gets done (tools). Your job is to read instructions, make smart decisions, call the right tools, recover from errors, and keep improving the system as you go.
 
 Stay pragmatic. Stay reliable. Keep learning.
+## Production AI Prompts
+
+These `workflows/*.md` files are read verbatim as **live backend system prompts** — editing them changes real users' AI calls in production. Each is loaded here:
+
+| Prompt file (`workflows/`)       | Loaded by (backend call site)                                                        |
+|----------------------------------|--------------------------------------------------------------------------------------|
+| `find_company_phone_number.md`   | `backend/app/core/config.py` (`get_workflow_text`) → `services/anthropic_service.py` |
+| `find_company_email.md`          | `backend/app/services/email_scraper_service.py`                                      |
+| `find_person_linkedin.md`        | `backend/app/services/linkedin_discovery_service.py`                                 |
+| `sales_intelligence_research.md` | `backend/app/services/sales_intelligence_service.py`                                 |
+| `win_back_email_prompt.md`       | `backend/app/services/win_back_email_service.py`                                     |
+
+The other `workflows/` files are **not** backend prompts: `linkedin_post.md` and
+`win_back_ui_process.md` are chat / UI-process SOPs, so they can be edited without
+touching production AI calls.
+
+These are production system prompts, not documentation or examples.
+
+Before editing any of them:
+
+1. Confirm its call site in the table above (and that it hasn't moved).
+2. Preserve required output schemas and parsing assumptions.
+3. Check validation, retry and fallback behaviour.
+4. Test the affected workflow.
+5. Do not substantially rewrite a production prompt without explaining the behavioural impact.
+
+The prompt files themselves are the source of truth for exact prompt content. `CLAUDE.md` documents their purpose and editing rules only.
