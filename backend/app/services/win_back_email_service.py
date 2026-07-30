@@ -215,7 +215,13 @@ def _format_lead_sources(lead_context: dict) -> str:
     if lead_context.get("email"):
         lines.append(f"Email: {lead_context['email']}")
     if lead_context.get("ai_summary"):
-        lines.append(f"\nAI Research Summary:\n{lead_context['ai_summary']}")
+        lines.append(
+            "\nAI Research Summary — THIS IS YOUR RICHEST SOURCE of a specific, personalised "
+            "hook. It is real, researched detail about THIS company (their market, how they "
+            "win work, their pressures). Lead the email with a concrete point drawn from here "
+            "whenever one fits, rather than anything generic:\n"
+            f"{lead_context['ai_summary']}"
+        )
     if lead_context.get("ch_data"):
         lines.append(f"\nCompanies House Data:\n{lead_context['ch_data']}")
     if lead_context.get("lead_notes"):
