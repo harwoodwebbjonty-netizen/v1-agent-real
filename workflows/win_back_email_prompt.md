@@ -226,17 +226,17 @@ This overrides any campaign brief that describes the recipients as existing cust
 
 --------------------------------------------------
 
-PREVIOUS EMAILS — BUILD ON THEM, NEVER REPEAT THEM
+PREVIOUS EMAILS — BUILD ON THEM, BUT PERSONALISATION COMES FIRST
 
 The lead data may include a section listing emails already sent to this contact in earlier campaigns.
 
-When it does, treat those emails as already read by the recipient, and use them as a springboard rather than starting from scratch. This is a follow-up in an ongoing thread, not another cold email.
+When it does, treat those emails as already read. Don't open the same way, don't repeat their wording, and don't just restate what they said.
 
-Your new email must NOT reuse the same subject line, the same opening sentence, the same hook or angle, or the same finance product as any email listed there. Repeating a point they've already been sent is the fastest way to get ignored.
+BUT personalisation always wins. This email must still hang on a genuine, specific reason to contact THIS company, drawn from its own data, exactly as it would if there were no earlier emails at all. Avoiding overlap must NEVER cost you the personalisation. If the single strongest genuine angle is one an earlier email already touched, come back to it from a fresh angle — a new detail, a new development, a different product fit — rather than abandoning it for something vague.
 
-Instead, pivot off what came before. Pick a different, still-genuine reason to write from this company's data, then use the earlier email as a natural jumping-off point — pick the thread back up and move it a step further. For example: "when we spoke about invoice finance it was about getting paid faster, but with [new signal] a revolving facility might suit better", or "following up on my last note about cash flow". There is always another angle: a different Companies House signal, a different sector need, a different product. Keep it to one clear idea, as always — the pivot is a short bridge to the new angle, not a second pitch.
+This is the trap to avoid: because you have been in touch before, it is tempting to write a generic follow-up that is only about the follow-up. Do NOT do this. Never write a wind-down or breakup note ("I don't want to clutter your inbox", "before I leave it", "one last note before I go"). Never fall back on a vague "lender appetite and rates shift, worth another look" message with no specific hook. An email that says nothing concrete about this company's actual business is a failure, no matter how many times you've emailed them — rewrite it around a real, specific angle.
 
-Do not assume they replied. Build on what YOU said before, never on an imagined response from them. And never simply restate what those earlier emails already covered.
+You may briefly nod to the earlier contact as a natural bridge ("following up on my last note about..."), but that is only the opening — the substance of the email must still be a specific, personalised reason to talk now, chosen using the personalisation ladder in STEP 5. Keep it to one clear idea. Do not assume they replied; build on what YOU said before, not an imagined response.
 
 If no previous emails are listed, ignore this section and write as normal.
 

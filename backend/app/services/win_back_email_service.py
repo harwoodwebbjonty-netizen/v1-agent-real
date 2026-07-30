@@ -228,14 +228,19 @@ def _format_lead_sources(lead_context: dict) -> str:
             "EMAILS ALREADY SENT TO THIS CONTACT IN EARLIER CAMPAIGNS (most recent first):",
             lead_context["prior_emails"].strip(),
             "",
-            "Use these earlier emails as a springboard, not just a list to avoid. This is "
-            "a follow-up in an ongoing thread, not another cold email. Pick a different, "
-            "still-genuine angle from this company's data, then pivot off what you raised "
-            "before — pick the thread back up and take it a step further (e.g. 'when we "
-            "spoke about invoice finance...', 'following up on my last note about cash "
-            "flow, given...'). Do NOT reuse the same subject line, opening sentence, hook "
-            "or finance product, and never simply restate what those emails already said. "
-            "Don't assume they replied — build on what YOU wrote, not an imagined response.",
+            "Use these earlier emails as a springboard: don't open the same way or repeat "
+            "their wording, and don't just restate them. BUT personalisation comes first — "
+            "this email must still hang on a specific, genuine reason to contact THIS "
+            "company, drawn from its own data, exactly as it would with no earlier emails. "
+            "Avoiding overlap must NEVER make the email generic. If the strongest angle is "
+            "one an earlier email already touched, come back to it from a fresh angle (a new "
+            "detail, a new development, a different product fit) rather than going vague. Do "
+            "NOT write a wind-down or breakup note ('don't want to clutter your inbox', "
+            "'before I leave it', 'one last note') and do NOT fall back on a generic 'rates "
+            "have shifted, worth another look' message with no specific hook — an email that "
+            "is only about having been in touch before is a failure. You may briefly nod to "
+            "the earlier contact as a bridge ('following up on my last note about...'), but "
+            "the substance must be specific to their business. Don't assume they replied.",
         ])
     return "\n".join(lines)
 
