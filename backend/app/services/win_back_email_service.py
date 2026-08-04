@@ -10,6 +10,7 @@ import anthropic
 
 from app.core.config import get_settings
 from app.services.companies_house_service import _SIC_DESCRIPTIONS
+from app.services.email_format import render_cta_button
 
 # Deliberately isolated from every other AI service — uses the Winchester CF
 # win-back prompt from the workflows directory, not the generic email writer.
@@ -383,7 +384,10 @@ def apply_campaign_link(email: dict, campaign_links: str, link_text: str) -> dic
 
     link_text = _clean_link_text(link_text)
     primary_url = urls[0]
-    display = f'<a href="{primary_url}">{html.escape(link_text)}</a>' if link_text else primary_url
+    # The one approved CTA renders as a black "Book a free business review"
+    # button (label overridable via campaign_link_text). Baked into the body
+    # here so it reaches every send path — Mailchimp export, Gmail, Outlook.
+    display = render_cta_button(primary_url, link_text)
     if primary_url in email["body"]:
         email["body"] = email["body"].replace(primary_url, display)
     else:

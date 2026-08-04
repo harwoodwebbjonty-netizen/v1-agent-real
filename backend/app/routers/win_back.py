@@ -20,6 +20,7 @@ from app.services.companies_house_service import (
     get_company_profile,
     search_company_by_name,
 )
+from app.services.email_format import build_win_back_footer_html, build_win_back_footer_text
 from app.services.email_oauth_service import OAuthError, send_email as send_email_via_oauth
 from app.services.linkedin_activity_service import fetch_linkedin_posts_preview, format_posts_for_prompt, get_or_fetch_linkedin_posts
 from app.services.mailchimp_service import (
@@ -738,7 +739,10 @@ async def send_one_email(
         raise HTTPException(status_code=400, detail=f"Connect a {body.provider} account in Settings first.")
 
     try:
-        await send_email_via_oauth(account, to, email_row["subject"], email_row["body"])
+        await send_email_via_oauth(
+            account, to, email_row["subject"], email_row["body"],
+            footer_html=build_win_back_footer_html(), footer_text=build_win_back_footer_text(),
+        )
     except OAuthError as exc:
         raise HTTPException(status_code=502, detail=str(exc))
 
@@ -772,7 +776,10 @@ async def send_all_emails(
         if not to:
             continue
         try:
-            await send_email_via_oauth(account, to, email_row["subject"], email_row["body"])
+            await send_email_via_oauth(
+                account, to, email_row["subject"], email_row["body"],
+                footer_html=build_win_back_footer_html(), footer_text=build_win_back_footer_text(),
+            )
             db.mark_win_back_email_sent(email_row["id"], body.provider, now_iso())
             sent += 1
         except OAuthError:

@@ -9,7 +9,7 @@ import httpx
 from app import db
 from app.core.config import get_settings
 from app.services.auth_service import new_id, now_iso
-from app.services.email_format import markdown_bold_to_html, strip_markdown_bold
+from app.services.email_format import html_to_plain_text, markdown_bold_to_html
 
 # Win-back bodies are plain text by default; apply_campaign_link() (in
 # win_back_email_service.py) may deterministically insert a single <a href>
@@ -197,7 +197,13 @@ async def refresh_token_if_needed(account_row) -> str:
     return tokens["access_token"]
 
 
-async def send_email(account_row, to: str, subject: str, body: str) -> None:
+async def send_email(
+    account_row, to: str, subject: str, body: str, footer_html: str = "", footer_text: str = ""
+) -> None:
+    """Send an email via the connected Gmail/Outlook account. `footer_html` /
+    `footer_text` are optional branded-footer blocks appended by the win-back
+    sender only — other callers (email writer, sequences) leave them empty so no
+    footer is added."""
     access_token = await refresh_token_if_needed(account_row)
     provider = account_row["provider"]
 
@@ -207,9 +213,9 @@ async def send_email(account_row, to: str, subject: str, body: str) -> None:
             message["To"] = to
             message["From"] = account_row["email_address"]
             message["Subject"] = subject
-            message.set_content(strip_markdown_bold(body))
-            if HTML_ANCHOR_RE.search(body) or "**" in body:
-                message.add_alternative(_build_html_alternative(body), subtype="html")
+            message.set_content(html_to_plain_text(body) + footer_text)
+            if footer_html or HTML_ANCHOR_RE.search(body) or "**" in body:
+                message.add_alternative(_build_html_alternative(body) + footer_html, subtype="html")
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
             response = await client.post(
                 "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -223,7 +229,7 @@ async def send_email(account_row, to: str, subject: str, body: str) -> None:
                 json={
                     "message": {
                         "subject": subject,
-                        "body": {"contentType": "HTML", "content": markdown_bold_to_html(body)},
+                        "body": {"contentType": "HTML", "content": markdown_bold_to_html(body) + footer_html},
                         "toRecipients": [{"emailAddress": {"address": to}}],
                     }
                 },

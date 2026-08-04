@@ -6,7 +6,7 @@ from datetime import datetime
 import httpx
 
 from app.core.config import get_settings
-from app.services.email_format import markdown_bold_to_html
+from app.services.email_format import build_win_back_footer_html, markdown_bold_to_html
 
 logger = logging.getLogger("app.mailchimp")
 
@@ -304,9 +304,14 @@ async def export_outreach_campaign(
         # Re-join the chunked body fields with no separator so Mailchimp
         # reconstructs the full email before rendering (see _chunk_body).
         body_tags = "".join(f"*|{t}|*" for t in _BODY_MERGE_FIELDS)
+        # The branded Winchester footer is static (identical for every
+        # recipient), so it lives in the campaign template here rather than the
+        # per-lead body merge fields — keeping it out of the ~1,250-char body
+        # budget and rendering once at the bottom of every exported email.
         html_body = (
             "<html><body style='font-family:sans-serif;max-width:600px;margin:0 auto;padding:20px'>"
             f"{body_tags}"
+            f"{build_win_back_footer_html()}"
             "<div style='margin-top:24px;padding-top:16px;border-top:1px solid #e0e0e0;"
             "font-size:11px;color:#888888;text-align:center'>"
             "*|LIST:ADDRESS|*<br>"
