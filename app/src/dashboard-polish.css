@@ -2,21 +2,18 @@
    markup, router state, request flows and existing component behaviour alone. */
 
 :root {
-  --dashboard-canvas: #f7f8fa;
-  --dashboard-border: #e5e7eb;
-  --dashboard-shadow: 0 1px 2px rgba(17, 24, 39, 0.04), 0 8px 24px rgba(17, 24, 39, 0.05);
+  --dashboard-canvas: var(--bg);
+  --dashboard-border: var(--border);
+  --dashboard-shadow: var(--shadow-card);
 }
 
+/* Sidebar appearance (navy gradient + border) is owned by style.css; only keep
+   the non-visual stickiness here so the dark rail isn't overridden back to white. */
 .app-sidebar {
   position: sticky;
   top: 0;
   height: 100vh;
-  background: #fff;
-  border-right: 1px solid var(--dashboard-border);
-  padding: 20px 12px;
 }
-
-.app-content { background: var(--dashboard-canvas); }
 
 .container {
   max-width: 1480px;
@@ -41,11 +38,7 @@
 }
 
 .card,
-.stat-card,
-.modal-dialog,
-.side-panel,
-.filters-popover,
-.wb-modal-box {
+.stat-card {
   border-color: var(--dashboard-border);
   box-shadow: var(--dashboard-shadow);
 }
