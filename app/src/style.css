@@ -4066,3 +4066,58 @@ button.p-filter-chip.active {
   font-size: 0.75rem;
   color: var(--text-muted);
 }
+
+/* --- List Campaign (Outreach) --- */
+.lc-form {
+  display: flex;
+  flex-direction: column;
+}
+
+.lc-draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.lc-draft-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: var(--space-3);
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.lc-draft-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.lc-draft-company {
+  font-weight: 500;
+}
+
+.lc-draft-meta {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.lc-body-preview {
+  font-size: var(--text-sm);
+  line-height: 1.5;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--panel);
+  white-space: normal;
+}
+
+.lc-draft-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}

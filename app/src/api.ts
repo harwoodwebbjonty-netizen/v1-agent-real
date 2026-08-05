@@ -1071,3 +1071,73 @@ export async function getWinBackCampaignRows(campaignId: string): Promise<WinBac
 export async function previewWinBackCampaignEmail(row: WinBackCsvRow, emailInstruction = "", offerContext = "", additionalContext = "", campaignLinks = "", campaignLinkText = "", signature = "", depth = "standard"): Promise<{ subject: string; body: string }> {
   return invoke<{ subject: string; body: string }>("preview_win_back_campaign_email", { row, emailInstruction, offerContext, additionalContext, campaignLinks, campaignLinkText, signature, depth });
 }
+
+// --- List email campaigns ---
+// A rep emails a whole cold-call list: one idea → a per-lead draft for every
+// lead, grouped by status, sent from their own Gmail/Outlook. Per-lead drafts
+// are ordinary email_drafts (edit via updateEmailDraft, single-send via
+// sendEmailDraft); these calls manage the campaign + its bulk actions.
+
+export interface ListCampaign {
+  id: string;
+  list_id: string;
+  name: string;
+  status: "generating" | "ready" | "stopped" | "error";
+  total_target: number;
+  generated: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ListCampaignDraft {
+  id: string;
+  lead_id: string;
+  company: string;
+  contact_name: string;
+  contact_status: string;
+  contact_email: string;
+  subject: string;
+  body: string;
+  status: string;
+  sent_via: string | null;
+  sent_at: string | null;
+}
+
+export async function createListCampaign(
+  listId: string,
+  idea: string,
+  opts: { name?: string; offers?: string; linkUrl?: string; linkText?: string; signature?: string } = {},
+): Promise<ListCampaign> {
+  return invoke<ListCampaign>("create_list_campaign", {
+    listId,
+    name: opts.name ?? "",
+    idea,
+    offers: opts.offers ?? "",
+    linkUrl: opts.linkUrl ?? "",
+    linkText: opts.linkText ?? "",
+    signature: opts.signature ?? "",
+  });
+}
+
+export async function getListCampaigns(): Promise<ListCampaign[]> {
+  return invoke<ListCampaign[]>("get_list_campaigns");
+}
+
+export async function getListCampaign(campaignId: string): Promise<ListCampaign> {
+  return invoke<ListCampaign>("get_list_campaign", { campaignId });
+}
+
+export async function getListCampaignDrafts(campaignId: string): Promise<ListCampaignDraft[]> {
+  return invoke<ListCampaignDraft[]>("get_list_campaign_drafts", { campaignId });
+}
+
+export async function resumeListCampaign(campaignId: string): Promise<ListCampaign> {
+  return invoke<ListCampaign>("resume_list_campaign", { campaignId });
+}
+
+export async function sendAllListCampaign(
+  campaignId: string,
+  provider: EmailProvider,
+): Promise<{ sent: number; failed: number; skipped: number }> {
+  return invoke<{ sent: number; failed: number; skipped: number }>("send_all_list_campaign", { campaignId, provider });
+}

@@ -24,6 +24,7 @@ from app.routers import (
     email_writer,
     lead_lists,
     leads,
+    list_campaigns,
     sequences,
     users,
     win_back,
@@ -57,6 +58,7 @@ app.include_router(email_templates.router)
 app.include_router(email_writer.router)
 app.include_router(email_oauth.router)
 app.include_router(sequences.router)
+app.include_router(list_campaigns.router)
 app.include_router(ai_prospecting.router)
 app.include_router(activity.router)
 app.include_router(ch_feed.router)

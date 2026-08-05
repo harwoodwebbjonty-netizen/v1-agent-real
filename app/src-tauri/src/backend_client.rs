@@ -2340,3 +2340,143 @@ pub async fn preview_win_back_campaign_email(base_url: &str, token: &str, row: W
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
 }
+
+// --- List email campaigns ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListCampaign {
+    pub id: String,
+    pub list_id: String,
+    pub name: String,
+    pub status: String,
+    pub total_target: usize,
+    pub generated: usize,
+    pub created_at: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ListCampaignDraft {
+    pub id: String,
+    pub lead_id: String,
+    pub company: String,
+    pub contact_name: String,
+    pub contact_status: String,
+    pub contact_email: String,
+    pub subject: String,
+    pub body: String,
+    pub status: String,
+    pub sent_via: Option<String>,
+    pub sent_at: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct ListCampaignsWrapper {
+    campaigns: Vec<ListCampaign>,
+}
+
+#[derive(Deserialize)]
+struct ListCampaignDraftsWrapper {
+    drafts: Vec<ListCampaignDraft>,
+}
+
+#[derive(Serialize)]
+struct CreateListCampaignRequest {
+    list_id: String,
+    name: String,
+    idea: String,
+    offers: String,
+    link_url: String,
+    link_text: String,
+    signature: String,
+}
+
+#[derive(Serialize)]
+struct ListCampaignSendRequest {
+    provider: String,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn create_list_campaign(base_url: &str, token: &str, list_id: &str, name: &str, idea: &str, offers: &str, link_url: &str, link_text: &str, signature: &str) -> Result<ListCampaign, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/list-campaigns", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateListCampaignRequest {
+            list_id: list_id.to_string(),
+            name: name.to_string(),
+            idea: idea.to_string(),
+            offers: offers.to_string(),
+            link_url: link_url.to_string(),
+            link_text: link_text.to_string(),
+            signature: signature.to_string(),
+        })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn get_list_campaigns(base_url: &str, token: &str) -> Result<Vec<ListCampaign>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/list-campaigns", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: ListCampaignsWrapper = handle_response(response).await?;
+    Ok(wrapper.campaigns)
+}
+
+pub async fn get_list_campaign(base_url: &str, token: &str, campaign_id: &str) -> Result<ListCampaign, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/list-campaigns/{}", base_url, campaign_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn get_list_campaign_drafts(base_url: &str, token: &str, campaign_id: &str) -> Result<Vec<ListCampaignDraft>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/list-campaigns/{}/drafts", base_url, campaign_id);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: ListCampaignDraftsWrapper = handle_response(response).await?;
+    Ok(wrapper.drafts)
+}
+
+pub async fn resume_list_campaign(base_url: &str, token: &str, campaign_id: &str) -> Result<ListCampaign, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/list-campaigns/{}/resume", base_url, campaign_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn send_all_list_campaign(base_url: &str, token: &str, campaign_id: &str, provider: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/list-campaigns/{}/send-all", base_url, campaign_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&ListCampaignSendRequest { provider: provider.to_string() })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}

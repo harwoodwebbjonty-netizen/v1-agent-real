@@ -5,7 +5,7 @@ mod csv_log;
 
 use app_state::StoredSession;
 use auth_client::UserInfo;
-use backend_client::{EnrichStatus, LeadRecord, WinBackCampaign, WinBackEmail};
+use backend_client::{EnrichStatus, LeadRecord, ListCampaign, ListCampaignDraft, WinBackCampaign, WinBackEmail};
 use serde::Serialize;
 use tauri_plugin_opener::OpenerExt;
 
@@ -1148,6 +1148,50 @@ async fn preview_win_back_campaign_email(
     backend_client::preview_win_back_campaign_email(&base_url, &session.token, row, &email_instruction, &offer_context, &additional_context, &campaign_links, &campaign_link_text, &signature, &depth).await
 }
 
+// --- List email campaigns ---
+
+#[tauri::command]
+async fn create_list_campaign(app_handle: tauri::AppHandle, list_id: String, name: String, idea: String, offers: String, link_url: String, link_text: String, signature: String) -> Result<ListCampaign, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_list_campaign(&base_url, &session.token, &list_id, &name, &idea, &offers, &link_url, &link_text, &signature).await
+}
+
+#[tauri::command]
+async fn get_list_campaigns(app_handle: tauri::AppHandle) -> Result<Vec<ListCampaign>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_list_campaigns(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn get_list_campaign(app_handle: tauri::AppHandle, campaign_id: String) -> Result<ListCampaign, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_list_campaign(&base_url, &session.token, &campaign_id).await
+}
+
+#[tauri::command]
+async fn get_list_campaign_drafts(app_handle: tauri::AppHandle, campaign_id: String) -> Result<Vec<ListCampaignDraft>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_list_campaign_drafts(&base_url, &session.token, &campaign_id).await
+}
+
+#[tauri::command]
+async fn resume_list_campaign(app_handle: tauri::AppHandle, campaign_id: String) -> Result<ListCampaign, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::resume_list_campaign(&base_url, &session.token, &campaign_id).await
+}
+
+#[tauri::command]
+async fn send_all_list_campaign(app_handle: tauri::AppHandle, campaign_id: String, provider: String) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::send_all_list_campaign(&base_url, &session.token, &campaign_id, &provider).await
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
   tauri::Builder::default()
@@ -1274,7 +1318,13 @@ pub fn run() {
       export_win_back_mailchimp,
       parse_win_back_csv,
       create_win_back_campaign_from_csv,
-      preview_win_back_campaign_email
+      preview_win_back_campaign_email,
+      create_list_campaign,
+      get_list_campaigns,
+      get_list_campaign,
+      get_list_campaign_drafts,
+      resume_list_campaign,
+      send_all_list_campaign
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

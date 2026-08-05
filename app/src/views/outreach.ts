@@ -1,6 +1,6 @@
 export function initOutreach(): void {
   const container = document.querySelector<HTMLDivElement>("#view-outreach")!;
-  const subViews = ["email-writer", "sequences"] as const;
+  const subViews = ["email-writer", "list-campaign", "sequences"] as const;
 
   container.querySelectorAll<HTMLButtonElement>(".sub-view-tab").forEach((btn) => {
     btn.addEventListener("click", () => {

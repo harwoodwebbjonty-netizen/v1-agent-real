@@ -584,6 +584,35 @@ def _migration_015_user_passwords(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE users ADD COLUMN password_hash TEXT")
 
 
+def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
+    """List Email Campaigns: a rep picks a cold-call list, types one idea, and
+    the tool generates a per-lead email (grouped by lead status). The per-lead
+    email content lives in email_drafts (tagged with campaign_id); this table
+    only holds the campaign itself + its progress so a credit-stopped run can
+    resume, mirroring win_back_campaigns."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS list_email_campaigns (
+            id TEXT PRIMARY KEY,
+            list_id TEXT NOT NULL,
+            owner_user_id TEXT NOT NULL,
+            name TEXT NOT NULL DEFAULT '',
+            idea TEXT NOT NULL DEFAULT '',
+            offers TEXT NOT NULL DEFAULT '',
+            link_url TEXT NOT NULL DEFAULT '',
+            link_text TEXT NOT NULL DEFAULT '',
+            signature TEXT NOT NULL DEFAULT '',
+            status TEXT NOT NULL DEFAULT 'generating',
+            total_target INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_list_email_campaigns_owner ON list_email_campaigns(owner_user_id);
+        CREATE INDEX IF NOT EXISTS idx_email_drafts_campaign ON email_drafts(campaign_id);
+        """
+    )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -611,8 +640,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (22, _migration_022_lead_linkedin_posts),
     (23, _migration_023_win_back_deal_owner),
     (24, _migration_024_win_back_source_rows),
+    (25, _migration_025_list_email_campaigns),
 ]
-CURRENT_SCHEMA_VERSION = 24
+CURRENT_SCHEMA_VERSION = 25
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1619,6 +1649,9 @@ _EMAIL_DRAFT_COLUMNS = (
     "estimated_open_rate",
     "estimated_reply_rate",
     "estimated_readability_score",
+    # Nullable: set only by List Email Campaigns to group a campaign's per-lead
+    # drafts. Every other caller leaves it absent (→ NULL), unchanged behaviour.
+    "campaign_id",
 )
 
 
@@ -1653,6 +1686,7 @@ def list_pending_email_drafts(owner_user_id: str) -> list[sqlite3.Row]:
                FROM email_drafts ed
                JOIN leads l ON l.id = ed.lead_id
                WHERE ed.status = 'draft' AND ed.owner_user_id = ?
+                 AND ed.campaign_id IS NULL
                ORDER BY ed.updated_at DESC""",
             (owner_user_id,),
         ).fetchall()
@@ -1999,6 +2033,92 @@ def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
             "UPDATE win_back_emails SET send_status = 'sent', send_method = ?, sent_at = ? WHERE id = ?",
             (method, sent_at, email_id),
         )
+
+
+# ---------------------------------------------------------------------------
+# List Email Campaigns (per-lead drafts live in email_drafts, tagged campaign_id)
+# ---------------------------------------------------------------------------
+
+
+def create_list_campaign(
+    id: str, list_id: str, owner_user_id: str, name: str, idea: str, offers: str,
+    link_url: str, link_text: str, signature: str, total_target: int, created_at: str,
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO list_email_campaigns
+               (id, list_id, owner_user_id, name, idea, offers, link_url, link_text,
+                signature, status, total_target, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?)""",
+            (id, list_id, owner_user_id, name, idea, offers, link_url, link_text,
+             signature, total_target, created_at, created_at),
+        )
+
+
+def get_list_campaign(campaign_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM list_email_campaigns WHERE id = ?", (campaign_id,)
+        ).fetchone()
+
+
+def list_list_campaigns(owner_user_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM list_email_campaigns WHERE owner_user_id = ? ORDER BY created_at DESC",
+            (owner_user_id,),
+        ).fetchall()
+
+
+def update_list_campaign_status(campaign_id: str, status: str, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE list_email_campaigns SET status = ?, updated_at = ? WHERE id = ?",
+            (status, updated_at, campaign_id),
+        )
+
+
+def count_list_campaign_drafts(campaign_id: str) -> int:
+    """DISTINCT leads with a draft in this campaign — the truthful 'generated'
+    count, unaffected by any accidental duplicate draft for one lead."""
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT COUNT(DISTINCT lead_id) AS n FROM email_drafts WHERE campaign_id = ?",
+            (campaign_id,),
+        ).fetchone()
+        return row["n"] if row else 0
+
+
+def list_campaign_drafts(campaign_id: str) -> list[sqlite3.Row]:
+    """This campaign's drafts joined with each lead's contact info + status, one
+    row per draft, ordered by the lead's status then company for grouping."""
+    with get_connection() as conn:
+        return conn.execute(
+            """SELECT ed.*, l.company, l.contact_name, l.contact_status,
+                      (SELECT e.email FROM lead_emails e WHERE e.lead_id = l.id
+                       ORDER BY e.created_at LIMIT 1) AS contact_email
+               FROM email_drafts ed
+               JOIN leads l ON l.id = ed.lead_id
+               WHERE ed.campaign_id = ?
+               ORDER BY l.contact_status, l.company, ed.created_at""",
+            (campaign_id,),
+        ).fetchall()
+
+
+def list_campaign_lead_ids_without_draft(campaign_id: str, list_id: str) -> list[str]:
+    """Leads on the campaign's list that have no draft yet — used by resume to
+    fill only the leads a credit-stopped run never reached."""
+    with get_connection() as conn:
+        rows = conn.execute(
+            """SELECT l.id FROM leads l
+               WHERE l.list_id = ?
+                 AND NOT EXISTS (
+                     SELECT 1 FROM email_drafts ed
+                     WHERE ed.campaign_id = ? AND ed.lead_id = l.id
+                 )""",
+            (list_id, campaign_id),
+        ).fetchall()
+        return [r["id"] for r in rows]
 
 
 # ---------------------------------------------------------------------------
