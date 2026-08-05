@@ -101,6 +101,8 @@
   --shadow-card: 0 10px 35px rgba(37, 48, 90, 0.06);
   --shadow-card-hover: 0 14px 35px rgba(37, 48, 90, 0.12);
   --shadow-brand: 0 7px 22px rgba(227, 19, 70, 0.22);
+  --shadow-menu: 0 18px 55px rgba(23, 24, 39, 0.16);
+  --shadow-modal: 0 30px 90px rgba(15, 16, 30, 0.30);
 
   /* Critical states — danger reads crimson in this system */
   --danger: #E31346;
@@ -125,7 +127,7 @@
   --panel: #EEF1F6;
   --border: #E4E7EF;
   --text: #121526; /* brand ink */
-  --text-muted: #6F7485;
+  --text-muted: #565C6B; /* secondary text — darkened for legible contrast (~6.7:1 on white) */
   --input-bg: #ffffff;
 
   color: var(--text);
@@ -561,7 +563,7 @@ body {
    re-tinted for legibility on navy. Per-section icon colours stay (they read
    as bright pops on the dark rail). Content area is unaffected. */
 .app-sidebar .nav-link {
-  color: #AAAEB8;
+  color: #C2C6D0;
 }
 .app-sidebar .nav-link:hover {
   background: var(--nav-hover);
@@ -580,12 +582,12 @@ body {
   color: #ffffff;
 }
 .app-sidebar .sidebar-version-label {
-  color: #6b7280;
+  color: #9AA0B0;
 }
 .app-sidebar .tab-chip {
   background: rgba(255, 255, 255, 0.05);
   border-color: rgba(255, 255, 255, 0.08);
-  color: #AAAEB8;
+  color: #C2C6D0;
 }
 .app-sidebar .tab-chip:hover {
   color: #ffffff;
@@ -604,7 +606,7 @@ body {
   border-color: var(--brand-crimson-light);
 }
 .app-sidebar .identity-trigger-caret {
-  color: #AAAEB8;
+  color: #9AA0B0;
 }
 
 .app-sidebar-bottom {
@@ -659,6 +661,7 @@ body {
   padding: var(--space-3);
   max-height: 360px;
   overflow-y: auto;
+  box-shadow: var(--shadow-menu);
 }
 
 .filters-popover.hidden {
@@ -931,7 +934,7 @@ textarea:focus {
 .btn {
   font-family: var(--font-display);
   font-size: var(--text-sm);
-  font-weight: 400;
+  font-weight: 500;
   padding: 0.45rem 0.85rem;
   border-radius: var(--radius-sm);
   border: 1px solid transparent;
@@ -1328,6 +1331,7 @@ a:hover {
   border: 1px solid var(--border);
   border-radius: var(--radius-md);
   padding: var(--space-3);
+  box-shadow: var(--shadow-menu);
 }
 
 .identity-panel.hidden {
@@ -1589,8 +1593,8 @@ a:hover {
 
 .search-input:focus {
   outline: none;
-  border-color: var(--accent-500);
-  box-shadow: 0 0 0 1px var(--accent-500);
+  border-color: var(--brand-crimson);
+  box-shadow: 0 0 0 3px rgba(227, 19, 70, 0.12);
 }
 
 .editable-cell {
@@ -3363,7 +3367,7 @@ button.p-filter-chip.active {
   padding: var(--space-6);
   max-width: 480px;
   width: 92%;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+  box-shadow: var(--shadow-modal);
 }
 .conflict-modal-title {
   font-size: 1.05rem;
@@ -3917,7 +3921,7 @@ button.p-filter-chip.active {
   max-height: 80vh;
   display: flex;
   flex-direction: column;
-  box-shadow: var(--shadow-lg);
+  box-shadow: var(--shadow-modal);
 }
 
 .wb-modal-header {
