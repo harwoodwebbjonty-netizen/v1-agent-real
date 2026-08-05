@@ -1,8 +1,9 @@
 import { Chart, registerables } from "chart.js";
-import type { Lead } from "../api";
+import type { Lead, LeadList } from "../api";
 import { setIndustryFilter } from "../components/industryFilter";
 import { CONTACT_STATUS_ORDER } from "../constants";
 import { setPendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
+import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { normalizeSicIndustry } from "../sic";
 import { getLeads, subscribe } from "../state";
 import { openTab } from "../tabs";
@@ -14,6 +15,7 @@ let industryChart: Chart | null = null;
 let trendChart: Chart | null = null;
 let statusChart: Chart | null = null;
 let chargeLendersChart: Chart | null = null;
+let callingByListChart: Chart | null = null;
 
 interface Charge {
   status: string;
@@ -120,6 +122,167 @@ function computeMonthlyTrend(leads: Lead[]): { labels: string[]; counts: number[
   }
   const labels = Object.keys(counts).sort();
   return { labels, counts: labels.map((k) => counts[k]) };
+}
+
+function leadHasPhone(lead: Lead): boolean {
+  return !!(lead.phone_number && lead.phone_number !== "not_found");
+}
+
+interface ListCallStats {
+  listId: string | null;
+  name: string;
+  owner: string;
+  total: number;
+  hasPhone: number;
+  called: number;
+  replied: number;
+  converted: number;
+}
+
+const UNASSIGNED_KEY = "__unassigned__";
+
+/** Per-list ("call sheet") calling breakdown. Seeded from the known lists so
+ * empty sheets still appear, plus an "Unassigned" bucket for any lead that is
+ * not on a list. A lead's called_at is the same flag the call sheet toggles. */
+function computeCallingByList(leads: Lead[], lists: LeadList[]): ListCallStats[] {
+  const buckets = new Map<string, ListCallStats>();
+  const ensure = (key: string, listId: string | null, name: string, owner: string): ListCallStats => {
+    let b = buckets.get(key);
+    if (!b) {
+      b = { listId, name, owner, total: 0, hasPhone: 0, called: 0, replied: 0, converted: 0 };
+      buckets.set(key, b);
+    }
+    return b;
+  };
+
+  for (const list of lists) ensure(list.id, list.id, list.name, list.owner_name || "—");
+
+  for (const lead of leads) {
+    const b =
+      lead.list_id && buckets.has(lead.list_id)
+        ? buckets.get(lead.list_id)!
+        : ensure(UNASSIGNED_KEY, null, "No list (unassigned)", "—");
+    b.total += 1;
+    if (leadHasPhone(lead)) b.hasPhone += 1;
+    if (lead.called_at) b.called += 1;
+    if (lead.contact_status === "Replied" || lead.contact_status === "Converted") b.replied += 1;
+    if (lead.contact_status === "Converted") b.converted += 1;
+  }
+
+  // Busiest sheets first; the unassigned bucket always sinks to the bottom.
+  return [...buckets.values()].sort((a, b) => {
+    if (a.listId === null) return 1;
+    if (b.listId === null) return -1;
+    return b.total - a.total;
+  });
+}
+
+function renderCallingByList(leads: Lead[], lists: LeadList[]): void {
+  const stats = computeCallingByList(leads, lists);
+  const withLeads = stats.filter((s) => s.total > 0);
+
+  const totalLeads = leads.length;
+  const totalCalled = leads.filter((l) => l.called_at).length;
+  const pctCalled = totalLeads === 0 ? 0 : Math.round((totalCalled / totalLeads) * 100);
+  document.querySelector("#call-kpi-called")!.textContent = String(totalCalled);
+  document.querySelector("#call-kpi-not-called")!.textContent = String(totalLeads - totalCalled);
+  document.querySelector("#call-kpi-pct")!.textContent = `${pctCalled}%`;
+  document.querySelector("#call-kpi-sheets")!.textContent = String(lists.length);
+
+  const tableEl = document.querySelector<HTMLElement>("#call-list-table")!;
+
+  if (withLeads.length === 0) {
+    tableEl.innerHTML =
+      '<p class="empty-hint">No call sheets with leads yet — build one on the Cold Call Lists page.</p>';
+    callingByListChart?.destroy();
+    callingByListChart = null;
+    return;
+  }
+
+  const rows = withLeads
+    .map((s) => {
+      const pct = s.total === 0 ? 0 : Math.round((s.called / s.total) * 100);
+      const owner = s.listId === null ? '<span class="empty-hint">—</span>' : escapeHtml(s.owner);
+      return `
+        <tr>
+          <td>${escapeHtml(s.name)}</td>
+          <td>${owner}</td>
+          <td class="num">${s.total}</td>
+          <td class="num">${s.hasPhone}</td>
+          <td class="num">${s.called}</td>
+          <td class="num">${s.total - s.called}</td>
+          <td>
+            <div class="call-pct-wrap">
+              <div class="funnel-bar-track call-pct-track"><div class="funnel-bar-fill" style="width:${pct}%"></div></div>
+              <span class="num">${pct}%</span>
+            </div>
+          </td>
+          <td class="num">${s.replied}</td>
+          <td class="num">${s.converted}</td>
+        </tr>`;
+    })
+    .join("");
+
+  const totals = withLeads.reduce(
+    (acc, s) => ({
+      total: acc.total + s.total,
+      hasPhone: acc.hasPhone + s.hasPhone,
+      called: acc.called + s.called,
+      replied: acc.replied + s.replied,
+      converted: acc.converted + s.converted,
+    }),
+    { total: 0, hasPhone: 0, called: 0, replied: 0, converted: 0 }
+  );
+  const totalsPct = totals.total === 0 ? 0 : Math.round((totals.called / totals.total) * 100);
+
+  tableEl.innerHTML = `
+    <table class="charge-type-tbl call-list-tbl">
+      <thead>
+        <tr>
+          <th>Call sheet</th><th>Owner</th>
+          <th class="num">Leads</th><th class="num">Has phone</th>
+          <th class="num">Called</th><th class="num">Not called</th>
+          <th>% Called</th>
+          <th class="num">Replied</th><th class="num">Converted</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+      <tfoot>
+        <tr class="call-list-total">
+          <td>All sheets</td><td></td>
+          <td class="num">${totals.total}</td><td class="num">${totals.hasPhone}</td>
+          <td class="num">${totals.called}</td><td class="num">${totals.total - totals.called}</td>
+          <td class="num">${totalsPct}%</td>
+          <td class="num">${totals.replied}</td><td class="num">${totals.converted}</td>
+        </tr>
+      </tfoot>
+    </table>`;
+
+  const canvas = document.querySelector<HTMLCanvasElement>("#call-list-chart");
+  if (canvas) {
+    const top = withLeads.slice(0, 12);
+    callingByListChart?.destroy();
+    callingByListChart = new Chart(canvas, {
+      type: "bar",
+      data: {
+        labels: top.map((s) => s.name),
+        datasets: [
+          { label: "Called", data: top.map((s) => s.called), backgroundColor: "#4F6BFF" },
+          { label: "Not called", data: top.map((s) => s.total - s.called), backgroundColor: "#e2e8f0" },
+        ],
+      },
+      options: {
+        indexAxis: "y",
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: "bottom" } },
+        scales: {
+          x: { stacked: true, beginAtZero: true, ticks: { precision: 0 } },
+          y: { stacked: true },
+        },
+      },
+    });
+  }
 }
 
 function renderKpis(leads: Lead[]): void {
@@ -305,6 +468,7 @@ function renderAnalytics(): void {
   renderStatusChart(leads);
   renderFunnel(leads);
   renderTrendChart(leads);
+  renderCallingByList(leads, getLeadLists());
   renderChargesAnalytics(leads);
 }
 
@@ -373,6 +537,32 @@ export function initAnalytics(): void {
         </section>
 
         <section class="card">
+          <h2 class="card-title">Sales Calling by List</h2>
+          <p class="card-subtitle">How many leads on each call sheet have been called, and the outcomes. From the Cold Call Lists.</p>
+          <div class="stats-grid" style="margin-bottom: var(--space-4)">
+            <div class="stat-card">
+              <span class="stat-label">Total Called</span>
+              <span id="call-kpi-called" class="stat-value">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Not Called</span>
+              <span id="call-kpi-not-called" class="stat-value">0</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">% Called</span>
+              <span id="call-kpi-pct" class="stat-value">0%</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Call Sheets</span>
+              <span id="call-kpi-sheets" class="stat-value">0</span>
+            </div>
+          </div>
+          <div id="call-list-table"></div>
+          <h3 class="card-subtitle" style="font-weight:600;margin:var(--space-4) 0 var(--space-2)">Called vs. not called by sheet</h3>
+          <div class="chart-wrap" style="min-height:240px"><canvas id="call-list-chart"></canvas></div>
+        </section>
+
+        <section class="card">
           <h2 class="card-title">Companies House — Charges</h2>
           <p class="card-subtitle">From enriched leads only. Enrich from the Leads page to populate.</p>
           <div class="stats-grid" style="margin-bottom: var(--space-4)">
@@ -395,5 +585,7 @@ export function initAnalytics(): void {
   `;
 
   subscribe(renderAnalytics);
+  subscribeLeadLists(renderAnalytics);
+  void refreshLeadLists();
   renderAnalytics();
 }
