@@ -142,20 +142,26 @@ New DB migrations run automatically on service restart.
 - **DB**: SQLite at `/opt/v1-agent/backend/data/team.db`, WAL mode,
   migrations in `backend/app/db.py` (bump `CURRENT_SCHEMA_VERSION`, append
   to `MIGRATIONS`, never edit shipped ones). CH feed self-prunes to 30 days.
-- **Design**: CoPilotIQ brand (v0.2.0 rebrand) — accent periwinkle
-  #4F6BFF (core) + violet #8B5CF6 (secondary), ink text #151826, dark bg
-  #0B0D16; mark = gradient "C" arc + dot (logo.png/app icons generated
-  from the brand spec with PIL — regenerate, don't hand-edit). Light-only
-  (no theme toggle), body font Inter + display font Poppins 500/600/700
-  for chrome (nav/titles/buttons/tooltips, via --font-display; all
-  bundled woff2). Soft geometry: --radius-sm 10px / --radius-md 14px —
-  nothing sharp. Text colours limited to accent/green/red + neutrals,
-  coloured per-section nav icons. Flat surfaces — no glows, glass,
-  ambient blobs or pulse animations (the logo mark carries the one
-  gradient); no emoji in UI copy (use stroke SVGs). Weight hierarchy:
-  titles 600, labels/buttons 500, body 400. Legacy token aliases
-  (--primary, --radius, --bg-1…) are defined in :root — never remove
-  them; ~60 view rules depend on them.
+- **Design**: makr CRM brand (crimson rebrand, from v0.2.20) — accent
+  crimson #E31346 (core), light #F01D55 / dark #BF0C38 (soft #FFF0F4,
+  border #F5B7C7); ink text #121526, page bg #F5F7FB. Primary buttons =
+  crimson gradient (--accent-gradient) + --shadow-brand. **Dark-navy left
+  nav**: gradient #101221→#0B0D19 with light text, crimson active
+  indicator (--nav-* tokens); the content area is light with a faint
+  crimson corner glow. mark = gradient "C" arc + dot (crimson: favicon.svg
+  is the vector source; logo.png/app icons regenerated with PIL/`tauri
+  icon` — regenerate, don't hand-edit). Light-only (no theme toggle — the
+  [data-theme="dark"] :root block is unused); body font Inter + display
+  font Poppins 500/600/700 for chrome (via --font-display; all bundled
+  woff2). Soft geometry: --radius-sm 9px / --radius-md 13px — nothing
+  sharp. Status: success #25A976, warning #E69D26, info #3974D8, danger =
+  crimson. Coloured per-section nav icons (kept). Shadows are soft/large
+  (--shadow-card 0 10px 35px) — this is the one deliberate departure from
+  the old flat surfaces. No emoji in UI copy (use stroke SVGs). Weight
+  hierarchy: titles 600, labels/buttons 500, body 400. **The palette lives
+  entirely in :root token *values* — restyle by remapping tokens, not
+  renaming.** Legacy token aliases (--primary, --radius, --bg-1…) are
+  defined in :root — never remove them; ~60 view rules depend on them.
 
 ### Known gaps — flag these when relevant
 - No Apple notarization: new Mac users hit Gatekeeper "damaged app"

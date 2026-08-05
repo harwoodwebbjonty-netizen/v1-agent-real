@@ -267,7 +267,7 @@ function renderCallingByList(leads: Lead[], lists: LeadList[]): void {
       data: {
         labels: top.map((s) => s.name),
         datasets: [
-          { label: "Called", data: top.map((s) => s.called), backgroundColor: "#4F6BFF" },
+          { label: "Called", data: top.map((s) => s.called), backgroundColor: "#E31346" },
           { label: "Not called", data: top.map((s) => s.total - s.called), backgroundColor: "#e2e8f0" },
         ],
       },
@@ -308,7 +308,7 @@ function renderIndustryChart(leads: Lead[]): void {
   industryChart?.destroy();
   industryChart = new Chart(canvas, {
     type: "bar",
-    data: { labels, datasets: [{ label: "Leads", data, backgroundColor: "#4F6BFF" }] },
+    data: { labels, datasets: [{ label: "Leads", data, backgroundColor: "#E31346" }] },
     options: {
       responsive: true,
       maintainAspectRatio: false,
@@ -331,7 +331,7 @@ function renderStatusChart(leads: Lead[]): void {
   const counts = computeStatusDistribution(leads);
   const labels = Object.keys(counts);
   const data = labels.map((l) => counts[l]);
-  const colors = ["#94a3b8", "#8B5CF6", "#f59e0b", "#10b981"];
+  const colors = ["#94a3b8", "#E31346", "#E69D26", "#25A976"];
   const canvas = document.querySelector<HTMLCanvasElement>("#status-chart")!;
   statusChart?.destroy();
   statusChart = new Chart(canvas, {
@@ -391,7 +391,7 @@ function renderTrendChart(leads: Lead[]): void {
         {
           label: "New leads",
           data: counts,
-          backgroundColor: "rgba(79, 107, 255, 0.7)",
+          backgroundColor: "rgba(227, 19, 70, 0.7)",
           borderRadius: 4,
         },
       ],
