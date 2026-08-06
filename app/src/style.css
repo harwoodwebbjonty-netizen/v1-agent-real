@@ -320,13 +320,11 @@ body {
 }
 
 .brand-logo {
-  height: 48px;
+  height: 42px;
   width: auto;
   max-width: 170px;
   object-fit: contain;
-  background: #ffffff;
-  border-radius: var(--radius-sm);
-  padding: 4px 8px;
+  /* Light wordmark sits directly on the navy rail — no plate/border needed. */
 }
 
 .app-sidebar.collapsed .brand-logo {
@@ -607,6 +605,42 @@ body {
 }
 .app-sidebar .identity-trigger-caret {
   color: #9AA0B0;
+}
+
+/* ── Sidebar typography ──
+   The rail switches to the geometric display face, tracked out and set in
+   uppercase — a cleaner, more technical "control-panel" register that reads
+   modern and professional without shouting. Content-area type is untouched. */
+.nav-label {
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.app-sidebar .nav-link.active .nav-label {
+  font-weight: 600;
+}
+
+.app-sidebar #identity-trigger-label {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+.app-sidebar .tab-chip {
+  font-family: var(--font-display);
+  letter-spacing: 0.04em;
+}
+
+.app-sidebar .sidebar-version-label {
+  color: #9AA0B0;
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
 }
 
 .app-sidebar-bottom {
