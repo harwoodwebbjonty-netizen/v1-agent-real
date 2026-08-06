@@ -38,16 +38,23 @@ async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Resp
 struct IdentifyRequest<'a> {
     name: &'a str,
     password: &'a str,
+    bootstrap_token: &'a str,
 }
 
-/// Name + password sign-in. A new name creates a profile with that password;
-/// an existing name must supply the matching password.
-pub async fn identify(base_url: &str, name: &str, password: &str) -> Result<(String, UserInfo), String> {
+/// Name + password sign-in. A new name creates a member profile with that
+/// password; an existing name must supply the matching password. The very first
+/// account on a fresh deployment also needs the bootstrap admin token.
+pub async fn identify(
+    base_url: &str,
+    name: &str,
+    password: &str,
+    bootstrap_token: &str,
+) -> Result<(String, UserInfo), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/auth/identify", base_url);
     let response = client
         .post(&url)
-        .json(&IdentifyRequest { name, password })
+        .json(&IdentifyRequest { name, password, bootstrap_token })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
@@ -87,17 +94,42 @@ struct UserListResponse {
     users: Vec<UserInfo>,
 }
 
-/// Public endpoint — no token needed (there's no password boundary, and the
-/// identity picker needs to show known names before anyone is signed in).
-pub async fn list_team_members(base_url: &str) -> Result<Vec<UserInfo>, String> {
+/// Full roster (ids/roles/last-seen) — now authenticated. Used post-sign-in by
+/// team management, presence, and assignment dropdowns.
+pub async fn list_team_members(base_url: &str, token: &str) -> Result<Vec<UserInfo>, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/users", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: UserListResponse = handle_response(response).await?;
+    Ok(parsed.users)
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserNameInfo {
+    pub name: String,
+    pub avatar: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct UserNamesResponse {
+    users: Vec<UserNameInfo>,
+}
+
+/// Public, slim — names + avatars only, for the pre-auth login picker.
+pub async fn list_user_names(base_url: &str) -> Result<Vec<UserNameInfo>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/users/names", base_url);
     let response = client
         .get(&url)
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
-    let parsed: UserListResponse = handle_response(response).await?;
+    let parsed: UserNamesResponse = handle_response(response).await?;
     Ok(parsed.users)
 }
 

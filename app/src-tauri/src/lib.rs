@@ -24,9 +24,15 @@ fn require_session(app_handle: &tauri::AppHandle) -> Result<StoredSession, Strin
 /// Name + password sign-in. A new name creates a profile with that password;
 /// an existing name must supply the matching password.
 #[tauri::command]
-async fn identify(app_handle: tauri::AppHandle, name: String, password: String) -> Result<UserInfo, String> {
+async fn identify(
+    app_handle: tauri::AppHandle,
+    name: String,
+    password: String,
+    bootstrap_token: Option<String>,
+) -> Result<UserInfo, String> {
     let base_url = app_state::resolve_base_url(&app_handle);
-    let (token, user) = auth_client::identify(&base_url, &name, &password).await?;
+    let (token, user) =
+        auth_client::identify(&base_url, &name, &password, bootstrap_token.as_deref().unwrap_or("")).await?;
     app_state::save_session(&app_handle, &StoredSession { token, user: user.clone() })?;
     Ok(user)
 }
@@ -54,12 +60,20 @@ fn get_current_session(app_handle: tauri::AppHandle) -> Option<UserInfo> {
 
 // --- Team management ---
 
-/// Public on the backend (no password boundary) — callable before anyone is
-/// signed in, since the identity picker needs to show known names.
+/// Full roster (ids/roles/last-seen) — authenticated. Used by team management,
+/// presence, and assignment dropdowns after sign-in.
 #[tauri::command]
 async fn list_team_members(app_handle: tauri::AppHandle) -> Result<Vec<UserInfo>, String> {
+    let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    auth_client::list_team_members(&base_url).await
+    auth_client::list_team_members(&base_url, &session.token).await
+}
+
+/// Public, slim — names + avatars only, for the pre-auth login picker.
+#[tauri::command]
+async fn list_user_names(app_handle: tauri::AppHandle) -> Result<Vec<auth_client::UserNameInfo>, String> {
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::list_user_names(&base_url).await
 }
 
 #[tauri::command]
@@ -1229,6 +1243,7 @@ pub fn run() {
       send_heartbeat,
       get_current_session,
       list_team_members,
+      list_user_names,
       create_team_member,
       update_team_member,
       delete_team_member,

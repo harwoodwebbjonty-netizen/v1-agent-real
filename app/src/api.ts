@@ -166,8 +166,18 @@ export interface UserInfo {
 // Name + password sign-in. A new name creates a profile with that password;
 // an existing name must supply the matching password.
 
-export async function identify(name: string, password: string): Promise<UserInfo> {
-  return invoke<UserInfo>("identify", { name, password });
+export async function identify(name: string, password: string, bootstrapToken = ""): Promise<UserInfo> {
+  return invoke<UserInfo>("identify", { name, password, bootstrapToken });
+}
+
+/** Slim public profile for the pre-auth login picker (name + avatar only). */
+export interface UserName {
+  name: string;
+  avatar: string | null;
+}
+
+export async function getUserNames(): Promise<UserName[]> {
+  return invoke<UserName[]>("list_user_names");
 }
 
 export async function logout(): Promise<void> {

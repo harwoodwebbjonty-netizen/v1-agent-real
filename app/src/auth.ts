@@ -26,10 +26,11 @@ export async function initAuth(): Promise<void> {
   listeners.forEach((fn) => fn());
 }
 
-/** Name + password sign-in: a new name creates a profile with that password,
- * an existing name must supply the matching password. */
-export async function identify(name: string, password: string): Promise<void> {
-  const user = await apiIdentify(name, password);
+/** Name + password sign-in: a new name creates a member profile with that
+ * password, an existing name must supply the matching password. The first-ever
+ * account on a fresh deployment also needs the admin bootstrap token. */
+export async function identify(name: string, password: string, bootstrapToken = ""): Promise<void> {
+  const user = await apiIdentify(name, password, bootstrapToken);
   setCurrentUser(user);
 }
 
