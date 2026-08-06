@@ -15,6 +15,7 @@ let intelligenceOnCooldown = false;
 let intelligenceCooldownTimer: ReturnType<typeof setTimeout> | null = null;
 
 let onAssign: ((id: string, assignedUserId: string | null) => Promise<void>) | null = null;
+let onSetShared: ((id: string, isShared: boolean) => Promise<void>) | null = null;
 let onAddPhone: ((id: string, phoneNumber: string) => Promise<void>) | null = null;
 let onUpdatePhone: ((id: string, phoneId: string, phoneNumber: string) => Promise<void>) | null = null;
 let onDeletePhone: ((id: string, phoneId: string) => Promise<void>) | null = null;
@@ -319,7 +320,7 @@ async function handleGenerateClick(lead: Lead): Promise<void> {
 function renderAssignment(lead: Lead): void {
   const el = document.querySelector("#assignment-section")!;
   el.innerHTML = `
-    <select id="assign-select" class="inline-edit">
+    <select id="assign-select" class="inline-edit" title="Assign this lead to a BDM">
       <option value="">Unassigned</option>
       ${teamMembers
         .map(
@@ -328,11 +329,24 @@ function renderAssignment(lead: Lead): void {
         )
         .join("")}
     </select>
+    ${
+      onSetShared
+        ? `<label class="share-toggle" title="When off, only the owner, the assigned BDM and admins can see this lead">
+             <input type="checkbox" id="share-check" ${lead.is_shared ? "checked" : ""} />
+             <span>Shared with the team</span>
+           </label>`
+        : ""
+    }
   `;
   document.querySelector("#assign-select")!.addEventListener("change", async (event) => {
     if (!currentLead || !onAssign) return;
     const value = (event.target as HTMLSelectElement).value;
     await onAssign(currentLead.id, value.length > 0 ? value : null);
+  });
+  const shareCheck = document.querySelector<HTMLInputElement>("#share-check");
+  shareCheck?.addEventListener("change", async () => {
+    if (!currentLead || !onSetShared) return;
+    await onSetShared(currentLead.id, shareCheck.checked);
   });
 }
 
@@ -542,6 +556,8 @@ export interface SidePanelCallbacks {
   onSaveNotes: (id: string, notes: string) => Promise<void>;
   onSaveDetails: (id: string, contactName: string, contactTitle: string, website: string, linkedin: string) => Promise<void>;
   onAssign: (id: string, assignedUserId: string | null) => Promise<void>;
+  /** Optional — when provided, the panel shows a "Shared with the team" toggle. */
+  onSetShared?: (id: string, isShared: boolean) => Promise<void>;
   onAddPhone: (id: string, phoneNumber: string) => Promise<void>;
   onUpdatePhone: (id: string, phoneId: string, phoneNumber: string) => Promise<void>;
   onDeletePhone: (id: string, phoneId: string) => Promise<void>;
@@ -560,6 +576,7 @@ export interface SidePanelCallbacks {
  * its own lead set instead of the Dashboard's. */
 export function setSidePanelCallbacks(callbacks: SidePanelCallbacks): void {
   onAssign = callbacks.onAssign;
+  onSetShared = callbacks.onSetShared ?? null;
   onAddPhone = callbacks.onAddPhone;
   onUpdatePhone = callbacks.onUpdatePhone;
   onDeletePhone = callbacks.onDeletePhone;

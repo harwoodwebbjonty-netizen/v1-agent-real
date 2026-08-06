@@ -72,6 +72,10 @@ pub struct NextBestAction {
     pub reason: String,
 }
 
+fn default_true() -> bool {
+    true
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LeadRecord {
     pub id: String,
@@ -103,6 +107,8 @@ pub struct LeadRecord {
     pub priority_score: i64,
     #[serde(default)]
     pub priority_breakdown: Option<String>,
+    #[serde(default = "default_true")]
+    pub is_shared: bool,
     pub list_name: Option<String>,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
@@ -514,6 +520,20 @@ pub async fn score_lead_list(base_url: &str, token: &str, list_id: &str) -> Resu
         .map_err(|e| format!("Failed to reach backend: {}", e))?;
     let parsed: serde_json::Value = handle_response(response).await?;
     Ok(parsed["scored"].as_i64().unwrap_or(0))
+}
+
+pub async fn set_lead_shared(base_url: &str, token: &str, lead_id: &str, is_shared: bool) -> Result<LeadRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/share", base_url, lead_id);
+    let body = serde_json::json!({ "is_shared": is_shared });
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
 }
 
 pub async fn set_lead_follow_up(base_url: &str, token: &str, lead_id: &str, follow_up_at: Option<String>) -> Result<LeadRecord, String> {

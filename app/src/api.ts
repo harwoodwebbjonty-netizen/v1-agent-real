@@ -43,6 +43,7 @@ export interface Lead {
   follow_up_at: string | null;
   priority_score: number;
   priority_breakdown: string | null;
+  is_shared: boolean;
   list_name: string | null;
   refresh_tier: string | null;
   next_dg_refresh_at: string | null;
@@ -211,6 +212,12 @@ export async function deleteTeamMember(userId: string): Promise<void> {
   await invoke("delete_team_member", { userId });
 }
 
+/** Admin-issued password set/reset (also used to set up legacy accounts that
+ * have no password yet). Revokes that user's other sessions. */
+export async function adminSetUserPassword(userId: string, password: string): Promise<UserInfo> {
+  return invoke<UserInfo>("admin_set_user_password", { userId, password });
+}
+
 export async function setUserAvatar(userId: string, avatar: string | null): Promise<UserInfo> {
   return invoke<UserInfo>("set_user_avatar", { userId, avatar });
 }
@@ -337,6 +344,12 @@ export async function addLeadsToList(listId: string, leadIds: string[]): Promise
 
 export async function setLeadFollowUp(leadId: string, followUpAt: string | null): Promise<Lead> {
   return invoke<Lead>("set_lead_follow_up", { leadId, followUpAt });
+}
+
+/** Toggle whether a lead is in the shared pool. Un-sharing keeps it visible only
+ * to its owner, its assigned BDM, and admins. Owner/admin only (enforced backend). */
+export async function setLeadShared(leadId: string, isShared: boolean): Promise<Lead> {
+  return invoke<Lead>("set_lead_shared", { leadId, isShared });
 }
 
 /** Recompute the deterministic priority score for every lead in a list.

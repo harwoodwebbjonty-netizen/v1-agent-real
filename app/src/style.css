@@ -4402,3 +4402,15 @@ button.p-filter-chip.active {
 .follow-up-hint { font-size: 0.78rem; color: var(--text-muted); }
 .follow-up-buttons { display: flex; gap: var(--space-2); }
 .fu-status { min-height: 1em; font-size: 0.78rem; color: var(--text-muted); }
+
+/* Side-panel BDM sharing toggle */
+.share-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: var(--space-2);
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+.share-toggle input { cursor: pointer; }

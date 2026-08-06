@@ -177,6 +177,30 @@ pub async fn update_team_member(
     handle_response(response).await
 }
 
+#[derive(Serialize)]
+struct SetPasswordRequest<'a> {
+    password: &'a str,
+}
+
+/// Admin-issued password set/reset. Revokes the target user's other sessions.
+pub async fn admin_set_user_password(
+    base_url: &str,
+    token: &str,
+    user_id: &str,
+    password: &str,
+) -> Result<UserInfo, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/users/{}/set-password", base_url, user_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&SetPasswordRequest { password })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
 pub async fn delete_team_member(base_url: &str, token: &str, user_id: &str) -> Result<(), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/users/{}", base_url, user_id);

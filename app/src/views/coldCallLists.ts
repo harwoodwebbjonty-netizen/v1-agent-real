@@ -25,6 +25,7 @@ import {
   scoreLeadList,
   scrapeLeadEmail,
   sendEmailDraft,
+  setLeadShared,
   toggleListLeadCalled,
   updateEmailDraft,
   updateLead,
@@ -1038,6 +1039,7 @@ export function initColdCallLists(): void {
   const listSidePanelCallbacks: SidePanelCallbacks = {
     onSaveNotes: async (id, notes) => { await updateLead(id, { leadNotes: notes }); await refreshCurrentList(); },
     onAssign: async (id, uid) => { await assignLead(id, uid); await refreshCurrentList(); },
+    onSetShared: async (id, isShared) => { await setLeadShared(id, isShared); await refreshCurrentList(); },
     onSaveDetails: async (id, contactName, contactTitle, website, linkedin) => { await updateLead(id, { contactName, contactTitle, website, linkedin }); await refreshCurrentList(); },
     onAddPhone: async (id, phoneNumber) => { await addLeadPhone(id, phoneNumber); await refreshCurrentList(); },
     onUpdatePhone: async (id, phoneId, phoneNumber) => { await updateLeadPhone(id, phoneId, phoneNumber); await refreshCurrentList(); },

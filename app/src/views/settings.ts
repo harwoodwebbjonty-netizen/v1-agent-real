@@ -5,6 +5,7 @@ import {
   type CreditUsage,
   checkBackendHealth,
   connectEmailAccount,
+  adminSetUserPassword,
   createTeamMember,
   deleteTeamMember,
   disconnectEmailOAuthAccount,
@@ -205,6 +206,7 @@ export function initSettings(): void {
               <option value="admin" ${m.role === "admin" ? "selected" : ""}>Admin</option>
             </select>
             <span>${escapeHtml(m.name)}</span>
+            <button class="btn btn-ghost btn-sm set-pw-btn" data-user-id="${escapeHtml(m.id)}" title="Set or reset this member's password">Set password</button>
             <button class="btn btn-ghost btn-sm delete-member-btn" data-user-id="${escapeHtml(m.id)}" title="Remove">✕</button>
           </li>
         `;
@@ -221,6 +223,25 @@ export function initSettings(): void {
         } catch (err) {
           teamStatus.textContent = `Failed to update role: ${err}`;
           select.value = getTeamMembers().find((m) => m.id === userId)?.role ?? select.value;
+        }
+      });
+    });
+
+    roster.querySelectorAll<HTMLButtonElement>(".set-pw-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const userId = btn.dataset.userId!;
+        const member = members.find((m) => m.id === userId);
+        if (!member) return;
+        const password = window.prompt(
+          `Set a new password for ${member.name} (minimum 8 characters). They'll use it to sign in; this also signs them out of other sessions.`
+        );
+        if (password === null) return;
+        if (password.length < 8) { teamStatus.textContent = "Password must be at least 8 characters."; return; }
+        try {
+          await adminSetUserPassword(userId, password);
+          teamStatus.textContent = `Password set for ${member.name}.`;
+        } catch (err) {
+          teamStatus.textContent = `Failed to set password: ${err}`;
         }
       });
     });

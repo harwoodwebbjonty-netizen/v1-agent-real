@@ -103,6 +103,13 @@ async fn delete_team_member(app_handle: tauri::AppHandle, user_id: String) -> Re
 }
 
 #[tauri::command]
+async fn admin_set_user_password(app_handle: tauri::AppHandle, user_id: String, password: String) -> Result<UserInfo, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::admin_set_user_password(&base_url, &session.token, &user_id, &password).await
+}
+
+#[tauri::command]
 async fn set_user_avatar(app_handle: tauri::AppHandle, user_id: String, avatar: Option<String>) -> Result<UserInfo, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -454,6 +461,13 @@ async fn set_lead_follow_up(app_handle: tauri::AppHandle, lead_id: String, follo
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
     backend_client::set_lead_follow_up(&base_url, &session.token, &lead_id, follow_up_at).await
+}
+
+#[tauri::command]
+async fn set_lead_shared(app_handle: tauri::AppHandle, lead_id: String, is_shared: bool) -> Result<backend_client::LeadRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::set_lead_shared(&base_url, &session.token, &lead_id, is_shared).await
 }
 
 #[tauri::command]
@@ -1247,6 +1261,7 @@ pub fn run() {
       create_team_member,
       update_team_member,
       delete_team_member,
+      admin_set_user_password,
       set_user_avatar,
       read_image_as_data_url,
       get_backend_base_url,
@@ -1284,6 +1299,7 @@ pub fn run() {
       add_leads_to_list,
       set_lead_follow_up,
       score_lead_list,
+      set_lead_shared,
       generate_follow_up_draft,
       ch_enrich_all,
       ch_enrich_auto,
