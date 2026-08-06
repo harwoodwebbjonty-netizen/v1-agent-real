@@ -64,6 +64,8 @@ class LeadOut(BaseModel):
     ch_data: Optional[str] = None
     called_at: Optional[str] = None
     follow_up_at: Optional[str] = None
+    priority_score: int = 0
+    priority_breakdown: Optional[str] = None
     list_name: Optional[str] = None
     phones: list[PhoneOut]
     emails: list[EmailOut]

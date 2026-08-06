@@ -443,6 +443,20 @@ async fn set_lead_follow_up(app_handle: tauri::AppHandle, lead_id: String, follo
 }
 
 #[tauri::command]
+async fn score_lead_list(app_handle: tauri::AppHandle, list_id: String) -> Result<i64, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::score_lead_list(&base_url, &session.token, &list_id).await
+}
+
+#[tauri::command]
+async fn generate_follow_up_draft(app_handle: tauri::AppHandle, lead_id: String) -> Result<backend_client::EmailDraft, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::generate_follow_up_draft(&base_url, &session.token, &lead_id).await
+}
+
+#[tauri::command]
 async fn ch_enrich_all(app_handle: tauri::AppHandle) -> Result<ChEnrichResult, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -1254,6 +1268,8 @@ pub fn run() {
       toggle_list_lead_called,
       add_leads_to_list,
       set_lead_follow_up,
+      score_lead_list,
+      generate_follow_up_draft,
       ch_enrich_all,
       ch_enrich_auto,
       ch_enrich_status,

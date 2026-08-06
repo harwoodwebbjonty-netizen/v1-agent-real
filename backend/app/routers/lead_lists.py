@@ -15,6 +15,7 @@ from app.schemas_leads import (
     LeadListResponse,
     LeadListsResponse,
 )
+from app.services import lead_scoring_service
 from app.services.auth_service import new_id, now_iso
 
 
@@ -117,6 +118,21 @@ def delete_lead_list(list_id: str, current_user: CurrentUser = Depends(get_curre
     _require_list_access(lead_list, current_user)
     db.delete_lead_list(list_id)
     return {"deleted": True}
+
+
+@router.post("/{list_id}/score")
+def score_lead_list(
+    list_id: str, current_user: CurrentUser = Depends(get_current_user)
+) -> dict:
+    """Recompute the deterministic priority score for every lead in the list so
+    the highest-value opportunities sort to the top of the call sheet. Free, no
+    AI, no credits — safe to re-run any time."""
+    lead_list = db.get_lead_list(list_id)
+    if lead_list is None:
+        raise HTTPException(status_code=404, detail="List not found")
+    _require_list_access(lead_list, current_user)
+    scored = lead_scoring_service.score_list(list_id)
+    return {"scored": scored}
 
 
 @router.patch("/{list_id}/leads/{lead_id}/toggle-called")

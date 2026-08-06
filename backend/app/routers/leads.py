@@ -51,6 +51,7 @@ from app.services.companies_house_service import (
     search_company_by_name,
 )
 from app.services.email_scraper_service import scrape_emails
+from app.services import lead_scoring_service
 from app.services.linkedin_activity_service import format_posts_for_prompt, get_or_fetch_linkedin_posts
 from app.services.next_best_action import compute_next_best_action
 from app.services.sales_intelligence_service import (
@@ -165,6 +166,8 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         ch_data=row["ch_data"],
         called_at=row["called_at"],
         follow_up_at=row["follow_up_at"] if "follow_up_at" in row.keys() else None,
+        priority_score=row["priority_score"] if "priority_score" in row.keys() else 0,
+        priority_breakdown=row["priority_breakdown"] if "priority_breakdown" in row.keys() else None,
         list_name=row["list_name"] if "list_name" in row.keys() else None,
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
         emails=[
@@ -688,6 +691,11 @@ async def _run_enrichment_batch(api_key: str, user_id: str, is_admin: bool, limi
             if industry:
                 fields["industry"] = industry
             db.update_lead_fields(lead["id"], fields, now_iso())
+            # Refresh the deterministic priority score now that CH data changed.
+            try:
+                lead_scoring_service.score_lead(lead["id"])
+            except Exception:
+                logger.exception("Priority scoring failed for enriched lead %s", lead["id"])
             enriched += 1
         except Exception as exc:
             logger.warning("CH enrich failed for '%s': %s", lead["company"], exc)

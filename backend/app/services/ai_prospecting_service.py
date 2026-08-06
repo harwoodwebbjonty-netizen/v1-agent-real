@@ -13,6 +13,7 @@ from typing import Optional
 from app import db
 from app.core.config import get_settings
 from app.schemas_ai_prospecting import ProspectingCriteria
+from app.services import lead_scoring_service
 from app.services.auth_service import new_id, now_iso
 from app.services.companies_house_service import (
     CHRateLimitError,
@@ -310,6 +311,13 @@ async def run_prospecting(
                 },
                 created_at,
             )
+
+            # Deterministic priority score so the lead sorts sensibly the moment
+            # it lands on a call sheet (free, no AI). Never let it block prospecting.
+            try:
+                lead_scoring_service.score_lead(lead_id)
+            except Exception:
+                logger.exception("Priority scoring failed for prospected lead %s", lead_id)
 
             created += 1
             db.update_prospecting_run(run_id, {"created": created})

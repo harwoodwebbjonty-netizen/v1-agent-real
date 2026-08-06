@@ -613,6 +613,20 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_026_lead_priority(conn: sqlite3.Connection) -> None:
+    """Deterministic lead-prioritisation score (0–100) so the highest-value
+    companies sort to the top of the cold-call sheet. Computed for free from
+    Companies House data already on the lead (charges, SIC, age) plus call/email
+    contact history and recent activity — no AI, no credits. priority_breakdown
+    stores the per-signal JSON for transparency. Distinct from the AI lead_score
+    in lead_intelligence_versions, which is paid and sparse."""
+    lead_columns = {row["name"] for row in conn.execute("PRAGMA table_info(leads)")}
+    if "priority_score" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN priority_score INTEGER NOT NULL DEFAULT 0")
+    if "priority_breakdown" not in lead_columns:
+        conn.execute("ALTER TABLE leads ADD COLUMN priority_breakdown TEXT NOT NULL DEFAULT '{}'")
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -641,8 +655,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (23, _migration_023_win_back_deal_owner),
     (24, _migration_024_win_back_source_rows),
     (25, _migration_025_list_email_campaigns),
+    (26, _migration_026_lead_priority),
 ]
-CURRENT_SCHEMA_VERSION = 25
+CURRENT_SCHEMA_VERSION = 26
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1234,6 +1249,15 @@ def set_lead_follow_up(lead_id: str, follow_up_at: Optional[str]) -> None:
     """Set or clear the follow-up date for a lead."""
     with get_connection() as conn:
         conn.execute("UPDATE leads SET follow_up_at = ? WHERE id = ?", (follow_up_at, lead_id))
+
+
+def set_lead_priority(lead_id: str, score: int, breakdown_json: str) -> None:
+    """Persist the deterministic prioritisation score + per-signal breakdown."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE leads SET priority_score = ?, priority_breakdown = ? WHERE id = ?",
+            (score, breakdown_json, lead_id),
+        )
 
 
 # --- AI sales intelligence (append-only version history — never updated, never deleted) ---

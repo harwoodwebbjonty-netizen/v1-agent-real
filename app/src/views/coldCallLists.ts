@@ -1,22 +1,32 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import {
+  type CallOutcome,
+  type EmailDraft,
+  type EmailOAuthAccount,
+  type EmailProvider,
   type Lead,
   type LeadList,
   addLeadEmail,
   addLeadPhone,
   addLeadsToList,
   assignLead,
+  createCallLog,
   createLeadList,
   deleteLeadEmail,
   deleteLeadList,
   deleteLeadPhone,
+  generateFollowUpDraft,
   generateLeadIntelligence,
   getLogEntries,
   importLeadsCsv,
+  listEmailOAuthAccounts,
   listTeamMembers,
   lookupCompanyPhone,
+  scoreLeadList,
   scrapeLeadEmail,
+  sendEmailDraft,
   toggleListLeadCalled,
+  updateEmailDraft,
   updateLead,
   updateLeadEmail,
   updateLeadPhone,
@@ -178,6 +188,7 @@ export function initColdCallLists(): void {
         <h2 class="call-sheet-title" id="list-detail-title"></h2>
         <div class="call-sheet-header-actions">
           <button id="toggle-add-btn" class="btn btn-ghost btn-sm">+ Add companies</button>
+          <button id="score-list-btn" class="btn btn-secondary btn-sm" title="Rank leads by value so the best calls sort to the top (free, no AI)">Score list</button>
           <button id="find-phones-btn" class="btn btn-secondary btn-sm">Find phones</button>
           <button id="delete-list-btn" class="btn btn-ghost btn-danger btn-sm">Delete</button>
         </div>
@@ -224,9 +235,9 @@ export function initColdCallLists(): void {
           <div class="ccl-sort-select">
             <label for="ccl-sort-select">Sort</label>
             <select id="ccl-sort-select">
-              <option value="">Default</option>
-              <option value="lead_score:asc">Score (high–low)</option>
-              <option value="lead_score:desc">Score (low–high)</option>
+              <option value="">Priority (high–low)</option>
+              <option value="lead_score:asc">AI score (high–low)</option>
+              <option value="lead_score:desc">AI score (low–high)</option>
               <option value="company:asc">Company A–Z</option>
               <option value="company:desc">Company Z–A</option>
               <option value="phone_number:asc">Phone first</option>
@@ -330,6 +341,7 @@ export function initColdCallLists(): void {
   const enrichFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-enrich-btn");
   const scopeFilterBtns = container.querySelectorAll<HTMLButtonElement>(".ccl-scope-btn");
   const findPhonesBtn = container.querySelector<HTMLButtonElement>("#find-phones-btn")!;
+  const scoreListBtn = container.querySelector<HTMLButtonElement>("#score-list-btn")!;
   const sortSelect = container.querySelector<HTMLSelectElement>("#ccl-sort-select")!;
   const toggleAddBtn = container.querySelector<HTMLButtonElement>("#toggle-add-btn")!;
   const addCompaniesPanel = container.querySelector<HTMLDivElement>("#add-companies-panel")!;
@@ -350,6 +362,7 @@ export function initColdCallLists(): void {
   let phoneFilter: "all" | "has-phone" | "no-phone" = "all";
   let selectedLeadIds = new Set<string>();
   let lastToggledIndex = -1;
+  let doneTodayCollapsed = true;
 
   // Selector state
   let selectorSearch = "";
@@ -813,8 +826,25 @@ export function initColdCallLists(): void {
     else if (enrichFilter === "enriched") filtered = filtered.filter(isEnriched);
     else if (enrichFilter === "not-enriched") filtered = filtered.filter((l) => !isEnriched(l));
 
-    const sorted = sortLeadsStable(filtered, sortColumn, sortDirection);
-    const visible = [...sorted.filter(isFollowUpDue), ...sorted.filter((l) => !isFollowUpDue(l))];
+    // Default order = deterministic priority (highest-value first) so the next
+    // best lead sits at the top; an explicit sort choice overrides it. The
+    // priority_score comparator already returns high-first, so "asc" (multiplier
+    // +1) preserves that — same convention the AI lead_score sort uses.
+    const effectiveCol: SortColumn = sortColumn ?? "priority_score";
+    const effectiveDir: SortDirection = sortColumn ? sortDirection : "asc";
+    const sorted = sortLeadsStable(filtered, effectiveCol, effectiveDir);
+
+    // Leads called TODAY drop into a "Done today" group at the bottom, so the
+    // active queue always advances to the next un-worked lead automatically.
+    const isDoneToday = (l: Lead) => {
+      if (!l.called_at) return false;
+      const d = new Date(l.called_at);
+      return d.getFullYear() === now.getFullYear() && d.getMonth() === now.getMonth() && d.getDate() === now.getDate();
+    };
+    const doneToday = sorted.filter(isDoneToday);
+    const active = sorted.filter((l) => !isDoneToday(l));
+    const activeOrdered = [...active.filter(isFollowUpDue), ...active.filter((l) => !isFollowUpDue(l))];
+    const visible = [...activeOrdered, ...doneToday];
 
     if (visible.length === 0) {
       renderEmptyState(listResultsBody, "No leads match your filters.", CALL_SHEET_COL_COUNT);
@@ -832,6 +862,22 @@ export function initColdCallLists(): void {
       onToggleCalled: async (lead) => {
         if (!currentListId) return;
         await toggleListLeadCalled(currentListId, lead.id); await refreshCurrentList();
+      },
+      onLogOutcome: async (lead, outcome) => {
+        if (!currentListId || outcome === "__called__") return;
+        if (outcome === "") {
+          // Clear the called state — lead returns to the active queue.
+          if (lead.called_at) await toggleListLeadCalled(currentListId, lead.id);
+          await refreshCurrentList();
+          return;
+        }
+        try { await createCallLog(lead.id, outcome as CallOutcome, ""); } catch { /* history is non-critical */ }
+        if (!lead.called_at) await toggleListLeadCalled(currentListId, lead.id);
+        // They answered → advance a fresh lead out of "New" automatically.
+        if (outcome === "connected" && lead.contact_status === CONTACT_STATUS_ORDER[0]) {
+          await updateLead(lead.id, { contactStatus: "Contacted" });
+        }
+        await refreshCurrentList();
       },
       onToggleSelect: (lead, selected, shiftKey) => {
         const currentIndex = visible.findIndex((l) => l.id === lead.id);
@@ -853,6 +899,7 @@ export function initColdCallLists(): void {
         updateBulkBar(visible);
       },
       onGenerateEmail: (lead) => { setPendingEmailWriterLead(lead.id); openTab("outreach", "Outreach"); },
+      onSendFollowUp: (lead) => { openFollowUpModal(lead); },
       onLookupPhone: (lead) => { void lookupCompanyPhone(lead.company, currentListId ?? undefined).then(() => refreshCurrentList()); },
       onSaveNotes: async (lead, notes) => {
         await updateLead(lead.id, { leadNotes: notes });
@@ -860,7 +907,29 @@ export function initColdCallLists(): void {
         if (idx >= 0) currentListLeads[idx] = { ...currentListLeads[idx], notes };
       },
       showListColumn: true,
+      showPriority: true,
     }, selectedLeadIds);
+
+    // "Done today" divider: a collapsible section that fills as calls are logged.
+    if (doneToday.length > 0) {
+      const firstDone = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${doneToday[0].id}"]`);
+      const divider = document.createElement("tr");
+      divider.className = "done-today-divider";
+      divider.innerHTML = `<td colspan="${CALL_SHEET_COL_COUNT}">
+        <button type="button" class="done-today-toggle">
+          <span class="done-today-caret">${doneTodayCollapsed ? "▸" : "▾"}</span> Done today (${doneToday.length})
+        </button></td>`;
+      if (firstDone) listResultsBody.insertBefore(divider, firstDone);
+      for (const l of doneToday) {
+        const r = listResultsBody.querySelector<HTMLTableRowElement>(`[data-lead-id="${l.id}"]`);
+        if (r) r.classList.toggle("done-today-row-hidden", doneTodayCollapsed);
+      }
+      divider.querySelector<HTMLButtonElement>(".done-today-toggle")?.addEventListener("click", () => {
+        doneTodayCollapsed = !doneTodayCollapsed;
+        renderListTable();
+      });
+    }
+
     updateBulkBar(visible);
   }
 
@@ -868,6 +937,102 @@ export function initColdCallLists(): void {
     if (!currentListId) return;
     currentListLeads = await getLogEntries();
     renderListTable();
+  }
+
+  // One-click "Send follow-up": drafts from the lead's call notes + previous
+  // emails (backend), then an inline review-and-send from the rep's own account.
+  async function openFollowUpModal(lead: Lead): Promise<void> {
+    const overlay = document.createElement("div");
+    overlay.className = "follow-up-overlay";
+    overlay.innerHTML = `
+      <div class="follow-up-modal" role="dialog" aria-modal="true">
+        <div class="follow-up-modal-head">
+          <h3>Follow-up · ${escapeHtml(lead.company)}</h3>
+          <button class="follow-up-close icon-btn" type="button" title="Close">✕</button>
+        </div>
+        <div class="follow-up-body">
+          <div class="follow-up-loading">Drafting a follow-up from your call notes and previous emails…</div>
+        </div>
+      </div>`;
+    document.body.appendChild(overlay);
+    const close = () => overlay.remove();
+    overlay.querySelector<HTMLButtonElement>(".follow-up-close")!.addEventListener("click", close);
+    overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+
+    let draft: EmailDraft;
+    try {
+      draft = await generateFollowUpDraft(lead.id);
+    } catch (err) {
+      const body = overlay.querySelector<HTMLDivElement>(".follow-up-body")!;
+      body.innerHTML = `<div class="follow-up-error">${escapeHtml(String(err))}</div>`;
+      return;
+    }
+
+    const accounts = await listEmailOAuthAccounts().catch(() => [] as EmailOAuthAccount[]);
+    const existingEmail = lead.emails[0]?.email ?? "";
+
+    const body = overlay.querySelector<HTMLDivElement>(".follow-up-body")!;
+    body.innerHTML = `
+      <label class="follow-up-field"><span>To</span>
+        <input class="fu-to search-input" type="email" placeholder="${existingEmail ? "" : "No email on file — add one to send"}" />
+      </label>
+      <label class="follow-up-field"><span>Subject</span>
+        <input class="fu-subject search-input" type="text" />
+      </label>
+      <label class="follow-up-field"><span>Message</span>
+        <textarea class="fu-body" rows="11"></textarea>
+      </label>
+      <div class="follow-up-actions">
+        <div class="follow-up-provider">
+          ${accounts.length > 0
+            ? `<span>Send from</span><select class="fu-provider search-input">${accounts
+                .map((a) => `<option value="${a.provider}">${escapeHtml(a.email_address)}</option>`)
+                .join("")}</select>`
+            : `<span class="follow-up-hint">Connect a Gmail or Microsoft account in Settings to send.</span>`}
+        </div>
+        <div class="follow-up-buttons">
+          <button class="btn btn-ghost btn-sm fu-cancel" type="button">Close</button>
+          <button class="btn btn-primary btn-sm fu-send" type="button" ${accounts.length === 0 ? "disabled" : ""}>Send</button>
+        </div>
+      </div>
+      <div class="fu-status status-message"></div>`;
+
+    const toInput = body.querySelector<HTMLInputElement>(".fu-to")!;
+    const subjectInput = body.querySelector<HTMLInputElement>(".fu-subject")!;
+    const bodyTextarea = body.querySelector<HTMLTextAreaElement>(".fu-body")!;
+    const providerSelect = body.querySelector<HTMLSelectElement>(".fu-provider");
+    const sendBtn = body.querySelector<HTMLButtonElement>(".fu-send")!;
+    const statusEl = body.querySelector<HTMLDivElement>(".fu-status")!;
+
+    subjectInput.value = draft.subject;
+    bodyTextarea.value = draft.body;
+    if (existingEmail) { toInput.value = existingEmail; toInput.readOnly = true; }
+
+    body.querySelector<HTMLButtonElement>(".fu-cancel")!.addEventListener("click", close);
+
+    sendBtn.addEventListener("click", async () => {
+      const provider = providerSelect?.value as EmailProvider | undefined;
+      if (!provider) return;
+      let recipient = existingEmail;
+      const typed = toInput.value.trim();
+      if (!recipient) {
+        if (!typed) { statusEl.textContent = "Add a recipient email address first."; return; }
+        recipient = typed;
+      }
+      sendBtn.disabled = true;
+      statusEl.textContent = "Sending…";
+      try {
+        await updateEmailDraft(draft.id, { subject: subjectInput.value, body: bodyTextarea.value });
+        if (!existingEmail && typed) { await addLeadEmail(lead.id, typed).catch(() => {}); }
+        await sendEmailDraft(draft.id, provider);
+        statusEl.textContent = "Sent ✓";
+        await refreshCurrentList();
+        setTimeout(close, 900);
+      } catch (err) {
+        statusEl.textContent = `Send failed: ${err}`;
+        sendBtn.disabled = false;
+      }
+    });
   }
 
   const listSidePanelCallbacks: SidePanelCallbacks = {
@@ -979,6 +1144,21 @@ export function initColdCallLists(): void {
       try { await lookupCompanyPhone(missing[i].company, currentListId); await refreshCurrentList(); } catch { /* continue */ }
     }
     listDetailStatus.textContent = ""; findPhonesBtn.disabled = false; await refreshLeadLists();
+  });
+
+  scoreListBtn.addEventListener("click", async () => {
+    if (!currentListId) return;
+    scoreListBtn.disabled = true;
+    listDetailStatus.textContent = "Scoring leads…";
+    try {
+      const scored = await scoreLeadList(currentListId);
+      await refreshCurrentList();
+      listDetailStatus.textContent = `Scored ${scored} lead${scored === 1 ? "" : "s"} — highest-value first.`;
+    } catch (err) {
+      listDetailStatus.textContent = `Scoring failed: ${err}`;
+    }
+    scoreListBtn.disabled = false;
+    setTimeout(() => { listDetailStatus.textContent = ""; }, 4000);
   });
 
   toggleAddBtn.addEventListener("click", () => {

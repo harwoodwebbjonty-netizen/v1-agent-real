@@ -41,6 +41,8 @@ export interface Lead {
   ch_data: string | null;
   called_at: string | null;
   follow_up_at: string | null;
+  priority_score: number;
+  priority_breakdown: string | null;
   list_name: string | null;
   refresh_tier: string | null;
   next_dg_refresh_at: string | null;
@@ -325,6 +327,12 @@ export async function addLeadsToList(listId: string, leadIds: string[]): Promise
 
 export async function setLeadFollowUp(leadId: string, followUpAt: string | null): Promise<Lead> {
   return invoke<Lead>("set_lead_follow_up", { leadId, followUpAt });
+}
+
+/** Recompute the deterministic priority score for every lead in a list.
+ * Free, no AI — returns how many leads were scored. */
+export async function scoreLeadList(listId: string): Promise<number> {
+  return invoke<number>("score_lead_list", { listId });
 }
 
 export async function importLeadsToDashboard(csvPath: string): Promise<number> {
@@ -616,6 +624,13 @@ export async function generateEmailDraft(
 /** Manual trigger only — spends Anthropic credits. */
 export async function refineEmailDraft(draftId: string, instruction: string): Promise<EmailDraft> {
   return invoke<EmailDraft>("refine_email_draft", { draftId, instruction });
+}
+
+/** One-click follow-up: drafts from the lead's call notes, company, industry
+ * and previous emails. Returns a draft to review and send — never auto-sends.
+ * Manual trigger only — spends Anthropic credits. */
+export async function generateFollowUpDraft(leadId: string): Promise<EmailDraft> {
+  return invoke<EmailDraft>("generate_follow_up_draft", { leadId });
 }
 
 export async function updateEmailDraft(id: string, patch: { subject?: string; body?: string }): Promise<EmailDraft> {

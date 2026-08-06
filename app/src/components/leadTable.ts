@@ -4,7 +4,7 @@ import { copyToClipboard } from "../contact";
 import { normalizeSicIndustry } from "../sic";
 import { escapeHtml } from "../utils";
 
-export type SortColumn = "company" | "phone_number" | "status" | "industry" | "contact_status" | "lead_score" | null;
+export type SortColumn = "company" | "phone_number" | "status" | "industry" | "contact_status" | "lead_score" | "priority_score" | null;
 export type SortDirection = "asc" | "desc";
 
 function compareLeads(a: Lead, b: Lead, col: SortColumn): number {
@@ -14,6 +14,11 @@ function compareLeads(a: Lead, b: Lead, col: SortColumn): number {
   }
   if (col === "lead_score") {
     return (b.intelligence?.lead_score ?? 0) - (a.intelligence?.lead_score ?? 0);
+  }
+  if (col === "priority_score") {
+    // Returns high-first (same convention as lead_score above); the call sheet
+    // passes "asc" so the +1 multiplier keeps highest-value at the top.
+    return (b.priority_score ?? 0) - (a.priority_score ?? 0);
   }
   if (col === "phone_number") {
     // Leads WITH a phone number sort first (asc = has phone, desc = no phone first)
@@ -92,6 +97,8 @@ export interface RowHandlers {
   onToggleCalled?: (lead: Lead) => void;
   /** Reduce-clicks: jump straight to drafting an email for this lead without opening the side panel first. */
   onGenerateEmail?: (lead: Lead) => void;
+  /** Call-sheet mode: one-click follow-up email — opens an inline review-and-send modal. */
+  onSendFollowUp?: (lead: Lead) => void;
   /** Look up phone number for a lead that doesn't have one yet. */
   onLookupPhone?: (lead: Lead) => void;
   /** Dashboard only: opens the activity modal for this lead. Renders a pulsing dot column on the left. */
@@ -102,6 +109,12 @@ export interface RowHandlers {
   showListColumn?: boolean;
   /** Call-sheet mode: inline editable notes column. Saves on blur/Enter without re-rendering the table. */
   onSaveNotes?: (lead: Lead, notes: string) => Promise<void>;
+  /** Call-sheet mode: show the deterministic priority score as a chip in the company cell. */
+  showPriority?: boolean;
+  /** Call-sheet mode: log a call outcome (also marks the lead called). When set, the
+   * plain Called checkbox is replaced by a compact outcome picker. Value "" clears the
+   * called state; "__called__" is the current-state placeholder and is a no-op. */
+  onLogOutcome?: (lead: Lead, outcome: string) => void;
 }
 
 const COLUMN_COUNT = 8;
@@ -129,7 +142,18 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
           : ""
       }
       ${
-        handlers.onToggleCalled
+        handlers.onLogOutcome
+          ? `<td class="called-cell">
+               <select class="outcome-select ${lead.called_at ? "is-called" : ""}" title="Log call outcome">
+                 <option value="">○ Not called</option>
+                 <option value="__called__" ${lead.called_at ? "selected" : "hidden"}>✓ Called</option>
+                 <option value="connected">✓ Connected</option>
+                 <option value="voicemail">Voicemail</option>
+                 <option value="no_answer">No answer</option>
+                 <option value="wrong_number">Wrong number</option>
+               </select>
+             </td>`
+          : handlers.onToggleCalled
           ? `<td class="called-cell">
                <input type="checkbox" class="called-cb" ${lead.called_at ? "checked" : ""} title="Mark as called" />
              </td>`
@@ -144,7 +168,11 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
           : ""
       }
       <td>
-        <div>${escapeHtml(lead.company)}</div>
+        <div>${
+          handlers.showPriority
+            ? `<span class="priority-badge" title="Priority score (higher = call first)">${lead.priority_score ?? 0}</span> `
+            : ""
+        }${escapeHtml(lead.company)}</div>
         ${(() => {
           try {
             const dirs: string[] = JSON.parse(lead.ch_data || "{}").directors || [];
@@ -185,6 +213,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
               : `<span class="empty-hint">—</span>`
           }
           ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
+          ${handlers.onSendFollowUp ? `<button class="icon-btn follow-up-btn" type="button" title="Send follow-up">↩</button>` : ""}
         </div>
       </td>
       ${handlers.showListColumn !== false ? `<td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>` : ""}
@@ -233,6 +262,13 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
       handlers.onToggleCalled!(lead);
     });
 
+    const outcomeSelect = row.querySelector<HTMLSelectElement>(".outcome-select");
+    outcomeSelect?.addEventListener("click", (event) => event.stopPropagation());
+    outcomeSelect?.addEventListener("change", (event) => {
+      event.stopPropagation();
+      handlers.onLogOutcome!(lead, outcomeSelect.value);
+    });
+
     const toggleBtn = row.querySelector<HTMLButtonElement>(".contacted-toggle");
     toggleBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
@@ -243,6 +279,12 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
     generateEmailBtn?.addEventListener("click", (event) => {
       event.stopPropagation();
       handlers.onGenerateEmail!(lead);
+    });
+
+    const followUpBtn = row.querySelector<HTMLButtonElement>(".follow-up-btn");
+    followUpBtn?.addEventListener("click", (event) => {
+      event.stopPropagation();
+      handlers.onSendFollowUp!(lead);
     });
 
     const activityDot = row.querySelector<HTMLElement>(".activity-dot");

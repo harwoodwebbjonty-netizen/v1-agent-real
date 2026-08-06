@@ -4202,3 +4202,169 @@ button.p-filter-chip.active {
   align-items: center;
   gap: var(--space-2);
 }
+
+/* ── Call-sheet prioritisation: priority badge, outcome picker, Done-today ── */
+
+.priority-badge {
+  display: inline-block;
+  min-width: 22px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: center;
+  color: var(--accent-core, #E31346);
+  background: var(--accent-glow, #FFF0F4);
+  border: 1px solid var(--accent-border, #F5B7C7);
+  vertical-align: middle;
+}
+
+.outcome-select {
+  font-size: 0.75rem;
+  padding: 3px 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 9px);
+  background: var(--bg-1, #fff);
+  color: var(--text-muted);
+  max-width: 120px;
+}
+
+.outcome-select.is-called {
+  color: var(--success, #25A976);
+  border-color: color-mix(in srgb, var(--success, #25A976) 40%, var(--border));
+  font-weight: 600;
+}
+
+.done-today-divider td {
+  padding: 0 !important;
+  background: transparent !important;
+  border: 0 !important;
+}
+
+.done-today-toggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px var(--space-3);
+  margin-top: 4px;
+  background: var(--surface-alt, var(--panel));
+  border: 0;
+  border-top: 1px dashed var(--border);
+  color: var(--text-muted);
+  font-size: 0.78rem;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.done-today-toggle:hover { color: var(--text); }
+.done-today-caret { font-size: 0.7rem; }
+.done-today-row-hidden { display: none; }
+
+/* ── Inline "Send follow-up" review modal ── */
+
+.follow-up-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.45);
+  padding: var(--space-4);
+}
+
+.follow-up-modal {
+  position: relative;
+  background: var(--bg-1, #fff);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg, 16px);
+  width: min(620px, 94vw);
+  max-height: 88vh;
+  display: flex;
+  flex-direction: column;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.follow-up-modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.follow-up-modal-head h3 {
+  margin: 0;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.follow-up-body {
+  padding: var(--space-4);
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.follow-up-loading,
+.follow-up-error {
+  padding: var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.85rem;
+}
+
+.follow-up-error { color: var(--danger, #E31346); }
+
+.follow-up-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.follow-up-field > span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--text-muted);
+}
+
+.follow-up-field .fu-body {
+  width: 100%;
+  resize: vertical;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius, 10px);
+  font: inherit;
+  font-size: 0.85rem;
+  line-height: 1.5;
+  background: var(--bg-1, #fff);
+  color: var(--text);
+}
+
+.follow-up-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.follow-up-provider {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
+.follow-up-provider select { max-width: 240px; }
+.follow-up-hint { font-size: 0.78rem; color: var(--text-muted); }
+.follow-up-buttons { display: flex; gap: var(--space-2); }
+.fu-status { min-height: 1em; font-size: 0.78rem; color: var(--text-muted); }

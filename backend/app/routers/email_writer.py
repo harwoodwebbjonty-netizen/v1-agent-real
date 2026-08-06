@@ -97,6 +97,15 @@ def _gather_lead_data(lead_id: str, current_user: CurrentUser):
     lead_context = build_lead_context(lead, phones, emails, intelligence, current_user.name, brand_voice)
     lead_context["recent_activity"] = recent_activity_summary(timeline)
 
+    # Surface the actual previous emails (subject + body) so a follow-up can
+    # reference them and not repeat the same pitch. Drafts are newest-first; the
+    # 3 most recent sent ones are plenty of context without bloating the prompt.
+    sent_drafts = [d for d in drafts if d["status"] == "sent"]
+    lead_context["previous_emails"] = [
+        {"subject": d["subject"] or "", "body": d["body"] or "", "sent_at": d["sent_at"] or ""}
+        for d in sent_drafts[:3]
+    ]
+
     return lead, lead_context, brand_voice
 
 
@@ -124,6 +133,48 @@ async def generate_draft(
             "body": result.body,
             "tone": body.preset,
             "length": body.length,
+            "estimated_open_rate": result.estimated_open_rate,
+            "estimated_reply_rate": result.estimated_reply_rate,
+            "estimated_readability_score": result.estimated_readability_score,
+        },
+        created_at,
+    )
+    return _to_draft_out(db.get_email_draft(draft_id))
+
+
+@router.post("/leads/{lead_id}/follow-up-draft", response_model=EmailDraftOut)
+@limiter.limit(get_settings().rate_limit)
+async def generate_follow_up_draft(
+    request: Request, lead_id: str, current_user: CurrentUser = Depends(get_current_user)
+) -> EmailDraftOut:
+    """One-click follow-up: draft a short follow-up from the lead's call notes,
+    company, industry and previous emails (all already in lead_context). Returns
+    a normal email_draft the rep reviews and sends from their own account via the
+    existing send endpoint — nothing is sent automatically."""
+    _check_email_writer_budget(current_user.id)
+    _, lead_context, brand_voice = _gather_lead_data(lead_id, current_user)
+    instruction = (
+        "Write a brief, warm follow-up to our recent phone call and any previous emails. "
+        "Reference the call notes and prior context specifically, add a little new value rather "
+        "than repeating the earlier pitch, and end with one clear, low-friction next step. Keep it concise."
+    )
+    try:
+        result = await generate_email(lead_context, brand_voice, instruction, "Follow Up", "Short")
+    except Exception:
+        raise HTTPException(status_code=502, detail="AI failed to generate the follow-up. Please try again.")
+
+    db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
+    draft_id = new_id()
+    created_at = now_iso()
+    db.create_email_draft(
+        draft_id,
+        lead_id,
+        current_user.id,
+        {
+            "subject": result.subject,
+            "body": result.body,
+            "tone": "Follow Up",
+            "length": "Short",
             "estimated_open_rate": result.estimated_open_rate,
             "estimated_reply_rate": result.estimated_reply_rate,
             "estimated_readability_score": result.estimated_readability_score,
