@@ -66,6 +66,7 @@ class LeadOut(BaseModel):
     follow_up_at: Optional[str] = None
     priority_score: int = 0
     priority_breakdown: Optional[str] = None
+    is_shared: bool = True
     list_name: Optional[str] = None
     phones: list[PhoneOut]
     emails: list[EmailOut]

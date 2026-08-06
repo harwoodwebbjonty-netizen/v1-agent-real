@@ -613,6 +613,31 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_027_auth_hardening_and_sharing(conn: sqlite3.Connection) -> None:
+    """v0.3.0 security hardening: per-account login lockout counters, optional
+    lead sharing (so a lead can be assigned to a specific BDM and kept private
+    instead of visible to the whole shared pool), and an OAuth CSRF-state store.
+    `is_shared` defaults to 1 so every existing lead keeps today's behaviour."""
+    ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+    if "failed_login_attempts" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN failed_login_attempts INTEGER NOT NULL DEFAULT 0")
+    if "locked_until" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN locked_until TEXT")
+    lcols = {r["name"] for r in conn.execute("PRAGMA table_info(leads)")}
+    if "is_shared" not in lcols:
+        conn.execute("ALTER TABLE leads ADD COLUMN is_shared INTEGER NOT NULL DEFAULT 1")
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS oauth_states (
+            state TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        """
+    )
+
+
 def _migration_026_lead_priority(conn: sqlite3.Connection) -> None:
     """Deterministic lead-prioritisation score (0–100) so the highest-value
     companies sort to the top of the cold-call sheet. Computed for free from
@@ -656,8 +681,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (24, _migration_024_win_back_source_rows),
     (25, _migration_025_list_email_campaigns),
     (26, _migration_026_lead_priority),
+    (27, _migration_027_auth_hardening_and_sharing),
 ]
-CURRENT_SCHEMA_VERSION = 26
+CURRENT_SCHEMA_VERSION = 27
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -821,6 +847,29 @@ def set_user_password(user_id: str, password_hash: str) -> None:
         conn.execute("UPDATE users SET password_hash = ? WHERE id = ?", (password_hash, user_id))
 
 
+def record_login_failure(user_id: str, locked_until: Optional[str]) -> None:
+    """Increment the failed-login counter and optionally set a lockout expiry."""
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET failed_login_attempts = failed_login_attempts + 1, locked_until = ? WHERE id = ?",
+            (locked_until, user_id),
+        )
+
+
+def reset_login_failures(user_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE users SET failed_login_attempts = 0, locked_until = NULL WHERE id = ?", (user_id,)
+        )
+
+
+def list_user_display_names() -> list[sqlite3.Row]:
+    """Slim public roster for the login picker — names + avatars only, no ids,
+    roles, or activity (which would aid account enumeration/targeting)."""
+    with get_connection() as conn:
+        return conn.execute("SELECT name, avatar FROM users ORDER BY created_at").fetchall()
+
+
 def get_user_by_name(name: str) -> Optional[sqlite3.Row]:
     with get_connection() as conn:
         return conn.execute("SELECT * FROM users WHERE name = ?", (name,)).fetchone()
@@ -920,6 +969,43 @@ def get_session(token: str) -> Optional[sqlite3.Row]:
 def delete_session(token: str) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM sessions WHERE token = ?", (token,))
+
+
+def delete_other_sessions_for_user(user_id: str, keep_token: Optional[str] = None) -> None:
+    """Revoke a user's sessions (all, or all but one) — used after a password
+    is set/changed so stolen/older tokens stop working."""
+    with get_connection() as conn:
+        if keep_token:
+            conn.execute("DELETE FROM sessions WHERE user_id = ? AND token != ?", (user_id, keep_token))
+        else:
+            conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+
+
+# --- OAuth CSRF-state store (email account linking) ---
+
+def create_oauth_state(state: str, user_id: str, provider: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO oauth_states (state, user_id, provider, created_at) VALUES (?, ?, ?, ?)",
+            (state, user_id, provider, created_at),
+        )
+
+
+def consume_oauth_state(state: str) -> Optional[sqlite3.Row]:
+    """Return the state row (with the owning user_id) and delete it — one-time use."""
+    with get_connection() as conn:
+        row = conn.execute("SELECT * FROM oauth_states WHERE state = ?", (state,)).fetchone()
+        if row is not None:
+            conn.execute("DELETE FROM oauth_states WHERE state = ?", (state,))
+        return row
+
+
+def set_lead_shared(lead_id: str, is_shared: bool, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE leads SET is_shared = ?, updated_at = ? WHERE id = ?",
+            (1 if is_shared else 0, updated_at, lead_id),
+        )
 
 
 # --- leads ---
@@ -1047,8 +1133,11 @@ def list_all_leads_for_user(user_id: str, is_admin: bool) -> list[sqlite3.Row]:
         return conn.execute(
             "SELECT l.*, ll.name AS list_name FROM leads l "
             "LEFT JOIN lead_lists ll ON l.list_id = ll.id "
-            "WHERE l.list_id IS NULL OR l.owner_user_id = ? ORDER BY l.timestamp",
-            (user_id,),
+            "WHERE (l.list_id IS NULL AND l.is_shared = 1) "
+            "   OR l.owner_user_id = ? "
+            "   OR l.assigned_user_id = ? "
+            "ORDER BY l.timestamp",
+            (user_id, user_id),
         ).fetchall()
 
 

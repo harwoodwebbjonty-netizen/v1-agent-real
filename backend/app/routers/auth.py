@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.security import HTTPAuthorizationCredentials
 
 from app import db
+from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.dependencies import CurrentUser, bearer_scheme, get_current_user
 from app.schemas_auth import IdentifyRequest, LoginResponse, UserOut, user_out_from_row
 from app.services.auth_service import (
     generate_session_token,
     hash_password,
+    is_expired,
+    lock_until_iso,
     new_id,
     now_iso,
     session_expiry_iso,
@@ -18,39 +22,59 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 
 def _issue_session(user_id: str) -> str:
     token = generate_session_token()
-    db.create_session(token, user_id, now_iso(), session_expiry_iso())
+    db.create_session(token, user_id, now_iso(), session_expiry_iso(get_settings().session_ttl_days))
     return token
 
 
-MIN_PASSWORD_LENGTH = 4
-
-
 @router.post("/identify", response_model=LoginResponse)
-def identify(body: IdentifyRequest) -> LoginResponse:
-    """Name + password sign-in. A new name creates a profile with the given
-    password (the very first profile ever created becomes admin). Accounts
-    created before passwords existed have no hash yet — the first successful
-    identify claims them by setting the provided password."""
+@limiter.limit(get_settings().auth_rate_limit)
+def identify(request: Request, body: IdentifyRequest) -> LoginResponse:
+    """Name + password sign-in. A new name creates a member profile. The very
+    first account on a fresh deployment becomes admin ONLY if it presents the
+    BOOTSTRAP_ADMIN_TOKEN. Legacy accounts (no password yet) are NOT self-claimed
+    — an admin must set their password (see POST /users/{id}/set-password).
+    Rate-limited, with per-account lockout after repeated failures."""
+    settings = get_settings()
     name = body.name.strip()
     password = body.password
     if not name:
         raise HTTPException(status_code=400, detail="Name is required")
-    if len(password) < MIN_PASSWORD_LENGTH:
+    if len(password) < settings.min_password_length:
         raise HTTPException(
-            status_code=400, detail=f"Password must be at least {MIN_PASSWORD_LENGTH} characters"
+            status_code=400,
+            detail=f"Password must be at least {settings.min_password_length} characters",
         )
 
     user = db.get_user_by_name(name)
     if user is None:
-        role = "admin" if db.count_users() == 0 else "member"
+        if db.count_users() == 0:
+            # First-ever account → admin, but only with the deployment secret.
+            if not settings.bootstrap_admin_token or body.bootstrap_token != settings.bootstrap_admin_token:
+                raise HTTPException(
+                    status_code=403,
+                    detail="Admin setup token required to create the first account.",
+                )
+            role = "admin"
+        else:
+            role = "member"
         user_id = new_id()
         db.create_user(user_id, name, role, now_iso(), password_hash=hash_password(password))
         user = db.get_user_by_id(user_id)
-    elif user["password_hash"] is None:
-        # Legacy account from before passwords — first login sets it.
-        db.set_user_password(user["id"], hash_password(password))
-    elif not verify_password(password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Incorrect password")
+    else:
+        locked_until = user["locked_until"] if "locked_until" in user.keys() else None
+        if locked_until and not is_expired(locked_until):
+            raise HTTPException(status_code=429, detail="Too many failed attempts — try again later.")
+        if user["password_hash"] is None:
+            raise HTTPException(
+                status_code=403,
+                detail="This account has no password yet. Ask an admin to set up your login.",
+            )
+        if not verify_password(password, user["password_hash"]):
+            prior = user["failed_login_attempts"] if "failed_login_attempts" in user.keys() else 0
+            lock = lock_until_iso(settings.login_lockout_minutes) if (prior + 1) >= settings.login_max_attempts else None
+            db.record_login_failure(user["id"], lock)
+            raise HTTPException(status_code=401, detail="Incorrect password")
+        db.reset_login_failures(user["id"])
 
     token = _issue_session(user["id"])
     return LoginResponse(token=token, user=user_out_from_row(user))

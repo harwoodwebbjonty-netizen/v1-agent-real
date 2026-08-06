@@ -6,6 +6,18 @@ from pydantic import BaseModel
 class IdentifyRequest(BaseModel):
     name: str
     password: str = ""
+    # Required only to mint the very first admin on a fresh deployment.
+    bootstrap_token: str = ""
+
+
+class UserNameOut(BaseModel):
+    """Slim public profile for the pre-auth login picker — no id/role/activity."""
+    name: str
+    avatar: Optional[str] = None
+
+
+class UserNamesResponse(BaseModel):
+    users: list[UserNameOut]
 
 
 class UserOut(BaseModel):

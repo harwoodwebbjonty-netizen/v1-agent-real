@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import hashlib
 import hmac
 import secrets
@@ -46,8 +48,14 @@ def days_since(iso_ts: str) -> float:
         return 999.0
 
 
-def session_expiry_iso() -> str:
-    return (datetime.now(timezone.utc) + SESSION_TTL).isoformat()
+def session_expiry_iso(days: int | None = None) -> str:
+    ttl = timedelta(days=days) if days is not None else SESSION_TTL
+    return (datetime.now(timezone.utc) + ttl).isoformat()
+
+
+def lock_until_iso(minutes: int) -> str:
+    """Timestamp `minutes` in the future — a login lockout expiry."""
+    return (datetime.now(timezone.utc) + timedelta(minutes=minutes)).isoformat()
 
 
 def is_expired(expires_at_iso: str) -> bool:

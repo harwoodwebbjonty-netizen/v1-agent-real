@@ -168,6 +168,7 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         follow_up_at=row["follow_up_at"] if "follow_up_at" in row.keys() else None,
         priority_score=row["priority_score"] if "priority_score" in row.keys() else 0,
         priority_breakdown=row["priority_breakdown"] if "priority_breakdown" in row.keys() else None,
+        is_shared=bool(row["is_shared"]) if "is_shared" in row.keys() else True,
         list_name=row["list_name"] if "list_name" in row.keys() else None,
         phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
         emails=[
@@ -188,11 +189,22 @@ def _duplicate_error(kind: str) -> HTTPException:
 
 
 def _require_lead_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
-    """Leads outside any list are part of the shared pool — visible/editable
-    by everyone, unchanged. Leads inside a list are private to their owner,
-    except admins, who can reach everything."""
-    if row["list_id"] and row["owner_user_id"] != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="You don't have access to this lead.")
+    """Access rules (optional-sharing model):
+      - admins reach everything;
+      - the owner and the assigned BDM always reach their lead;
+      - a lead in the shared pool (no list AND is_shared=1) is reachable by all.
+    A lead with is_shared=0 (assigned to a BDM, not shared) or one inside a
+    private list is therefore visible only to its owner/assignee (+ admins)."""
+    if current_user.role == "admin":
+        return
+    if row["owner_user_id"] == current_user.id:
+        return
+    if "assigned_user_id" in row.keys() and row["assigned_user_id"] == current_user.id:
+        return
+    is_shared = row["is_shared"] if "is_shared" in row.keys() else 1
+    if is_shared and not row["list_id"]:
+        return
+    raise HTTPException(status_code=403, detail="You don't have access to this lead.")
 
 
 @router.get("", response_model=LeadListResponse)
@@ -302,6 +314,27 @@ def assign_lead(
 
     updated = db.get_lead(lead_id)
     return _to_lead_out(updated, _user_name_map(), activity)
+
+
+class SetLeadSharedRequest(BaseModel):
+    is_shared: bool
+
+
+@router.post("/{lead_id}/share", response_model=LeadOut)
+def set_lead_shared(
+    lead_id: str, body: SetLeadSharedRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
+) -> LeadOut:
+    """Toggle whether a lead is in the shared pool. Un-sharing keeps it visible
+    only to its owner, its assigned BDM, and admins (the optional-sharing model).
+    Only the owner or an admin may change sharing."""
+    row = db.get_lead(lead_id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    if row["owner_user_id"] != current_user.id and current_user.role != "admin":
+        raise HTTPException(status_code=403, detail="Only the owner or an admin can change sharing.")
+    db.set_lead_shared(lead_id, body.is_shared, now_iso())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
 # --- Follow-up scheduling ---
@@ -705,7 +738,7 @@ async def _run_enrichment_batch(api_key: str, user_id: str, is_admin: bool, limi
 @router.post("/ch-enrich-all")
 async def ch_enrich_all(
     limit: int = 100,
-    current_user: CurrentUser = Depends(get_current_user),
+    current_user: CurrentUser = Depends(require_admin),
 ) -> dict:
     """Manual batch: enriches up to `limit` leads (default 100). Skips already-done leads.
     Writes a sentinel for any company not found on CH so it stops being retried."""
@@ -735,7 +768,7 @@ async def _enrich_all_background(api_key: str, user_id: str, is_admin: bool) -> 
 
 
 @router.post("/ch-enrich-auto")
-async def ch_enrich_auto(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+async def ch_enrich_auto(current_user: CurrentUser = Depends(require_admin)) -> dict:
     """Starts a background job that enriches all leads in 100-lead batches until done.
     Safe to call while already running — returns current status instead of starting a duplicate."""
     global _enrich_task
@@ -757,7 +790,7 @@ def ch_enrich_stop(current_user: CurrentUser = Depends(get_current_user)) -> dic
 
 
 @router.post("/backfill-industry")
-def backfill_industry(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+def backfill_industry(current_user: CurrentUser = Depends(require_admin)) -> dict:
     """One-time fix: set industry='Unclassified' for fully-enriched leads that have no SIC codes on CH."""
     rows = db.list_all_leads_for_user(current_user.id, current_user.role == "admin")
     updated = 0
@@ -776,7 +809,7 @@ def backfill_industry(current_user: CurrentUser = Depends(get_current_user)) -> 
 
 
 @router.post("/dedup")
-def dedup_leads(current_user: CurrentUser = Depends(get_current_user)) -> dict:
+def dedup_leads(current_user: CurrentUser = Depends(require_admin)) -> dict:
     """Merges duplicate leads in the shared pool (list_id IS NULL).
     Winner = oldest created_at. All phones, emails, notes, call logs, etc. are
     absorbed into the winner; the duplicate is deleted. Also normalises any

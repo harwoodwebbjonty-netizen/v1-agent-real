@@ -1,6 +1,7 @@
 import base64
 import html
 import re
+import secrets
 from datetime import datetime, timedelta, timezone
 from email.message import EmailMessage
 
@@ -64,6 +65,10 @@ def _redirect_uri(provider: str) -> str:
 
 def get_authorization_url(provider: str, user_id: str) -> str:
     settings = get_settings()
+    # Random, single-use anti-CSRF nonce bound to the user server-side — the
+    # callback trusts THIS, not a client-supplied user id.
+    state = secrets.token_urlsafe(24)
+    db.create_oauth_state(state, user_id, provider, now_iso())
     if provider == "gmail":
         if not settings.google_oauth_client_id:
             raise OAuthNotConfiguredError("Google OAuth is not configured yet.")
@@ -75,7 +80,7 @@ def get_authorization_url(provider: str, user_id: str) -> str:
                 "scope": GOOGLE_SCOPES,
                 "access_type": "offline",
                 "prompt": "consent",
-                "state": user_id,
+                "state": state,
             }
         )
         return f"{GOOGLE_AUTH_URL}?{params}"
@@ -88,7 +93,7 @@ def get_authorization_url(provider: str, user_id: str) -> str:
                 "redirect_uri": _redirect_uri("microsoft"),
                 "response_type": "code",
                 "scope": MICROSOFT_SCOPES,
-                "state": user_id,
+                "state": state,
             }
         )
         return f"{MICROSOFT_AUTH_URL}?{params}"
@@ -96,11 +101,14 @@ def get_authorization_url(provider: str, user_id: str) -> str:
 
 
 async def handle_oauth_callback(provider: str, code: str, state: str) -> None:
-    """`state` is the id of the user who started the flow. Exchanges the
-    code for tokens, fetches the connected email address, and stores the
-    account (one row per user+provider, upserted)."""
+    """Verify the anti-CSRF `state` nonce (one-time, bound to the user who
+    started the flow), then exchange the code for tokens, fetch the connected
+    email address, and store the account (one row per user+provider, upserted)."""
     settings = get_settings()
-    user_id = state
+    state_row = db.consume_oauth_state(state)
+    if state_row is None or state_row["provider"] != provider:
+        raise OAuthError("Invalid or expired authorization state. Please try connecting again.")
+    user_id = state_row["user_id"]
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         if provider == "gmail":

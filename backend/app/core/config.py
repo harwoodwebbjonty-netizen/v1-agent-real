@@ -19,7 +19,32 @@ class Settings(BaseSettings):
     # writer for a more natural, human voice without changing those cheaper tools.
     win_back_writer_model: str = "claude-sonnet-4-6"
     rate_limit: str = "10/minute"
+    # Stricter limit for the unauthenticated login endpoint (brute-force guard).
+    auth_rate_limit: str = "5/minute"
     max_pause_turn_continuations: int = 3
+
+    # --- Auth hardening (v0.3.0) ---
+    # One-time secret that must be presented to mint the FIRST admin on a fresh
+    # deployment. Empty by default = legacy behaviour disabled: with no users and
+    # no token set, the first-admin bootstrap is refused (set this in the VPS .env
+    # before first sign-in). Prevents an anonymous first caller seizing admin.
+    bootstrap_admin_token: str = ""
+    # Session lifetime (days). Overrides the auth_service default when set.
+    session_ttl_days: int = 30
+    # Per-account login lockout after too many failures.
+    login_max_attempts: int = 8
+    login_lockout_minutes: int = 15
+    min_password_length: int = 8
+    # CSV/import safety cap — maximum rows accepted per import request.
+    import_max_rows: int = 5000
+
+    # Public base URL for building absolute links (OAuth redirects, unsubscribe).
+    # Empty = fall back to oauth_redirect_base_url. Set to the HTTPS domain once
+    # TLS is live so generated links and OAuth callbacks use https://.
+    public_base_url: str = ""
+    # Comma-separated allowed CORS origins (empty = none; the desktop app calls
+    # via native reqwest, not a browser, so this is defence-in-depth).
+    cors_allow_origins: str = ""
 
     # AI Email Writer — real sending via OAuth. Empty by default; the
     # Connect buttons return a clear "not configured" error until these are
