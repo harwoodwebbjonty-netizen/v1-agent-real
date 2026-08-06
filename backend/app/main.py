@@ -1,7 +1,8 @@
 import asyncio
 import logging
 
-from fastapi import Depends, FastAPI, Request
+from fastapi import Depends, FastAPI, HTTPException, Request
+from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.responses import JSONResponse
@@ -47,6 +48,17 @@ ACTIVITY_REFRESH_POLL_SECONDS = 30 * 60
 app = FastAPI(title="Company Phone Lookup Backend")
 app.state.limiter = limiter
 app.add_middleware(SlowAPIMiddleware)
+
+# CORS is defence-in-depth only — the desktop app calls via native reqwest, not a
+# browser. Default (empty setting) allows no cross-origin browser access.
+_cors_origins = [o.strip() for o in get_settings().cors_allow_origins.split(",") if o.strip()]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(auth.router)
 app.include_router(users.router)
 app.include_router(leads.router)
@@ -131,6 +143,17 @@ def _backfill_industry_unclassified() -> None:
 @app.exception_handler(RateLimitExceeded)
 async def rate_limit_handler(request: Request, exc: RateLimitExceeded) -> JSONResponse:
     return JSONResponse(status_code=429, content={"detail": "Rate limit exceeded. Try again shortly."})
+
+
+@app.exception_handler(Exception)
+async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """Never leak internals to clients. HTTPException (with its intended detail)
+    is handled by FastAPI before reaching here; this catches everything else,
+    logs the full trace server-side, and returns a generic message."""
+    if isinstance(exc, HTTPException):
+        raise exc
+    logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
 @app.get("/health")

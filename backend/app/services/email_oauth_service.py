@@ -60,7 +60,10 @@ class OAuthError(Exception):
 
 
 def _redirect_uri(provider: str) -> str:
-    return f"{get_settings().oauth_redirect_base_url}/email-oauth/{provider}/callback"
+    # Prefer the public HTTPS base URL once TLS is live; fall back otherwise.
+    settings = get_settings()
+    base = settings.public_base_url or settings.oauth_redirect_base_url
+    return f"{base}/email-oauth/{provider}/callback"
 
 
 def get_authorization_url(provider: str, user_id: str) -> str:
