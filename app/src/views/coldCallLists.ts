@@ -57,6 +57,15 @@ import { getLeads, refreshLeads } from "../state";
 import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
 
+/** Coalesces rapid calls (e.g. per-keystroke search) into one after `ms` idle. */
+function debounce(fn: () => void, ms: number): () => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return () => {
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(fn, ms);
+  };
+}
+
 // select + called + dot + company + phone + status + industry + contact-status + emails + list + notes
 const CALL_SHEET_COL_COUNT = 11;
 // checkbox + company + phone + industry + list
@@ -659,9 +668,10 @@ export function initColdCallLists(): void {
     }
   });
 
+  const debouncedRenderSelector = debounce(() => renderSelector(), 150);
   selectorSearchInput.addEventListener("input", () => {
     selectorSearch = selectorSearchInput.value;
-    renderSelector();
+    debouncedRenderSelector();
   });
 
   selectorPhoneBtns.forEach((btn) => {
@@ -1228,7 +1238,8 @@ export function initColdCallLists(): void {
 
   container.querySelector("#new-list-btn")!.addEventListener("click", showNameScreen);
 
-  listSearchInput.addEventListener("input", () => { searchText = listSearchInput.value; renderListTable(); });
+  const debouncedRenderList = debounce(() => renderListTable(), 150);
+  listSearchInput.addEventListener("input", () => { searchText = listSearchInput.value; debouncedRenderList(); });
 
   sortableHeaders.forEach((th) => {
     th.addEventListener("click", () => {

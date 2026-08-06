@@ -6,7 +6,7 @@ from pydantic import BaseModel
 
 from app import db
 from app.dependencies import CurrentUser, get_current_user
-from app.routers.leads import _to_lead_out, _user_name_map, get_activity_context
+from app.routers.leads import LeadBatch, _to_lead_out, _user_name_map, get_activity_context
 from app.schemas_leads import (
     CreateLeadListRequest,
     ImportLeadsRequest,
@@ -61,7 +61,9 @@ def get_list_leads(list_id: str, current_user: CurrentUser = Depends(get_current
     _require_list_access(lead_list, current_user)
     names = _user_name_map()
     activity = get_activity_context()
-    return LeadListResponse(leads=[_to_lead_out(r, names, activity) for r in db.list_leads(list_id=list_id)])
+    rows = db.list_leads(list_id=list_id)
+    batch = LeadBatch(rows)
+    return LeadListResponse(leads=[_to_lead_out(r, names, activity, batch) for r in rows])
 
 
 @router.post("/{list_id}/import-csv", response_model=ImportLeadsResponse)

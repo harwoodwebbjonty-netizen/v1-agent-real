@@ -613,6 +613,20 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_028_leads_hot_indexes(conn: sqlite3.Connection) -> None:
+    """Indexes on the most-filtered leads columns — every list render, insert-time
+    dedup, and the refresh scheduler previously full-scanned `leads` (audit H6)."""
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_leads_list_id ON leads(list_id);
+        CREATE INDEX IF NOT EXISTS idx_leads_owner ON leads(owner_user_id);
+        CREATE INDEX IF NOT EXISTS idx_leads_assigned ON leads(assigned_user_id);
+        CREATE INDEX IF NOT EXISTS idx_leads_company_number ON leads(company_number);
+        CREATE INDEX IF NOT EXISTS idx_leads_next_dg_refresh ON leads(next_dg_refresh_at);
+        """
+    )
+
+
 def _migration_027_auth_hardening_and_sharing(conn: sqlite3.Connection) -> None:
     """v0.3.0 security hardening: per-account login lockout counters, optional
     lead sharing (so a lead can be assigned to a specific BDM and kept private
@@ -682,8 +696,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (25, _migration_025_list_email_campaigns),
     (26, _migration_026_lead_priority),
     (27, _migration_027_auth_hardening_and_sharing),
+    (28, _migration_028_leads_hot_indexes),
 ]
-CURRENT_SCHEMA_VERSION = 27
+CURRENT_SCHEMA_VERSION = 28
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1423,6 +1438,80 @@ def get_lead_intelligence_first_generated_at(lead_id: str) -> Optional[str]:
             (lead_id,),
         ).fetchone()
         return row["first_at"] if row else None
+
+
+# --- Batched lead-render lookups (fixes the GET /leads N+1) ---
+# Each returns a dict keyed by lead_id, computed in a handful of grouped queries
+# over one reused connection — never one query per lead. IN clauses are chunked
+# to stay under SQLite's ~999 bound-parameter limit.
+
+def _id_chunks(ids: list[str], size: int = 400):
+    for i in range(0, len(ids), size):
+        yield ids[i:i + size]
+
+
+def get_phones_for_leads(lead_ids: list[str]) -> dict[str, list[sqlite3.Row]]:
+    result: dict[str, list[sqlite3.Row]] = {lid: [] for lid in lead_ids}
+    if not lead_ids:
+        return result
+    with get_connection() as conn:
+        for chunk in _id_chunks(lead_ids):
+            ph = ", ".join("?" for _ in chunk)
+            for r in conn.execute(
+                f"SELECT * FROM lead_phones WHERE lead_id IN ({ph}) ORDER BY created_at", chunk
+            ):
+                result[r["lead_id"]].append(r)
+    return result
+
+
+def get_emails_for_leads(lead_ids: list[str]) -> dict[str, list[sqlite3.Row]]:
+    result: dict[str, list[sqlite3.Row]] = {lid: [] for lid in lead_ids}
+    if not lead_ids:
+        return result
+    with get_connection() as conn:
+        for chunk in _id_chunks(lead_ids):
+            ph = ", ".join("?" for _ in chunk)
+            for r in conn.execute(
+                f"SELECT * FROM lead_emails WHERE lead_id IN ({ph}) ORDER BY created_at", chunk
+            ):
+                result[r["lead_id"]].append(r)
+    return result
+
+
+def get_latest_intelligence_for_leads(lead_ids: list[str]) -> dict[str, sqlite3.Row]:
+    """Latest intelligence version per lead. Ordered DESC so the first row seen
+    for each lead_id is its most recent (each lead falls in exactly one chunk)."""
+    result: dict[str, sqlite3.Row] = {}
+    if not lead_ids:
+        return result
+    with get_connection() as conn:
+        for chunk in _id_chunks(lead_ids):
+            ph = ", ".join("?" for _ in chunk)
+            for r in conn.execute(
+                f"SELECT * FROM lead_intelligence_versions WHERE lead_id IN ({ph}) "
+                "ORDER BY created_at DESC, id DESC",
+                chunk,
+            ):
+                if r["lead_id"] not in result:
+                    result[r["lead_id"]] = r
+    return result
+
+
+def get_intelligence_meta_for_leads(lead_ids: list[str]) -> dict[str, tuple[int, str]]:
+    """Per lead: (version_count, first_generated_at)."""
+    result: dict[str, tuple[int, str]] = {}
+    if not lead_ids:
+        return result
+    with get_connection() as conn:
+        for chunk in _id_chunks(lead_ids):
+            ph = ", ".join("?" for _ in chunk)
+            for r in conn.execute(
+                f"SELECT lead_id, COUNT(*) AS c, MIN(created_at) AS first_at "
+                f"FROM lead_intelligence_versions WHERE lead_id IN ({ph}) GROUP BY lead_id",
+                chunk,
+            ):
+                result[r["lead_id"]] = (r["c"], r["first_at"])
+    return result
 
 
 def acquire_intelligence_lock(lead_id: str, locked_at: str) -> None:

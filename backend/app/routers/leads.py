@@ -87,6 +87,19 @@ class ActivityContext:
 def get_activity_context() -> ActivityContext:
     return ActivityContext()
 
+
+class LeadBatch:
+    """Pre-fetches phones, emails, and intelligence for a whole page of leads in
+    a handful of grouped queries — so rendering N leads is O(1) queries, not the
+    ~5N connections the per-lead helpers used to open (audit C3/H10)."""
+
+    def __init__(self, rows: list[sqlite3.Row]) -> None:
+        ids = [r["id"] for r in rows]
+        self.phones = db.get_phones_for_leads(ids)
+        self.emails = db.get_emails_for_leads(ids)
+        self.intel_latest = db.get_latest_intelligence_for_leads(ids)
+        self.intel_meta = db.get_intelligence_meta_for_leads(ids)
+
 _INTELLIGENCE_JSON_COLUMNS = (
     "pain_points",
     "buying_signals",
@@ -104,15 +117,21 @@ def _intelligence_fields_from_row(row: sqlite3.Row) -> dict:
     return fields
 
 
-def _to_intelligence_out(lead_id: str, row: sqlite3.Row) -> Optional[LeadIntelligenceOut]:
+def _to_intelligence_out(
+    lead_id: str, row: sqlite3.Row, batch: "LeadBatch | None" = None
+) -> Optional[LeadIntelligenceOut]:
     if row is None:
         return None
-    versions = db.list_lead_intelligence_versions(lead_id)
+    if batch is not None:
+        count, first_at = batch.intel_meta.get(lead_id, (1, row["created_at"]))
+    else:
+        count = len(db.list_lead_intelligence_versions(lead_id))
+        first_at = db.get_lead_intelligence_first_generated_at(lead_id) or row["created_at"]
     return LeadIntelligenceOut(
         **_intelligence_fields_from_row(row),
-        generated_at=db.get_lead_intelligence_first_generated_at(lead_id) or row["created_at"],
+        generated_at=first_at or row["created_at"],
         updated_at=row["created_at"],
-        version_count=len(versions),
+        version_count=count,
     )
 
 
@@ -128,8 +147,19 @@ def _user_name_map() -> dict[str, str]:
     return {u["id"]: u["name"] for u in db.list_users()}
 
 
-def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityContext) -> LeadOut:
-    intelligence = _to_intelligence_out(row["id"], db.get_latest_lead_intelligence(row["id"]))
+def _to_lead_out(
+    row: sqlite3.Row, names: dict[str, str], activity: ActivityContext, batch: "LeadBatch | None" = None
+) -> LeadOut:
+    lead_id = row["id"]
+    if batch is not None:
+        intel_row = batch.intel_latest.get(lead_id)
+        intelligence = _to_intelligence_out(lead_id, intel_row, batch) if intel_row is not None else None
+        phone_rows = batch.phones.get(lead_id, [])
+        email_rows = batch.emails.get(lead_id, [])
+    else:
+        intelligence = _to_intelligence_out(lead_id, db.get_latest_lead_intelligence(lead_id))
+        phone_rows = db.list_phones(lead_id)
+        email_rows = db.list_emails(lead_id)
     next_best_action = compute_next_best_action(
         status=row["status"],
         contact_status=row["contact_status"],
@@ -170,7 +200,7 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
         priority_breakdown=row["priority_breakdown"] if "priority_breakdown" in row.keys() else None,
         is_shared=bool(row["is_shared"]) if "is_shared" in row.keys() else True,
         list_name=row["list_name"] if "list_name" in row.keys() else None,
-        phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in db.list_phones(row["id"])],
+        phones=[PhoneOut(id=p["id"], phone_number=p["phone_number"], source=p["source"]) for p in phone_rows],
         emails=[
             EmailOut(
                 id=e["id"], email=e["email"], source=e["source"],
@@ -178,7 +208,7 @@ def _to_lead_out(row: sqlite3.Row, names: dict[str, str], activity: ActivityCont
                 person_match=e["person_match"] if "person_match" in e.keys() else "unknown",
                 verify_detail=e["verify_detail"] if "verify_detail" in e.keys() else "",
             )
-            for e in db.list_emails(row["id"])
+            for e in email_rows
         ],
         intelligence=intelligence,
     )
@@ -210,7 +240,9 @@ def _require_lead_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
 @router.get("", response_model=LeadListResponse)
 def list_leads(current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadListResponse:
     names = _user_name_map()
-    return LeadListResponse(leads=[_to_lead_out(r, names, activity) for r in db.list_all_leads_for_user(current_user.id, current_user.role == "admin")])
+    rows = db.list_all_leads_for_user(current_user.id, current_user.role == "admin")
+    batch = LeadBatch(rows)
+    return LeadListResponse(leads=[_to_lead_out(r, names, activity, batch) for r in rows])
 
 
 @router.post("", response_model=LeadOut)
