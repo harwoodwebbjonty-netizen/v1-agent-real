@@ -4403,6 +4403,20 @@ button.p-filter-chip.active {
 .follow-up-buttons { display: flex; gap: var(--space-2); }
 .fu-status { min-height: 1em; font-size: 0.78rem; color: var(--text-muted); }
 
+/* Roles & permissions editor */
+.role-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+.role-name { font-weight: 600; }
+.role-badge { font-size: 0.66rem; padding: 1px 6px; border-radius: 999px; background: var(--accent-glow, #FFF0F4); color: var(--accent-core, #E31346); }
+.role-badge.system { background: var(--surface-alt, #eef1f7); color: var(--text-muted); }
+.role-scope { color: var(--text-muted); font-size: 0.76rem; }
+.role-row-actions { margin-left: auto; display: flex; gap: 4px; }
+.role-editor { margin-top: 12px; padding: 14px; border: 1px solid var(--border); border-radius: var(--radius, 10px); display: flex; flex-direction: column; gap: 12px; }
+.perm-group h4 { margin: 0 0 4px; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-muted); }
+.perm-item { display: flex; align-items: center; gap: 6px; font-size: 0.85rem; padding: 2px 0; cursor: pointer; }
+.perm-item input { cursor: pointer; }
+.role-editor-actions { display: flex; gap: 8px; }
+.grole-fixed { font-size: 0.76rem; color: var(--text-muted); }
+
 /* Admin audit-log list */
 .audit-list { max-height: 340px; overflow-y: auto; }
 .audit-row { font-size: 0.82rem; padding: 4px 0; border-bottom: 1px solid var(--border); }

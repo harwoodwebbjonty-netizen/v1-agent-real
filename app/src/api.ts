@@ -161,6 +161,54 @@ export interface UserInfo {
   role: "admin" | "member";
   avatar: string | null;
   last_seen_at: string | null;
+  role_id?: string | null;
+  role_name?: string;
+  permissions?: string[];
+  lead_scope?: string;
+}
+
+// --- Roles (RBAC) ---
+
+export interface Role {
+  id: string;
+  name: string;
+  permissions: string[];
+  lead_scope: string;
+  is_system: boolean;
+  is_default: boolean;
+}
+
+export interface PermissionCatalogue {
+  catalogue: Array<{ group: string; items: Array<{ key: string; label: string }> }>;
+  lead_scopes: string[];
+}
+
+export async function getRoles(): Promise<Role[]> {
+  return invoke<Role[]>("list_roles");
+}
+
+export async function getRoleCatalogue(): Promise<PermissionCatalogue> {
+  return invoke<PermissionCatalogue>("get_role_catalogue");
+}
+
+export async function createRole(name: string, permissions: string[], leadScope: string): Promise<Role> {
+  return invoke<Role>("create_role", { name, permissions, leadScope });
+}
+
+export async function updateRole(roleId: string, name: string, permissions: string[], leadScope: string): Promise<Role> {
+  return invoke<Role>("update_role", { roleId, name, permissions, leadScope });
+}
+
+export async function deleteRole(roleId: string): Promise<void> {
+  await invoke("delete_role", { roleId });
+}
+
+export async function setDefaultRole(roleId: string): Promise<void> {
+  await invoke("set_default_role", { roleId });
+}
+
+export async function assignUserRole(userId: string, roleId: string): Promise<UserInfo> {
+  return invoke<UserInfo>("assign_user_role", { userId, roleId });
 }
 
 // --- Auth ---

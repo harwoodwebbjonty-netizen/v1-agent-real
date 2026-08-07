@@ -1,5 +1,9 @@
 use serde::{Deserialize, Serialize};
 
+fn default_scope() -> String {
+    "all_shared".to_string()
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInfo {
     pub id: String,
@@ -7,6 +11,29 @@ pub struct UserInfo {
     pub role: String,
     pub avatar: Option<String>,
     pub last_seen_at: Option<String>,
+    #[serde(default)]
+    pub role_id: Option<String>,
+    #[serde(default)]
+    pub role_name: String,
+    #[serde(default)]
+    pub permissions: Vec<String>,
+    #[serde(default = "default_scope")]
+    pub lead_scope: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct Role {
+    pub id: String,
+    pub name: String,
+    pub permissions: Vec<String>,
+    pub lead_scope: String,
+    pub is_system: bool,
+    pub is_default: bool,
+}
+
+#[derive(Deserialize)]
+struct RolesResponse {
+    roles: Vec<Role>,
 }
 
 #[derive(Deserialize)]
@@ -229,6 +256,110 @@ pub async fn list_audit_log(base_url: &str, token: &str, limit: i64) -> Result<V
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     let parsed: AuditLogResponse = handle_response(response).await?;
     Ok(parsed.entries)
+}
+
+// --- Roles (RBAC) ---
+
+pub async fn list_roles(base_url: &str, token: &str) -> Result<Vec<Role>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/roles", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let parsed: RolesResponse = handle_response(response).await?;
+    Ok(parsed.roles)
+}
+
+pub async fn get_role_catalogue(base_url: &str, token: &str) -> Result<serde_json::Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/roles/catalogue", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
+#[derive(Serialize)]
+struct RoleRequest<'a> {
+    name: &'a str,
+    permissions: &'a [String],
+    lead_scope: &'a str,
+}
+
+pub async fn create_role(base_url: &str, token: &str, name: &str, permissions: &[String], lead_scope: &str) -> Result<Role, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/roles", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&RoleRequest { name, permissions, lead_scope })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
+pub async fn update_role(base_url: &str, token: &str, role_id: &str, name: &str, permissions: &[String], lead_scope: &str) -> Result<Role, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/roles/{}", base_url, role_id);
+    let response = client
+        .patch(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&RoleRequest { name, permissions, lead_scope })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
+}
+
+pub async fn delete_role(base_url: &str, token: &str, role_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/roles/{}", base_url, role_id);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+pub async fn set_default_role(base_url: &str, token: &str, role_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/roles/{}/default", base_url, role_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct AssignRoleRequest<'a> {
+    role_id: &'a str,
+}
+
+pub async fn assign_user_role(base_url: &str, token: &str, user_id: &str, role_id: &str) -> Result<UserInfo, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/users/{}/role", base_url, user_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&AssignRoleRequest { role_id })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend: {}", e))?;
+    handle_response(response).await
 }
 
 pub async fn delete_team_member(base_url: &str, token: &str, user_id: &str) -> Result<(), String> {

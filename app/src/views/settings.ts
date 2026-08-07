@@ -5,10 +5,19 @@ import {
   type CreditUsage,
   checkBackendHealth,
   connectEmailAccount,
+  type PermissionCatalogue,
+  type Role,
   adminSetUserPassword,
+  assignUserRole,
+  createRole,
   createTeamMember,
+  deleteRole,
   deleteTeamMember,
   getAuditLog,
+  getRoleCatalogue,
+  getRoles,
+  setDefaultRole,
+  updateRole,
   disconnectEmailOAuthAccount,
   exportLogCsv,
   getBackendBaseUrl,
@@ -21,7 +30,7 @@ import {
   updateBrandVoice,
   updateTeamMember,
 } from "../api";
-import { getCurrentUser, isAdmin, logout, subscribeAuth, updateLocalUser } from "../auth";
+import { getCurrentUser, hasPermission, isAdmin, logout, subscribeAuth, updateLocalUser } from "../auth";
 import { renderAvatarHtml } from "../avatar";
 import { CONTACT_STATUS_ORDER } from "../constants";
 import { getCompactRows, getDefaultContactStatus, setCompactRows, setDefaultContactStatus } from "../preferences";
@@ -67,6 +76,15 @@ export function initSettings(): void {
           <button id="add-member-btn" class="btn btn-primary">Add team member</button>
         </div>
         <span id="team-status" class="status-message"></span>
+      </section>
+
+      <section class="card hidden" id="roles-card">
+        <h2 class="card-title">Roles &amp; permissions</h2>
+        <p class="card-subtitle">Create roles (BDM, BDE, anything) and choose what each can see and do. Admins always have full access.</p>
+        <ul id="roles-list" class="history-list"></ul>
+        <button id="new-role-btn" class="btn btn-secondary btn-sm">+ New role</button>
+        <div id="role-editor" class="role-editor hidden"></div>
+        <span id="roles-status" class="status-message"></span>
       </section>
 
       <section class="card hidden" id="audit-card">
@@ -197,6 +215,9 @@ export function initSettings(): void {
   // --- Team ---
   const teamStatus = document.querySelector<HTMLSpanElement>("#team-status")!;
   const addMemberForm = document.querySelector<HTMLDivElement>("#add-member-form")!;
+  // Roles for the per-member "assign role" dropdown (loaded in the Roles section
+  // below; renderTeam reads this array).
+  let roles: Role[] = [];
 
   function renderTeam(): void {
     const members = getTeamMembers();
@@ -206,6 +227,14 @@ export function initSettings(): void {
         if (!isAdmin()) {
           return `<li class="team-roster-row">${renderAvatarHtml(m, "avatar-sm")}<span>${escapeHtml(m.name)}</span> — ${escapeHtml(m.role)}</li>`;
         }
+        const groleSelect = m.role === "admin"
+          ? `<span class="grole-fixed">Full access</span>`
+          : `<select class="inline-edit grole-select" data-user-id="${escapeHtml(m.id)}" title="Assign a role">
+               ${roles
+                 .filter((r) => r.id !== "role-admin")
+                 .map((r) => `<option value="${escapeHtml(r.id)}" ${m.role_id === r.id ? "selected" : ""}>${escapeHtml(r.name)}</option>`)
+                 .join("")}
+             </select>`;
         return `
           <li class="team-roster-row">
             ${renderAvatarHtml(m, "avatar-sm")}
@@ -214,6 +243,7 @@ export function initSettings(): void {
               <option value="admin" ${m.role === "admin" ? "selected" : ""}>Admin</option>
             </select>
             <span>${escapeHtml(m.name)}</span>
+            ${groleSelect}
             <button class="btn btn-ghost btn-sm set-pw-btn" data-user-id="${escapeHtml(m.id)}" title="Set or reset this member's password">Set password</button>
             <button class="btn btn-ghost btn-sm delete-member-btn" data-user-id="${escapeHtml(m.id)}" title="Remove">✕</button>
           </li>
@@ -231,6 +261,17 @@ export function initSettings(): void {
         } catch (err) {
           teamStatus.textContent = `Failed to update role: ${err}`;
           select.value = getTeamMembers().find((m) => m.id === userId)?.role ?? select.value;
+        }
+      });
+    });
+
+    roster.querySelectorAll<HTMLSelectElement>(".grole-select").forEach((select) => {
+      select.addEventListener("change", async () => {
+        try {
+          await assignUserRole(select.dataset.userId!, select.value);
+          teamStatus.textContent = "Role updated.";
+        } catch (err) {
+          teamStatus.textContent = `Failed to update role: ${err}`;
         }
       });
     });
@@ -276,6 +317,107 @@ export function initSettings(): void {
   renderTeam();
   subscribeTeam(renderTeam);
   subscribeAuth(renderTeam);
+
+  // --- Roles & permissions (manage_roles only) ---
+  const rolesCard = container.querySelector<HTMLElement>("#roles-card")!;
+  const rolesList = container.querySelector<HTMLUListElement>("#roles-list")!;
+  const roleEditor = container.querySelector<HTMLDivElement>("#role-editor")!;
+  const rolesStatus = container.querySelector<HTMLSpanElement>("#roles-status")!;
+  let catalogue: PermissionCatalogue | null = null;
+
+  function scopeLabel(scope: string): string {
+    return scope === "own_assigned" ? "Own / assigned leads only" : "Shared pool + own + assigned";
+  }
+
+  function renderRolesList(): void {
+    rolesList.innerHTML = roles
+      .map((r) => `
+        <li class="role-row" data-id="${escapeHtml(r.id)}">
+          <span class="role-name">${escapeHtml(r.name)}</span>
+          ${r.is_default ? '<span class="role-badge">default</span>' : ""}
+          ${r.is_system ? '<span class="role-badge system">built-in</span>' : ""}
+          <span class="role-scope">${escapeHtml(scopeLabel(r.lead_scope))}</span>
+          <span class="role-row-actions">
+            ${r.id !== "role-admin" ? '<button class="btn btn-ghost btn-sm role-edit">Edit</button>' : ""}
+            ${!r.is_default ? '<button class="btn btn-ghost btn-sm role-default">Make default</button>' : ""}
+            ${!r.is_system ? '<button class="btn btn-ghost btn-danger btn-sm role-delete">Delete</button>' : ""}
+          </span>
+        </li>`)
+      .join("");
+
+    rolesList.querySelectorAll<HTMLElement>(".role-row").forEach((row) => {
+      const role = roles.find((r) => r.id === row.dataset.id);
+      if (!role) return;
+      row.querySelector(".role-edit")?.addEventListener("click", () => openRoleEditor(role));
+      row.querySelector(".role-default")?.addEventListener("click", async () => {
+        try { await setDefaultRole(role.id); await loadRoles(); } catch (err) { rolesStatus.textContent = `Failed: ${err}`; }
+      });
+      row.querySelector(".role-delete")?.addEventListener("click", async () => {
+        if (!window.confirm(`Delete the "${role.name}" role? Members on it move to the default role.`)) return;
+        try { await deleteRole(role.id); await loadRoles(); } catch (err) { rolesStatus.textContent = `Failed: ${err}`; }
+      });
+    });
+  }
+
+  function openRoleEditor(role: Role | null): void {
+    if (!catalogue) return;
+    const selected = new Set(role?.permissions ?? []);
+    const scope = role?.lead_scope ?? "all_shared";
+    roleEditor.classList.remove("hidden");
+    roleEditor.innerHTML = `
+      <input id="role-name" class="search-input" placeholder="Role name (e.g. BDM)" value="${escapeHtml(role?.name ?? "")}" />
+      ${catalogue.catalogue
+        .map((group) => `
+          <div class="perm-group">
+            <h4>${escapeHtml(group.group)}</h4>
+            ${group.items
+              .map((item) => `<label class="perm-item"><input type="checkbox" data-perm="${escapeHtml(item.key)}" ${selected.has(item.key) ? "checked" : ""} /> ${escapeHtml(item.label)}</label>`)
+              .join("")}
+          </div>`)
+        .join("")}
+      <div class="perm-group">
+        <h4>Which leads they see</h4>
+        <label class="perm-item"><input type="radio" name="rolescope" value="all_shared" ${scope === "all_shared" ? "checked" : ""} /> Shared pool + own + assigned</label>
+        <label class="perm-item"><input type="radio" name="rolescope" value="own_assigned" ${scope === "own_assigned" ? "checked" : ""} /> Only their own / assigned leads</label>
+      </div>
+      <div class="role-editor-actions">
+        <button id="role-save" class="btn btn-primary btn-sm">${role ? "Save changes" : "Create role"}</button>
+        <button id="role-cancel" class="btn btn-ghost btn-sm">Cancel</button>
+      </div>`;
+
+    roleEditor.querySelector("#role-cancel")!.addEventListener("click", () => roleEditor.classList.add("hidden"));
+    roleEditor.querySelector("#role-save")!.addEventListener("click", async () => {
+      const name = (roleEditor.querySelector<HTMLInputElement>("#role-name")!).value.trim();
+      if (!name) { rolesStatus.textContent = "Role name is required."; return; }
+      const perms = Array.from(roleEditor.querySelectorAll<HTMLInputElement>("input[data-perm]:checked")).map((el) => el.dataset.perm!);
+      const chosenScope = roleEditor.querySelector<HTMLInputElement>("input[name='rolescope']:checked")?.value ?? "all_shared";
+      try {
+        if (role) await updateRole(role.id, name, perms, chosenScope);
+        else await createRole(name, perms, chosenScope);
+        roleEditor.classList.add("hidden");
+        await loadRoles();
+        rolesStatus.textContent = "Saved.";
+      } catch (err) {
+        rolesStatus.textContent = `Failed to save role: ${err}`;
+      }
+    });
+  }
+
+  async function loadRoles(): Promise<void> {
+    if (!hasPermission("manage_roles")) { rolesCard.classList.add("hidden"); return; }
+    rolesCard.classList.remove("hidden");
+    try {
+      if (!catalogue) catalogue = await getRoleCatalogue();
+      roles = await getRoles();
+      renderRolesList();
+      renderTeam(); // populate the per-member role dropdowns now that roles are loaded
+    } catch (err) {
+      rolesStatus.textContent = `Failed to load roles: ${err}`;
+    }
+  }
+  container.querySelector("#new-role-btn")!.addEventListener("click", () => openRoleEditor(null));
+  subscribeAuth(loadRoles);
+  void loadRoles();
 
   // --- Audit log (admin only) ---
   const auditCard = container.querySelector<HTMLElement>("#audit-card")!;

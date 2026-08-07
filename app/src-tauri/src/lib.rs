@@ -117,6 +117,55 @@ async fn list_audit_log(app_handle: tauri::AppHandle, limit: Option<i64>) -> Res
 }
 
 #[tauri::command]
+async fn list_roles(app_handle: tauri::AppHandle) -> Result<Vec<auth_client::Role>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::list_roles(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn get_role_catalogue(app_handle: tauri::AppHandle) -> Result<serde_json::Value, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::get_role_catalogue(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn create_role(app_handle: tauri::AppHandle, name: String, permissions: Vec<String>, lead_scope: String) -> Result<auth_client::Role, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::create_role(&base_url, &session.token, &name, &permissions, &lead_scope).await
+}
+
+#[tauri::command]
+async fn update_role(app_handle: tauri::AppHandle, role_id: String, name: String, permissions: Vec<String>, lead_scope: String) -> Result<auth_client::Role, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::update_role(&base_url, &session.token, &role_id, &name, &permissions, &lead_scope).await
+}
+
+#[tauri::command]
+async fn delete_role(app_handle: tauri::AppHandle, role_id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::delete_role(&base_url, &session.token, &role_id).await
+}
+
+#[tauri::command]
+async fn set_default_role(app_handle: tauri::AppHandle, role_id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::set_default_role(&base_url, &session.token, &role_id).await
+}
+
+#[tauri::command]
+async fn assign_user_role(app_handle: tauri::AppHandle, user_id: String, role_id: String) -> Result<UserInfo, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::assign_user_role(&base_url, &session.token, &user_id, &role_id).await
+}
+
+#[tauri::command]
 async fn set_user_avatar(app_handle: tauri::AppHandle, user_id: String, avatar: Option<String>) -> Result<UserInfo, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -1270,6 +1319,13 @@ pub fn run() {
       delete_team_member,
       admin_set_user_password,
       list_audit_log,
+      list_roles,
+      get_role_catalogue,
+      create_role,
+      update_role,
+      delete_role,
+      set_default_role,
+      assign_user_role,
       set_user_avatar,
       read_image_as_data_url,
       get_backend_base_url,

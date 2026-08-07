@@ -1,7 +1,21 @@
-import { isAdmin, subscribeAuth } from "../auth";
+import { hasPermission, subscribeAuth } from "../auth";
 import { getActiveTabId, openTab, type ViewName } from "../tabs";
 
-const ADMIN_ONLY_VIEWS: ViewName[] = ["settings", "win-back", "ai-prospecting"];
+// Each top-level nav section maps to a "view" permission. A section is shown only
+// if the user's role grants it (admin has all). Sub-views (call queue, email
+// writer, etc.) live under these sections and aren't gated separately here.
+const NAV_PERMISSIONS: Partial<Record<ViewName, string>> = {
+  "action-centre": "view_today",
+  "activity-feed": "view_activity_feed",
+  "ai-prospecting": "view_prospecting",
+  dashboard: "view_leads",
+  "cold-call-lists": "view_cold_call_lists",
+  outreach: "view_outreach",
+  "win-back": "view_win_back",
+  calendar: "view_calendar",
+  analytics: "view_analytics",
+  settings: "view_settings",
+};
 
 const NAV_TITLES: Record<ViewName, string> = {
   "action-centre": "Today",
@@ -111,24 +125,29 @@ async function openSettingsWithPin(): Promise<void> {
 }
 
 export function initTabBar(): void {
-  const adminOnlyLinks = document.querySelectorAll<HTMLAnchorElement>('[data-admin-only="true"]');
-
-  // Auth loads async after initTabBar runs, so subscribe to changes rather
-  // than checking isAdmin() once at startup (it would always be false then).
-  // Hides every admin-only section (Settings, Win-back, AI Prospecting) for
-  // members — the backend enforces the same restriction on its endpoints.
-  function updateAdminVisibility(): void {
-    adminOnlyLinks.forEach((link) => {
-      link.style.display = isAdmin() ? "" : "none";
+  // Auth loads async after initTabBar runs, so subscribe to changes rather than
+  // checking once at startup. Show each section only if the role grants its
+  // view permission; the backend enforces the matching restriction on its
+  // endpoints (this is UI convenience, not the security boundary).
+  function updateNavVisibility(): void {
+    document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((link) => {
+      const view = link.dataset.nav as ViewName;
+      const perm = NAV_PERMISSIONS[view];
+      link.style.display = !perm || hasPermission(perm) ? "" : "none";
     });
-    // If a member is somehow on an admin-only view (e.g. user switch while
-    // it was open), bounce them to Today.
-    if (!isAdmin() && ADMIN_ONLY_VIEWS.includes(getActiveTabId() as ViewName)) {
-      openTab("action-centre", "Today");
+    // If the user is on a section they can no longer see (role change / switch),
+    // bounce them to the first section they can.
+    const active = getActiveTabId() as ViewName;
+    const activePerm = NAV_PERMISSIONS[active];
+    if (activePerm && !hasPermission(activePerm)) {
+      const firstAllowed = (Object.keys(NAV_PERMISSIONS) as ViewName[]).find(
+        (v) => hasPermission(NAV_PERMISSIONS[v]!)
+      );
+      if (firstAllowed) openTab(firstAllowed, NAV_TITLES[firstAllowed]);
     }
   }
-  subscribeAuth(updateAdminVisibility);
-  updateAdminVisibility();
+  subscribeAuth(updateNavVisibility);
+  updateNavVisibility();
 
   document.querySelectorAll<HTMLAnchorElement>("[data-nav]").forEach((link) => {
     const view = link.dataset.nav as ViewName;

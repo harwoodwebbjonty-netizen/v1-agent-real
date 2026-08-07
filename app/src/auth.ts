@@ -11,6 +11,13 @@ export function isAdmin(): boolean {
   return currentUser?.role === "admin";
 }
 
+/** True if the current user's role grants `permission` (admin always does). */
+export function hasPermission(permission: string): boolean {
+  if (!currentUser) return false;
+  if (currentUser.role === "admin") return true;
+  return (currentUser.permissions ?? []).includes(permission);
+}
+
 export function subscribeAuth(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
