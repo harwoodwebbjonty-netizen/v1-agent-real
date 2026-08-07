@@ -1,3 +1,4 @@
+import json
 import logging
 import re
 import secrets
@@ -615,6 +616,48 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_031_roles(conn: sqlite3.Connection) -> None:
+    """RBAC: custom roles with per-permission toggles + lead scope. Seeds two
+    built-in roles (Admin = all permissions; Member = today's member access) and
+    maps existing users onto them so nothing changes for anyone on upgrade."""
+    from app.core.permissions import ALL_PERMISSIONS, MEMBER_PERMISSIONS
+
+    conn.execute(
+        """
+        CREATE TABLE IF NOT EXISTS roles (
+            id TEXT PRIMARY KEY,
+            name TEXT UNIQUE NOT NULL,
+            permissions TEXT NOT NULL DEFAULT '[]',
+            lead_scope TEXT NOT NULL DEFAULT 'all_shared',
+            is_system INTEGER NOT NULL DEFAULT 0,
+            is_default INTEGER NOT NULL DEFAULT 0,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+    ucols = {r["name"] for r in conn.execute("PRAGMA table_info(users)")}
+    if "role_id" not in ucols:
+        conn.execute("ALTER TABLE users ADD COLUMN role_id TEXT")
+
+    now = datetime.now(timezone.utc).isoformat()
+    existing = {r["name"] for r in conn.execute("SELECT name FROM roles")}
+    if "Admin" not in existing:
+        conn.execute(
+            "INSERT INTO roles (id, name, permissions, lead_scope, is_system, is_default, created_at) "
+            "VALUES ('role-admin', 'Admin', ?, 'all_shared', 1, 0, ?)",
+            (json.dumps(ALL_PERMISSIONS), now),
+        )
+    if "Member" not in existing:
+        conn.execute(
+            "INSERT INTO roles (id, name, permissions, lead_scope, is_system, is_default, created_at) "
+            "VALUES ('role-member', 'Member', ?, 'all_shared', 1, 1, ?)",
+            (json.dumps(MEMBER_PERMISSIONS), now),
+        )
+    # Map existing accounts onto the built-in roles.
+    conn.execute("UPDATE users SET role_id = 'role-admin' WHERE role = 'admin' AND (role_id IS NULL OR role_id = '')")
+    conn.execute("UPDATE users SET role_id = 'role-member' WHERE role != 'admin' AND (role_id IS NULL OR role_id = '')")
+
+
 def _migration_030_audit_log(conn: sqlite3.Connection) -> None:
     """Accountability trail for a shared multi-user DB (audit M6): who changed
     what, when. actor_name is denormalised so entries survive user deletion."""
@@ -736,8 +779,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (28, _migration_028_leads_hot_indexes),
     (29, _migration_029_company_norm_and_flags),
     (30, _migration_030_audit_log),
+    (31, _migration_031_roles),
 ]
-CURRENT_SCHEMA_VERSION = 30
+CURRENT_SCHEMA_VERSION = 31
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -918,6 +962,66 @@ def set_app_flag(key: str, value: str, updated_at: str) -> None:
             "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
             (key, value, updated_at),
         )
+
+
+# --- Roles (RBAC) ---
+
+def list_roles() -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM roles ORDER BY is_system DESC, name").fetchall()
+
+
+def get_role(role_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM roles WHERE id = ?", (role_id,)).fetchone()
+
+
+def get_role_by_name(name: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM roles WHERE name = ?", (name,)).fetchone()
+
+
+def create_role(id: str, name: str, permissions_json: str, lead_scope: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO roles (id, name, permissions, lead_scope, is_system, is_default, created_at) "
+            "VALUES (?, ?, ?, ?, 0, 0, ?)",
+            (id, name, permissions_json, lead_scope, created_at),
+        )
+
+
+def update_role(role_id: str, name: str, permissions_json: str, lead_scope: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE roles SET name = ?, permissions = ?, lead_scope = ? WHERE id = ?",
+            (name, permissions_json, lead_scope, role_id),
+        )
+
+
+def delete_role(role_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM roles WHERE id = ? AND is_system = 0", (role_id,))
+
+
+def set_user_role(user_id: str, role_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE users SET role_id = ? WHERE id = ?", (role_id, user_id))
+
+
+def get_default_role() -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM roles WHERE is_default = 1 LIMIT 1").fetchone()
+
+
+def set_default_role(role_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("UPDATE roles SET is_default = 0")
+        conn.execute("UPDATE roles SET is_default = 1 WHERE id = ?", (role_id,))
+
+
+def count_users_with_role(role_id: str) -> int:
+    with get_connection() as conn:
+        return conn.execute("SELECT COUNT(*) FROM users WHERE role_id = ?", (role_id,)).fetchone()[0]
 
 
 def count_users() -> int:

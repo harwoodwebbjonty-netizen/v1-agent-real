@@ -59,6 +59,13 @@ def identify(request: Request, body: IdentifyRequest) -> LoginResponse:
             role = "member"
         user_id = new_id()
         db.create_user(user_id, name, role, now_iso(), password_hash=hash_password(password))
+        # Assign a role: the first admin gets the built-in Admin role; everyone
+        # else lands in the configured default role (admin can reassign later).
+        if role == "admin":
+            db.set_user_role(user_id, "role-admin")
+        else:
+            default_role = db.get_default_role()
+            db.set_user_role(user_id, default_role["id"] if default_role else "role-member")
         user = db.get_user_by_id(user_id)
     else:
         locked_until = user["locked_until"] if "locked_until" in user.keys() else None
