@@ -17,7 +17,7 @@ import {
 import { CONTACT_STATUS_ORDER } from "../constants";
 import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { getLeads, refreshLeads } from "../state";
-import { escapeHtml } from "../utils";
+import { escapeHtml, renderEmailBodyHtml } from "../utils";
 
 // A rep picks a cold-call list, gives one overall idea (deals/offers + a call
 // link) and the backend writes a per-lead email for every lead on the list,
@@ -26,20 +26,9 @@ import { escapeHtml } from "../utils";
 
 const POLL_MS = 2500;
 
-/** Render a stored draft body (which may contain a baked-in CTA <a> button,
- * **bold** markers and newlines) to safe HTML — mirrors the backend's HTML
- * alternative: keep the anchor tags, escape everything else. */
-const ANCHOR_RE = /<a\s+href="[^"]*"[^>]*>.*?<\/a>/gi;
-function renderBodyHtml(body: string): string {
-  const anchors = body.match(ANCHOR_RE) || [];
-  const parts = body.split(ANCHOR_RE);
-  let html = "";
-  parts.forEach((part, i) => {
-    html += escapeHtml(part).replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>").replace(/\n/g, "<br>");
-    if (i < anchors.length) html += anchors[i];
-  });
-  return html;
-}
+/** Render a stored draft body to safe HTML (escapes everything; rebuilds anchors
+ * with a scheme-validated href only — see renderEmailBodyHtml, audit H8). */
+const renderBodyHtml = renderEmailBodyHtml;
 
 function leadHasEmail(lead: Lead): boolean {
   return !!(lead.emails && lead.emails.length > 0);

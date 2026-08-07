@@ -1,4 +1,5 @@
 import logging
+import re
 import secrets
 import shutil
 import sqlite3
@@ -1258,9 +1259,22 @@ def get_lead(lead_id: str) -> Optional[sqlite3.Row]:
         return conn.execute("SELECT * FROM leads WHERE id = ?", (lead_id,)).fetchone()
 
 
+_SAFE_COLUMN_RE = re.compile(r"^[a-z_][a-z0-9_]*$")
+
+
+def _assert_safe_columns(fields: dict) -> None:
+    """Defence-in-depth for the dynamic SET builders: reject any key that isn't a
+    plain column identifier so a stray raw-dict caller can't inject SQL (audit L4).
+    Values are always bound with ?; only names are interpolated."""
+    bad = [k for k in fields if not _SAFE_COLUMN_RE.match(k)]
+    if bad:
+        raise ValueError(f"Illegal column name(s) in update: {bad}")
+
+
 def update_lead_fields(lead_id: str, fields: dict, updated_at: str) -> None:
     if not fields:
         return
+    _assert_safe_columns(fields)
     columns = ", ".join(f"{key} = ?" for key in fields)
     with get_connection() as conn:
         conn.execute(
@@ -1999,6 +2013,7 @@ def get_email_draft(draft_id: str) -> Optional[sqlite3.Row]:
 def update_email_draft_fields(draft_id: str, fields: dict, updated_at: str) -> None:
     if not fields:
         return
+    _assert_safe_columns(fields)
     columns = ", ".join(f"{key} = ?" for key in fields)
     with get_connection() as conn:
         conn.execute(

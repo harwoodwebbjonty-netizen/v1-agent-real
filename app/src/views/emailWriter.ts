@@ -26,7 +26,7 @@ import {
 import { consumePendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeads, subscribe } from "../state";
 import { getActiveTabId, subscribeTabs } from "../tabs";
-import { escapeHtml } from "../utils";
+import { escapeHtml, sanitizeHtmlFragment } from "../utils";
 
 const VARIABLES: { key: string; label: string }[] = [
   { key: "first_name", label: "First Name" },
@@ -341,7 +341,7 @@ export function initEmailWriter(): void {
 
     function markDirty(): void {
       session.subject = subjectInput.value;
-      session.bodyHtml = bodyEl.innerHTML;
+      session.bodyHtml = sanitizeHtmlFragment(bodyEl.innerHTML);
       session.dirty = true;
       renderDraftTabs();
     }

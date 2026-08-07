@@ -2,6 +2,7 @@ import { sendHeartbeat, type UserInfo } from "./api";
 import { renderAvatarHtml } from "./avatar";
 import { getCurrentUser, subscribeAuth } from "./auth";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "./team";
+import { escapeHtml } from "./utils";
 
 const HEARTBEAT_INTERVAL_MS = 45_000;
 const ACTIVE_THRESHOLD_MS = 2 * 60 * 1000;
@@ -32,7 +33,7 @@ export function initPresence(): void {
     }
     bar.classList.remove("hidden");
     bar.innerHTML = active
-      .map((u) => `<span class="active-user-avatar" title="${u.name} — active now">${renderAvatarHtml(u, "avatar-sm")}</span>`)
+      .map((u) => `<span class="active-user-avatar" title="${escapeHtml(u.name)} — active now">${renderAvatarHtml(u, "avatar-sm")}</span>`)
       .join("");
   }
 
