@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app import db
-from app.dependencies import CurrentUser, get_current_user, require_admin
+from app.dependencies import CurrentUser, get_current_user, require_permission
 from app.services.auth_service import now_iso
 
 router = APIRouter(prefix="/credit-settings", tags=["credit-settings"])
@@ -21,7 +21,7 @@ def get_limits(current_user: CurrentUser = Depends(get_current_user)) -> dict:
 
 
 @router.post("/limits")
-def save_limits(body: dict, admin: CurrentUser = Depends(require_admin)) -> dict:
+def save_limits(body: dict, admin: CurrentUser = Depends(require_permission("change_credit_limits"))) -> dict:
     """Admin-only: users spend on the org's API keys, so only an admin may
     change budgets. Pass user_id to set another user's limits (defaults to
     the admin's own)."""

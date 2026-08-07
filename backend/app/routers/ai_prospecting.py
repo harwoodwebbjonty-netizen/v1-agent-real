@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends
 
 from app import db
 from app.core.config import get_settings
-from app.dependencies import CurrentUser, get_current_user, require_admin
+from app.dependencies import CurrentUser, get_current_user, require_permission
 from app.schemas_ai_prospecting import (
     ProspectingCriteria,
     ProspectingRunOut,
@@ -59,7 +59,7 @@ def get_run(run_id: str, current_user: CurrentUser = Depends(get_current_user)) 
 
 @router.post("/run")
 async def start_run(
-    criteria: ProspectingCriteria, current_user: CurrentUser = Depends(require_admin)
+    criteria: ProspectingCriteria, current_user: CurrentUser = Depends(require_permission("start_prospecting"))
 ) -> StartProspectingResponse:
     """Starts a prospecting run as a background task. Poll /runs/{run_id}
     for live progress (found / created / skipped counts). Admin-only — a run

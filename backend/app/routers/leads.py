@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from app import db
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
-from app.dependencies import CurrentUser, get_current_user, require_admin
+from app.dependencies import CurrentUser, get_current_user, require_admin, require_permission
 from app.schemas_contacts import (
     AddEmailRequest,
     AddPhoneRequest,
@@ -232,8 +232,9 @@ def _require_lead_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
         return
     if "assigned_user_id" in row.keys() and row["assigned_user_id"] == current_user.id:
         return
+    # Shared-pool access only for users whose role scope includes it.
     is_shared = row["is_shared"] if "is_shared" in row.keys() else 1
-    if is_shared and not row["list_id"]:
+    if is_shared and not row["list_id"] and current_user.lead_scope == "all_shared":
         return
     raise HTTPException(status_code=403, detail="You don't have access to this lead.")
 
@@ -241,7 +242,7 @@ def _require_lead_access(row: sqlite3.Row, current_user: CurrentUser) -> None:
 @router.get("", response_model=LeadListResponse)
 def list_leads(current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadListResponse:
     names = _user_name_map()
-    rows = db.list_all_leads_for_user(current_user.id, current_user.role == "admin")
+    rows = db.list_all_leads_for_user(current_user.id, current_user.role == "admin", current_user.lead_scope)
     batch = LeadBatch(rows)
     return LeadListResponse(leads=[_to_lead_out(r, names, activity, batch) for r in rows])
 
@@ -776,7 +777,7 @@ async def _run_enrichment_batch(api_key: str, user_id: str, is_admin: bool, limi
 @router.post("/ch-enrich-all")
 async def ch_enrich_all(
     limit: int = 100,
-    current_user: CurrentUser = Depends(require_admin),
+    current_user: CurrentUser = Depends(require_permission("run_enrichment")),
 ) -> dict:
     """Manual batch: enriches up to `limit` leads (default 100). Skips already-done leads.
     Writes a sentinel for any company not found on CH so it stops being retried."""
@@ -806,7 +807,7 @@ async def _enrich_all_background(api_key: str, user_id: str, is_admin: bool) -> 
 
 
 @router.post("/ch-enrich-auto")
-async def ch_enrich_auto(current_user: CurrentUser = Depends(require_admin)) -> dict:
+async def ch_enrich_auto(current_user: CurrentUser = Depends(require_permission("run_enrichment"))) -> dict:
     """Starts a background job that enriches all leads in 100-lead batches until done.
     Safe to call while already running — returns current status instead of starting a duplicate."""
     global _enrich_task
@@ -828,7 +829,7 @@ def ch_enrich_stop(current_user: CurrentUser = Depends(get_current_user)) -> dic
 
 
 @router.post("/backfill-industry")
-def backfill_industry(current_user: CurrentUser = Depends(require_admin)) -> dict:
+def backfill_industry(current_user: CurrentUser = Depends(require_permission("run_enrichment"))) -> dict:
     """One-time fix: set industry='Unclassified' for fully-enriched leads that have no SIC codes on CH."""
     rows = db.list_all_leads_for_user(current_user.id, current_user.role == "admin")
     updated = 0
@@ -847,7 +848,7 @@ def backfill_industry(current_user: CurrentUser = Depends(require_admin)) -> dic
 
 
 @router.post("/dedup")
-def dedup_leads(current_user: CurrentUser = Depends(require_admin)) -> dict:
+def dedup_leads(current_user: CurrentUser = Depends(require_permission("dedup_merge"))) -> dict:
     """Merges duplicate leads in the shared pool (list_id IS NULL).
     Winner = oldest created_at. All phones, emails, notes, call logs, etc. are
     absorbed into the winner; the duplicate is deleted. Also normalises any

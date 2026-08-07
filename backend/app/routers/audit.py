@@ -1,14 +1,14 @@
 from fastapi import APIRouter, Depends
 
 from app import db
-from app.dependencies import CurrentUser, require_admin
+from app.dependencies import CurrentUser, require_permission
 
 router = APIRouter(prefix="/audit-log", tags=["audit"])
 
 
 @router.get("")
 def get_audit_log(
-    limit: int = 200, offset: int = 0, admin: CurrentUser = Depends(require_admin)
+    limit: int = 200, offset: int = 0, admin: CurrentUser = Depends(require_permission("view_audit_log"))
 ) -> dict:
     """Admin-only accountability trail: who changed what, most recent first."""
     limit = max(1, min(limit, 500))

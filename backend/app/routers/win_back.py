@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from app import db
 from app.core.config import get_settings
 from app.core.import_safety import enforce_import_row_cap, sanitize_cell
-from app.dependencies import CurrentUser, get_current_user, require_admin
+from app.dependencies import CurrentUser, get_current_user, require_permission
 from app.services.auth_service import days_since, new_id, now_iso
 from app.services.companies_house_service import (
     CHRateLimitError,
@@ -39,7 +39,7 @@ logger = logging.getLogger("app.win_back")
 # Win-back campaigns are admin-only: they mass-generate and mass-send emails
 # on the org's API keys and OAuth accounts — not something the sales team
 # needs for day-to-day calling.
-router = APIRouter(prefix="/win-back", tags=["win-back"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/win-back", tags=["win-back"], dependencies=[Depends(require_permission("run_win_back"))])
 
 
 # --- Pydantic schemas ---

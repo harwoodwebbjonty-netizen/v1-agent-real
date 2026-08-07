@@ -3,7 +3,7 @@ from pydantic import BaseModel
 
 from app import db
 from app.core.config import get_settings
-from app.dependencies import CurrentUser, get_current_user, require_admin
+from app.dependencies import CurrentUser, get_current_user, require_permission
 from app.schemas_auth import (
     SetAvatarRequest,
     UserNameOut,
@@ -33,13 +33,33 @@ def list_users(current_user: CurrentUser = Depends(get_current_user)) -> UserLis
     return UserListResponse(users=[user_out_from_row(r) for r in rows])
 
 
+class SetRoleRequest(BaseModel):
+    role_id: str
+
+
+@router.post("/{user_id}/role", response_model=UserOut)
+def set_user_role(
+    user_id: str, body: SetRoleRequest, admin: CurrentUser = Depends(require_permission("manage_team"))
+) -> UserOut:
+    """Assign a role to a member. Admins (users.role == 'admin') keep full access
+    regardless — this sets the granular role for everyone else."""
+    user = db.get_user_by_id(user_id)
+    if user is None:
+        raise HTTPException(status_code=404, detail="User not found")
+    if db.get_role(body.role_id) is None:
+        raise HTTPException(status_code=404, detail="Role not found")
+    db.set_user_role(user_id, body.role_id)
+    db.record_audit(admin.id, admin.name, "assign_role", "user", user_id, detail=body.role_id)
+    return user_out_from_row(db.get_user_by_id(user_id))
+
+
 class SetPasswordRequest(BaseModel):
     password: str
 
 
 @router.post("/{user_id}/set-password", response_model=UserOut)
 def set_user_password(
-    user_id: str, body: SetPasswordRequest, admin: CurrentUser = Depends(require_admin)
+    user_id: str, body: SetPasswordRequest, admin: CurrentUser = Depends(require_permission("manage_team"))
 ) -> UserOut:
     """Admin-issued password set/reset — the safe replacement for the removed
     'first login claims a legacy account' path. Revokes the user's existing
@@ -59,7 +79,7 @@ def set_user_password(
 
 
 @router.post("", response_model=UserOut)
-def create_user(body: CreateUserRequest, admin: CurrentUser = Depends(require_admin)) -> UserOut:
+def create_user(body: CreateUserRequest, admin: CurrentUser = Depends(require_permission("manage_team"))) -> UserOut:
     if db.get_user_by_name(body.name.strip()) is not None:
         raise HTTPException(status_code=400, detail="That name is already taken")
 
@@ -69,7 +89,7 @@ def create_user(body: CreateUserRequest, admin: CurrentUser = Depends(require_ad
 
 
 @router.patch("/{user_id}", response_model=UserOut)
-def update_user(user_id: str, body: UpdateUserRequest, admin: CurrentUser = Depends(require_admin)) -> UserOut:
+def update_user(user_id: str, body: UpdateUserRequest, admin: CurrentUser = Depends(require_permission("manage_team"))) -> UserOut:
     user = db.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
@@ -103,7 +123,7 @@ def set_avatar(
 
 
 @router.delete("/{user_id}")
-def delete_user(user_id: str, admin: CurrentUser = Depends(require_admin)) -> dict[str, str]:
+def delete_user(user_id: str, admin: CurrentUser = Depends(require_permission("manage_team"))) -> dict[str, str]:
     user = db.get_user_by_id(user_id)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
