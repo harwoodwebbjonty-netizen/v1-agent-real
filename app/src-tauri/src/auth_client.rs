@@ -201,6 +201,36 @@ pub async fn admin_set_user_password(
     handle_response(response).await
 }
 
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct AuditEntry {
+    pub id: String,
+    pub actor_name: String,
+    pub action: String,
+    pub entity_type: String,
+    pub entity_id: String,
+    pub detail: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct AuditLogResponse {
+    entries: Vec<AuditEntry>,
+}
+
+/// Admin-only accountability trail (most recent first).
+pub async fn list_audit_log(base_url: &str, token: &str, limit: i64) -> Result<Vec<AuditEntry>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/audit-log?limit={}", base_url, limit);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: AuditLogResponse = handle_response(response).await?;
+    Ok(parsed.entries)
+}
+
 pub async fn delete_team_member(base_url: &str, token: &str, user_id: &str) -> Result<(), String> {
     let client = reqwest::Client::new();
     let url = format!("{}/users/{}", base_url, user_id);

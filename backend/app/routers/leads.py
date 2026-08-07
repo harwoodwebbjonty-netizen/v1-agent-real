@@ -50,6 +50,7 @@ from app.services.companies_house_service import (
     get_company_profile,
     search_company_by_name,
 )
+from app.core.import_safety import enforce_import_row_cap, sanitize_import_row
 from app.services.email_scraper_service import scrape_emails
 from app.services import lead_scoring_service
 from app.services.linkedin_activity_service import format_posts_for_prompt, get_or_fetch_linkedin_posts
@@ -647,9 +648,11 @@ def get_linkedin_posts(lead_id: str, current_user: CurrentUser = Depends(get_cur
 
 @router.post("/import-csv", response_model=ImportLeadsResponse)
 def import_leads_csv(body: ImportLeadsRequest, current_user: CurrentUser = Depends(get_current_user)) -> ImportLeadsResponse:
+    enforce_import_row_cap(body.leads)
     imported = 0
     created_at = now_iso()
-    for entry in body.leads:
+    for raw_entry in body.leads:
+        entry = sanitize_import_row(raw_entry)
         company = entry.get("company")
         if not company:
             continue
@@ -911,9 +914,11 @@ def dedup_leads(current_user: CurrentUser = Depends(require_admin)) -> dict:
 def migrate_leads(body: MigrateRequest, admin: CurrentUser = Depends(require_admin)) -> MigrateResponse:
     """One-time import of the legacy local CSV leads, owned by the admin who
     runs the migration. Never invoked again after the local file is imported."""
+    enforce_import_row_cap(body.leads)
     imported = 0
     created_at = now_iso()
-    for entry in body.leads:
+    for raw_entry in body.leads:
+        entry = sanitize_import_row(raw_entry)
         company = entry.get("company")
         if not company:
             continue

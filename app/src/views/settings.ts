@@ -8,6 +8,7 @@ import {
   adminSetUserPassword,
   createTeamMember,
   deleteTeamMember,
+  getAuditLog,
   disconnectEmailOAuthAccount,
   exportLogCsv,
   getBackendBaseUrl,
@@ -66,6 +67,13 @@ export function initSettings(): void {
           <button id="add-member-btn" class="btn btn-primary">Add team member</button>
         </div>
         <span id="team-status" class="status-message"></span>
+      </section>
+
+      <section class="card hidden" id="audit-card">
+        <h2 class="card-title">Audit log</h2>
+        <p class="card-subtitle">Recent changes across the workspace — who did what.</p>
+        <button id="audit-refresh-btn" class="btn btn-secondary btn-sm">Refresh</button>
+        <ul id="audit-list" class="history-list audit-list"></ul>
       </section>
 
       <section class="card">
@@ -268,6 +276,32 @@ export function initSettings(): void {
   renderTeam();
   subscribeTeam(renderTeam);
   subscribeAuth(renderTeam);
+
+  // --- Audit log (admin only) ---
+  const auditCard = container.querySelector<HTMLElement>("#audit-card")!;
+  const auditList = container.querySelector<HTMLUListElement>("#audit-list")!;
+  async function renderAudit(): Promise<void> {
+    auditCard.classList.toggle("hidden", !isAdmin());
+    if (!isAdmin()) return;
+    try {
+      const entries = await getAuditLog(200);
+      auditList.innerHTML = entries.length === 0
+        ? '<li class="empty-hint">No activity recorded yet.</li>'
+        : entries
+            .map((e) => {
+              const when = new Date(e.created_at).toLocaleString();
+              const what = [e.action, e.entity_type].filter(Boolean).join(" ");
+              const detail = e.detail ? ` — ${escapeHtml(e.detail)}` : "";
+              return `<li class="audit-row"><span class="audit-when">${escapeHtml(when)}</span> <strong>${escapeHtml(e.actor_name || "—")}</strong> ${escapeHtml(what)}${detail}</li>`;
+            })
+            .join("");
+    } catch (err) {
+      auditList.innerHTML = `<li class="empty-hint">Failed to load audit log: ${escapeHtml(String(err))}</li>`;
+    }
+  }
+  container.querySelector<HTMLButtonElement>("#audit-refresh-btn")!.addEventListener("click", () => void renderAudit());
+  subscribeAuth(renderAudit);
+  void renderAudit();
 
   document.querySelector("#add-member-btn")!.addEventListener("click", async () => {
     const nameInput = document.querySelector<HTMLInputElement>("#new-member-name")!;

@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from app import db
 from app.core.config import get_settings
+from app.core.import_safety import enforce_import_row_cap, sanitize_cell
 from app.dependencies import CurrentUser, get_current_user, require_admin
 from app.services.auth_service import days_since, new_id, now_iso
 from app.services.companies_house_service import (
@@ -450,6 +451,7 @@ async def create_campaign_from_csv(
 ) -> dict:
     if not body.rows:
         raise HTTPException(status_code=400, detail="At least one row is required.")
+    enforce_import_row_cap(body.rows)
 
     lead_ids: list[str] = []
     to_generate_lead_ids: list[str] = []
@@ -463,15 +465,15 @@ async def create_campaign_from_csv(
         lead_id = db.create_lead(
             id=new_id(),
             timestamp=ts,
-            company=row.company,
+            company=sanitize_cell(row.company),
             phone_number=row.phone,
             source_url=row.website,
             status="New",
-            notes=row.notes,
+            notes=sanitize_cell(row.notes),
             owner_user_id=current_user.id,
             created_at=ts,
         )
-        extra = {k: v for k, v in {
+        extra = {k: sanitize_cell(v) for k, v in {
             "contact_name": row.contact_name,
             "website": row.website,
             "linkedin": row.linkedin,

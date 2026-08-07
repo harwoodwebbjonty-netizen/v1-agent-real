@@ -15,6 +15,7 @@ from app.schemas_leads import (
     LeadListResponse,
     LeadListsResponse,
 )
+from app.core.import_safety import enforce_import_row_cap, sanitize_import_row
 from app.services import lead_scoring_service
 from app.services.auth_service import new_id, now_iso
 
@@ -75,9 +76,11 @@ def import_leads_csv(
         raise HTTPException(status_code=404, detail="List not found")
     _require_list_access(lead_list, current_user)
 
+    enforce_import_row_cap(body.leads)
     imported = 0
     created_at = now_iso()
-    for entry in body.leads:
+    for raw_entry in body.leads:
+        entry = sanitize_import_row(raw_entry)
         company = entry.get("company")
         if not company:
             continue

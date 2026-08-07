@@ -4403,6 +4403,11 @@ button.p-filter-chip.active {
 .follow-up-buttons { display: flex; gap: var(--space-2); }
 .fu-status { min-height: 1em; font-size: 0.78rem; color: var(--text-muted); }
 
+/* Admin audit-log list */
+.audit-list { max-height: 340px; overflow-y: auto; }
+.audit-row { font-size: 0.82rem; padding: 4px 0; border-bottom: 1px solid var(--border); }
+.audit-when { color: var(--text-muted); font-variant-numeric: tabular-nums; margin-right: 6px; }
+
 /* Side-panel BDM sharing toggle */
 .share-toggle {
   display: flex;

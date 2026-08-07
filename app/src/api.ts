@@ -218,6 +218,21 @@ export async function adminSetUserPassword(userId: string, password: string): Pr
   return invoke<UserInfo>("admin_set_user_password", { userId, password });
 }
 
+export interface AuditEntry {
+  id: string;
+  actor_name: string;
+  action: string;
+  entity_type: string;
+  entity_id: string;
+  detail: string;
+  created_at: string;
+}
+
+/** Admin-only accountability trail (most recent first). */
+export async function getAuditLog(limit = 200): Promise<AuditEntry[]> {
+  return invoke<AuditEntry[]>("list_audit_log", { limit });
+}
+
 export async function setUserAvatar(userId: string, avatar: string | null): Promise<UserInfo> {
   return invoke<UserInfo>("set_user_avatar", { userId, avatar });
 }

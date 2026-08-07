@@ -110,6 +110,13 @@ async fn admin_set_user_password(app_handle: tauri::AppHandle, user_id: String, 
 }
 
 #[tauri::command]
+async fn list_audit_log(app_handle: tauri::AppHandle, limit: Option<i64>) -> Result<Vec<auth_client::AuditEntry>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    auth_client::list_audit_log(&base_url, &session.token, limit.unwrap_or(200)).await
+}
+
+#[tauri::command]
 async fn set_user_avatar(app_handle: tauri::AppHandle, user_id: String, avatar: Option<String>) -> Result<UserInfo, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -1262,6 +1269,7 @@ pub fn run() {
       update_team_member,
       delete_team_member,
       admin_set_user_password,
+      list_audit_log,
       set_user_avatar,
       read_image_as_data_url,
       get_backend_base_url,

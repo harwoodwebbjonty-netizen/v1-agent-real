@@ -6,9 +6,11 @@ the existing email-writer endpoints. See services/list_campaign_service.py."""
 import asyncio
 import sqlite3
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 
 from app import db
+from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.dependencies import CurrentUser, get_current_user
 from app.schemas_list_campaigns import (
     CampaignDraftOut,
@@ -44,8 +46,9 @@ def _to_campaign_out(row: sqlite3.Row) -> ListCampaignOut:
 
 
 @router.post("", response_model=ListCampaignOut)
+@limiter.limit(get_settings().rate_limit)
 async def create_campaign(
-    body: CreateListCampaignRequest, current_user: CurrentUser = Depends(get_current_user)
+    request: Request, body: CreateListCampaignRequest, current_user: CurrentUser = Depends(get_current_user)
 ) -> ListCampaignOut:
     if not body.idea.strip():
         raise HTTPException(status_code=400, detail="Add an email idea before generating.")
@@ -123,7 +126,8 @@ def get_campaign_drafts(campaign_id: str, current_user: CurrentUser = Depends(ge
 
 
 @router.post("/{campaign_id}/resume", response_model=ListCampaignOut)
-async def resume_campaign(campaign_id: str, current_user: CurrentUser = Depends(get_current_user)) -> ListCampaignOut:
+@limiter.limit(get_settings().rate_limit)
+async def resume_campaign(request: Request, campaign_id: str, current_user: CurrentUser = Depends(get_current_user)) -> ListCampaignOut:
     row = db.get_list_campaign(campaign_id)
     if row is None:
         raise HTTPException(status_code=404, detail="Campaign not found")
@@ -152,8 +156,9 @@ async def resume_campaign(campaign_id: str, current_user: CurrentUser = Depends(
 
 
 @router.post("/{campaign_id}/send-all")
+@limiter.limit(get_settings().rate_limit)
 async def send_all(
-    campaign_id: str, body: SendCampaignRequest, current_user: CurrentUser = Depends(get_current_user)
+    request: Request, campaign_id: str, body: SendCampaignRequest, current_user: CurrentUser = Depends(get_current_user)
 ) -> dict:
     row = db.get_list_campaign(campaign_id)
     if row is None:
