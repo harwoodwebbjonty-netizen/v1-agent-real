@@ -108,8 +108,15 @@ async def _activity_refresh_loop() -> None:
 
 @app.on_event("startup")
 def on_startup() -> None:
+    from app.services.auth_service import now_iso
+
     db.init_db()
-    _backfill_industry_unclassified()
+    # One-time backfill — gated by a flag so it doesn't full-scan `leads` on every
+    # boot (audit M7). New/enriched leads set industry at creation, so once done
+    # it never needs to run again.
+    if db.get_app_flag("industry_backfilled") != "1":
+        _backfill_industry_unclassified()
+        db.set_app_flag("industry_backfilled", "1", now_iso())
     asyncio.create_task(_sequence_scheduler_loop())
     asyncio.create_task(_activity_refresh_loop())
     settings = get_settings()

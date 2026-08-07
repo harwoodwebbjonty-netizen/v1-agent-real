@@ -914,8 +914,10 @@ export function initColdCallLists(): void {
       onLookupPhone: (lead) => { void lookupCompanyPhone(lead.company, currentListId ?? undefined).then(() => refreshCurrentList()); },
       onSaveNotes: async (lead, notes) => {
         await updateLead(lead.id, { leadNotes: notes });
+        // Keep the in-memory row consistent with what we persisted (lead_notes),
+        // so the notes column doesn't revert on the next render (audit M9).
         const idx = currentListLeads.findIndex((l) => l.id === lead.id);
-        if (idx >= 0) currentListLeads[idx] = { ...currentListLeads[idx], notes };
+        if (idx >= 0) currentListLeads[idx] = { ...currentListLeads[idx], lead_notes: notes };
       },
       showListColumn: true,
       showPriority: true,

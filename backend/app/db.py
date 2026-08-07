@@ -613,6 +613,20 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_029_company_norm_and_flags(conn: sqlite3.Connection) -> None:
+    """Index-backed dedup (audit C4): a normalised company column replaces the
+    unindexable LOWER(TRIM(company)) full scan on every insert. Plus a tiny
+    key/value flags table so one-time startup backfills don't run every boot (M7)."""
+    lcols = {r["name"] for r in conn.execute("PRAGMA table_info(leads)")}
+    if "company_norm" not in lcols:
+        conn.execute("ALTER TABLE leads ADD COLUMN company_norm TEXT")
+        conn.execute("UPDATE leads SET company_norm = lower(trim(company))")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_leads_company_norm ON leads(company_norm)")
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS app_flags (key TEXT PRIMARY KEY, value TEXT NOT NULL, updated_at TEXT NOT NULL)"
+    )
+
+
 def _migration_028_leads_hot_indexes(conn: sqlite3.Connection) -> None:
     """Indexes on the most-filtered leads columns — every list render, insert-time
     dedup, and the refresh scheduler previously full-scanned `leads` (audit H6)."""
@@ -697,8 +711,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (26, _migration_026_lead_priority),
     (27, _migration_027_auth_hardening_and_sharing),
     (28, _migration_028_leads_hot_indexes),
+    (29, _migration_029_company_norm_and_flags),
 ]
-CURRENT_SCHEMA_VERSION = 28
+CURRENT_SCHEMA_VERSION = 29
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -830,6 +845,9 @@ def get_connection() -> Iterator[sqlite3.Connection]:
     # (multiple users + four background loops all share this one file).
     conn.execute("PRAGMA journal_mode=WAL")
     conn.execute("PRAGMA busy_timeout=5000")
+    # Enforce declared foreign keys (off by default per-connection in SQLite).
+    # New tables declare FKs; child-table cleanup on merge/delete is also explicit.
+    conn.execute("PRAGMA foreign_keys=ON")
     try:
         yield conn
         conn.commit()
@@ -838,6 +856,21 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 
 # --- users ---
+
+def get_app_flag(key: str) -> Optional[str]:
+    with get_connection() as conn:
+        row = conn.execute("SELECT value FROM app_flags WHERE key = ?", (key,)).fetchone()
+        return row["value"] if row else None
+
+
+def set_app_flag(key: str, value: str, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO app_flags (key, value, updated_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=excluded.updated_at",
+            (key, value, updated_at),
+        )
+
 
 def count_users() -> int:
     with get_connection() as conn:
@@ -912,6 +945,11 @@ def update_user(user_id: str, name: Optional[str], role: Optional[str]) -> None:
 def delete_user(user_id: str) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM sessions WHERE user_id = ?", (user_id,))
+        # Clear the deleted user's ownership/assignment so leads don't keep a
+        # dangling user id (audit H5). Both columns are nullable; the leads
+        # remain (shared ones stay visible), just unowned/unassigned.
+        conn.execute("UPDATE leads SET owner_user_id = NULL WHERE owner_user_id = ?", (user_id,))
+        conn.execute("UPDATE leads SET assigned_user_id = NULL WHERE assigned_user_id = ?", (user_id,))
         conn.execute("DELETE FROM users WHERE id = ?", (user_id,))
 
 
@@ -1025,13 +1063,20 @@ def set_lead_shared(lead_id: str, is_shared: bool, updated_at: str) -> None:
 
 # --- leads ---
 
+def _norm_company(name: str) -> str:
+    """Normalised company key for dedup — matches the indexed `company_norm`."""
+    return (name or "").strip().lower()
+
+
 def _find_existing_lead_in_conn(conn: sqlite3.Connection, company_number: Optional[str], company_name: str) -> Optional[sqlite3.Row]:
     if company_number:
         row = conn.execute("SELECT * FROM leads WHERE company_number = ?", (company_number,)).fetchone()
         if row:
             return row
+    # Index-backed equality on the normalised column (was an unindexable
+    # LOWER(TRIM(company)) full scan on every insert — audit C4).
     return conn.execute(
-        "SELECT * FROM leads WHERE LOWER(TRIM(company)) = LOWER(TRIM(?))", (company_name,)
+        "SELECT * FROM leads WHERE company_norm = ?", (_norm_company(company_name),)
     ).fetchone()
 
 
@@ -1067,10 +1112,10 @@ def create_lead(
             return existing["id"]
         conn.execute(
             """INSERT INTO leads
-               (id, timestamp, company, phone_number, source_url, status, notes,
+               (id, timestamp, company, company_norm, phone_number, source_url, status, notes,
                 industry, contact_status, lead_notes, owner_user_id, assigned_user_id, list_id, company_number, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, '', 'New', '', ?, NULL, ?, ?, ?, ?)""",
-            (id, timestamp, company, phone_number, source_url, status, notes, owner_user_id, list_id, company_number, created_at, created_at),
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, '', 'New', '', ?, NULL, ?, ?, ?, ?)""",
+            (id, timestamp, company, _norm_company(company), phone_number, source_url, status, notes, owner_user_id, list_id, company_number, created_at, created_at),
         )
         return id
 
@@ -1116,15 +1161,20 @@ def merge_lead_into(winner_id: str, loser_id: str, now: str) -> None:
                 (*updates.values(), now, winner_id),
             )
 
-        # Re-parent child records (IGNORE handles unique constraint conflicts)
+        # Re-parent child records (IGNORE handles unique constraint conflicts).
+        # UNIQUE(lead_id, …) tables need OR IGNORE + delete-leftovers; the rest
+        # are a plain re-parent. This list must cover EVERY table with a lead_id
+        # or a merge silently orphans rows (audit H5) — keep it exhaustive.
         conn.execute("UPDATE OR IGNORE lead_phones SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
         conn.execute("DELETE FROM lead_phones WHERE lead_id = ?", (loser_id,))
         conn.execute("UPDATE OR IGNORE lead_emails SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
         conn.execute("DELETE FROM lead_emails WHERE lead_id = ?", (loser_id,))
-        for table in ("lead_intelligence_versions", "call_logs", "email_drafts", "sequence_enrollments"):
+        for table in (
+            "lead_intelligence_versions", "call_logs", "email_drafts", "sequence_enrollments",
+            "calendar_events", "activity_events",
+            "lead_linkedin_posts", "win_back_emails", "ch_charge_feed",
+        ):
             conn.execute(f"UPDATE {table} SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
-        conn.execute("UPDATE calendar_events SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
-        conn.execute("UPDATE activity_events SET lead_id = ? WHERE lead_id = ?", (winner_id, loser_id))
         conn.execute("DELETE FROM lead_intelligence_locks WHERE lead_id = ?", (loser_id,))
         conn.execute("DELETE FROM leads WHERE id = ?", (loser_id,))
 

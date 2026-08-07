@@ -218,7 +218,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
       </td>
       ${handlers.showListColumn !== false ? `<td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>` : ""}
       ${handlers.onSaveNotes !== undefined
-        ? `<td class="notes-cell"><textarea class="notes-textarea" rows="1" placeholder="Add note…">${escapeHtml(lead.notes || "")}</textarea></td>`
+        ? `<td class="notes-cell"><textarea class="notes-textarea" rows="1" placeholder="Add note…">${escapeHtml(lead.lead_notes || "")}</textarea></td>`
         : ""}
     `;
     row.addEventListener("click", (event) => {
@@ -295,7 +295,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
 
     const notesTextarea = row.querySelector<HTMLTextAreaElement>(".notes-textarea");
     if (notesTextarea && handlers.onSaveNotes) {
-      const originalNotes = lead.notes || "";
+      const originalNotes = lead.lead_notes || "";
       notesTextarea.addEventListener("click", (e) => e.stopPropagation());
       notesTextarea.addEventListener("focus", () => {
         notesTextarea.style.height = "auto";
