@@ -376,6 +376,7 @@ function renderPhones(lead: Lead): void {
   el.querySelectorAll<HTMLButtonElement>(".delete-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!currentLead || !onDeletePhone) return;
+      if (!window.confirm("Delete this phone number?")) return;
       await onDeletePhone(currentLead.id, btn.dataset.id!);
     });
   });
@@ -460,6 +461,7 @@ function renderEmails(lead: Lead): void {
   el.querySelectorAll<HTMLButtonElement>(".delete-btn").forEach((btn) => {
     btn.addEventListener("click", async () => {
       if (!currentLead || !onDeleteEmail) return;
+      if (!window.confirm("Delete this email address?")) return;
       await onDeleteEmail(currentLead.id, btn.dataset.id!);
     });
   });

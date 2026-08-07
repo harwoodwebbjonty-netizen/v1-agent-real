@@ -55,6 +55,7 @@ import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { getLeads, refreshLeads } from "../state";
 import { openTab } from "../tabs";
+import { showToast } from "../toast";
 import { escapeHtml } from "../utils";
 
 /** Coalesces rapid calls (e.g. per-keystroke search) into one after `ms` idle. */
@@ -782,7 +783,7 @@ export function initColdCallLists(): void {
       await refreshLeadLists();
       await openListDetail(list.id);
     } catch (err) {
-      alert(`Failed to create list: ${err}`);
+      showToast(`Failed to create list: ${err}`);
       selectorCreateBtn.disabled = false;
       selectorCreateBtn.textContent = "Create list";
     }
@@ -994,9 +995,17 @@ export function initColdCallLists(): void {
         </div>
       </div>`;
     document.body.appendChild(overlay);
-    const close = () => overlay.remove();
+    const previouslyFocused = document.activeElement as HTMLElement | null;
+    const close = () => {
+      document.removeEventListener("keydown", onKey);
+      overlay.remove();
+      previouslyFocused?.focus();  // restore focus to the triggering control
+    };
+    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
+    document.addEventListener("keydown", onKey);
     overlay.querySelector<HTMLButtonElement>(".follow-up-close")!.addEventListener("click", close);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
+    overlay.querySelector<HTMLButtonElement>(".follow-up-close")!.focus();
 
     let draft: EmailDraft;
     try {
@@ -1128,7 +1137,7 @@ export function initColdCallLists(): void {
     const listName = listDetailTitle.textContent || "this list";
     if (!confirm(`Delete "${listName}"? Leads will be kept in Results (unassigned).`)) return;
     try { await deleteLeadList(currentListId); showOverview(); void refreshLeadLists(); }
-    catch (err) { alert(`Failed to delete list: ${err}`); }
+    catch (err) { showToast(`Failed to delete list: ${err}`); }
   });
 
   selectAllCb.addEventListener("change", () => {
@@ -1166,9 +1175,9 @@ export function initColdCallLists(): void {
       selectedLeadIds.clear(); lastToggledIndex = -1; await refreshCurrentList();
       if (result.skipped > 0) {
         const names = result.skipped_details.map((d) => `${d.company} (already in "${d.list_name}")`).join("\n");
-        alert(`${result.added} added.\n\n${result.skipped} skipped — already in another list:\n${names}`);
+        showToast(`${result.added} added.\n\n${result.skipped} skipped — already in another list:\n${names}`);
       }
-    } catch (err) { alert(`Failed to add leads: ${err}`); }
+    } catch (err) { showToast(`Failed to add leads: ${err}`); }
     bulkAddBtn.disabled = false;
   });
 
@@ -1220,7 +1229,7 @@ export function initColdCallLists(): void {
       await refreshLeadLists();
       selectedLeadIds.clear(); lastToggledIndex = -1; closeGenerateForm();
       await openListDetail(list.id);
-    } catch (err) { alert(`Failed to create call list: ${err}`); }
+    } catch (err) { showToast(`Failed to create call list: ${err}`); }
     generateConfirmBtn.disabled = false; generateConfirmBtn.textContent = "Create";
   }
 

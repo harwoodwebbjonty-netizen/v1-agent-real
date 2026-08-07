@@ -144,7 +144,7 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
       ${
         handlers.onLogOutcome
           ? `<td class="called-cell">
-               <select class="outcome-select ${lead.called_at ? "is-called" : ""}" title="Log call outcome">
+               <select class="outcome-select ${lead.called_at ? "is-called" : ""}" title="Log call outcome" aria-label="Log call outcome">
                  <option value="">○ Not called</option>
                  <option value="__called__" ${lead.called_at ? "selected" : "hidden"}>✓ Called</option>
                  <option value="connected">✓ Connected</option>
@@ -186,9 +186,9 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
             lead.phone_number && lead.phone_number !== "not_found"
               ? `<span>${escapeHtml(lead.phone_number)}</span>
                  <a class="icon-btn" href="tel:${escapeHtml(lead.phone_number)}" title="Call"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg></a>
-                 <button class="icon-btn copy-phone-btn" type="button" title="Copy">⧉</button>`
+                 <button class="icon-btn copy-phone-btn" type="button" title="Copy" aria-label="Copy phone number">⧉</button>`
               : handlers.onLookupPhone
-                ? `<button class="icon-btn lookup-phone-btn" type="button" title="Look up phone number">🔍</button>`
+                ? `<button class="icon-btn lookup-phone-btn" type="button" title="Look up phone number" aria-label="Look up phone number">🔍</button>`
                 : `<span class="empty-hint">—</span>`
           }
         </div>
@@ -212,8 +212,8 @@ export function renderRows(tbody: HTMLTableSectionElement, leads: Lead[], handle
               ? `<span class="status-badge unverified">✉ ${lead.emails.length}</span>`
               : `<span class="empty-hint">—</span>`
           }
-          ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email">📧</button>` : ""}
-          ${handlers.onSendFollowUp ? `<button class="icon-btn follow-up-btn" type="button" title="Send follow-up">↩</button>` : ""}
+          ${handlers.onGenerateEmail ? `<button class="icon-btn generate-email-btn" type="button" title="Generate Email" aria-label="Generate email">📧</button>` : ""}
+          ${handlers.onSendFollowUp ? `<button class="icon-btn follow-up-btn" type="button" title="Send follow-up" aria-label="Send follow-up email">↩</button>` : ""}
         </div>
       </td>
       ${handlers.showListColumn !== false ? `<td>${lead.list_name ? `<span class="status-badge list-badge">${escapeHtml(lead.list_name)}</span>` : ""}</td>` : ""}

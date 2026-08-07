@@ -55,6 +55,7 @@ import { getDefaultContactStatus } from "../preferences";
 import { getLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
 import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
+import { showToast } from "../toast";
 
 export function initDashboard(): void {
   const companiesInput = document.querySelector<HTMLTextAreaElement>("#companies")!;
@@ -345,9 +346,9 @@ export function initDashboard(): void {
     try {
       const imported = await importLeadsToDashboard(path);
       await refreshLeads();
-      alert(`Imported ${imported} lead(s) successfully.`);
+      showToast(`Imported ${imported} lead(s) successfully.`);
     } catch (err) {
-      alert(`Import failed: ${err}`);
+      showToast(`Import failed: ${err}`);
     } finally {
       importCsvBtn.disabled = false;
       importCsvBtn.textContent = "Import CSV";
