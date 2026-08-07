@@ -22,11 +22,17 @@ def isolated_db(tmp_path, monkeypatch):
 def _seed_legacy_database(db_path: Path) -> None:
     """Simulates a database created by the app before this migration system
     existed — full schema already present (idempotent SCHEMA + ALTERs
-    already ran), real data inserted, but no schema_version table yet."""
+    already ran), real data inserted, but no schema_version table yet.
+
+    Runs every migration (all idempotent) to build the full current schema —
+    baseline alone lacks columns later ALTERs add (e.g. users.password_hash),
+    so the data-seed helpers below need the whole schema present."""
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
     try:
-        db._migration_001_baseline(conn)
+        conn.execute("PRAGMA foreign_keys=ON")
+        for _version, migration_fn in db.MIGRATIONS:
+            migration_fn(conn)
         conn.commit()
     finally:
         conn.close()

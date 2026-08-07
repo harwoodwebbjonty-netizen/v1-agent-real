@@ -150,13 +150,55 @@ push a tag like `v0.2.0`, and the GitHub Actions release workflow builds new
 installers automatically. They land as a **draft** release on GitHub — you
 publish it manually when ready, then send teammates the new download link.
 
+## v0.3.0 hardening — new `.env` keys (set before first sign-in)
+
+The v0.3.0 release adds security controls. Add these to the VPS `backend/.env`
+(all optional with safe defaults except the bootstrap token, which you should set
+before anyone signs in on a fresh deployment):
+
+- `BOOTSTRAP_ADMIN_TOKEN` — **required to create the first admin** on a fresh DB.
+  Pick a long random value; you'll type it once in the app's "Create profile"
+  screen for the very first account. Without it, the first account cannot become
+  admin (this closes the "first anonymous caller becomes admin" hole).
+- `SESSION_TTL_DAYS` (default 30), `LOGIN_MAX_ATTEMPTS` (default 8),
+  `LOGIN_LOCKOUT_MINUTES` (default 15), `MIN_PASSWORD_LENGTH` (default 8),
+  `AUTH_RATE_LIMIT` (default `5/minute`) — login hardening.
+- `IMPORT_MAX_ROWS` (default 5000) — CSV import cap.
+- `PUBLIC_BASE_URL` — set to `https://yourdomain.com` once TLS is live (see below);
+  generated links + OAuth redirects use it. `CORS_ALLOW_ORIGINS` — usually blank.
+
+**Note on legacy accounts:** the old "first login sets the password" behaviour is
+removed. Any pre-password account must have its password set by an admin in
+**Settings → Team → Set password**. Active users (who already have passwords) are
+unaffected. New migrations (up to schema v30) run automatically on service restart.
+
+## Database backups (nightly)
+
+`backend/deploy/backup.sh` takes a consistent online snapshot of `team.db`,
+gzips it, and keeps the most recent 14. Install the cron once on the VPS:
+
+```bash
+chmod +x /opt/v1-agent/backend/deploy/backup.sh
+crontab -e
+# add:
+30 2 * * * /opt/v1-agent/backend/deploy/backup.sh >> /opt/v1-agent/backend/data/backups/backup.log 2>&1
+```
+
+Restore: `systemctl stop phone-lookup-backend`, `gunzip` a chosen backup over
+`data/team.db`, `systemctl start phone-lookup-backend`.
+
 ## Upgrading to HTTPS once you have a domain
+
+There's a ready TLS config at `backend/deploy/nginx-tls.conf.example` with the
+full finish sequence in its header. In short:
 
 1. Point an A record for your domain at `YOUR_SERVER_IP`.
 2. On the server: `apt install -y certbot python3-certbot-nginx`
 3. `certbot --nginx -d yourdomain.com` — it edits the nginx config in place
    and sets up auto-renewal.
-4. Update the desktop app's Backend Connection setting (and the
+4. Set `PUBLIC_BASE_URL=https://yourdomain.com` and
+   `OAUTH_REDIRECT_BASE_URL=https://yourdomain.com` in `.env`, restart the service,
+   then update the desktop app's Backend Connection setting (and the
    `BACKEND_BASE_URL` repo variable) to `https://yourdomain.com`.
 5. Now fill in the Google/Microsoft OAuth fields in `.env` for real — their
    redirect URIs require HTTPS, which you now have.
