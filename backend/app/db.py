@@ -1,8 +1,9 @@
 import logging
+import secrets
 import shutil
 import sqlite3
 from contextlib import contextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Callable, Iterator, Optional
 
@@ -613,6 +614,27 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_030_audit_log(conn: sqlite3.Connection) -> None:
+    """Accountability trail for a shared multi-user DB (audit M6): who changed
+    what, when. actor_name is denormalised so entries survive user deletion."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS audit_log (
+            id TEXT PRIMARY KEY,
+            actor_id TEXT,
+            actor_name TEXT NOT NULL DEFAULT '',
+            action TEXT NOT NULL,
+            entity_type TEXT NOT NULL DEFAULT '',
+            entity_id TEXT NOT NULL DEFAULT '',
+            detail TEXT NOT NULL DEFAULT '',
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_audit_created ON audit_log(created_at);
+        CREATE INDEX IF NOT EXISTS idx_audit_actor ON audit_log(actor_id);
+        """
+    )
+
+
 def _migration_029_company_norm_and_flags(conn: sqlite3.Connection) -> None:
     """Index-backed dedup (audit C4): a normalised company column replaces the
     unindexable LOWER(TRIM(company)) full scan on every insert. Plus a tiny
@@ -712,8 +734,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (27, _migration_027_auth_hardening_and_sharing),
     (28, _migration_028_leads_hot_indexes),
     (29, _migration_029_company_norm_and_flags),
+    (30, _migration_030_audit_log),
 ]
-CURRENT_SCHEMA_VERSION = 29
+CURRENT_SCHEMA_VERSION = 30
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -856,6 +879,30 @@ def get_connection() -> Iterator[sqlite3.Connection]:
 
 
 # --- users ---
+
+def record_audit(
+    actor_id: Optional[str], actor_name: str, action: str,
+    entity_type: str = "", entity_id: str = "", detail: str = "",
+) -> None:
+    """Append an audit entry. Best-effort — must never break the caller's action."""
+    ts = datetime.now(timezone.utc).isoformat()
+    try:
+        with get_connection() as conn:
+            conn.execute(
+                "INSERT INTO audit_log (id, actor_id, actor_name, action, entity_type, entity_id, detail, created_at) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                (secrets.token_hex(12), actor_id, actor_name, action, entity_type, entity_id, detail, ts),
+            )
+    except Exception:
+        logger.exception("Failed to write audit entry (%s %s)", action, entity_type)
+
+
+def list_audit_log(limit: int = 200, offset: int = 0) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM audit_log ORDER BY created_at DESC LIMIT ? OFFSET ?", (limit, offset)
+        ).fetchall()
+
 
 def get_app_flag(key: str) -> Optional[str]:
     with get_connection() as conn:

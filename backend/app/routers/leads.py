@@ -324,6 +324,7 @@ def update_lead(
 
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
     db.update_lead_fields(lead_id, fields, now_iso())
+    db.record_audit(current_user.id, current_user.name, "update", "lead", lead_id, detail=", ".join(fields.keys()))
 
     updated = db.get_lead(lead_id)
     return _to_lead_out(updated, _user_name_map(), activity)
@@ -343,6 +344,7 @@ def assign_lead(
         raise HTTPException(status_code=400, detail="assigned_user_id does not match a known user")
 
     db.assign_lead(lead_id, body.assigned_user_id, now_iso())
+    db.record_audit(current_user.id, current_user.name, "assign", "lead", lead_id, detail=body.assigned_user_id or "unassigned")
 
     updated = db.get_lead(lead_id)
     return _to_lead_out(updated, _user_name_map(), activity)
@@ -366,6 +368,7 @@ def set_lead_shared(
     if row["owner_user_id"] != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Only the owner or an admin can change sharing.")
     db.set_lead_shared(lead_id, body.is_shared, now_iso())
+    db.record_audit(current_user.id, current_user.name, "share" if body.is_shared else "unshare", "lead", lead_id)
     return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
@@ -900,6 +903,7 @@ def dedup_leads(current_user: CurrentUser = Depends(require_admin)) -> dict:
             db.merge_lead_into(winner["id"], loser["id"], now)
             merged += 1
 
+    db.record_audit(current_user.id, current_user.name, "dedup", "leads", "", detail=f"merged {merged}")
     return {"merged": merged}
 
 

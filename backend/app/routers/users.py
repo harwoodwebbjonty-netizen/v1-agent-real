@@ -81,6 +81,7 @@ def update_user(user_id: str, body: UpdateUserRequest, admin: CurrentUser = Depe
         raise HTTPException(status_code=400, detail="Can't remove the last admin — promote someone else first")
 
     db.update_user(user_id, body.name.strip() if body.name else None, body.role)
+    db.record_audit(admin.id, admin.name, "user_update", "user", user_id, detail=body.role or "")
     return user_out_from_row(db.get_user_by_id(user_id))
 
 

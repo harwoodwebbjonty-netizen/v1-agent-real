@@ -14,6 +14,7 @@ from app.dependencies import CurrentUser, get_current_user
 from app.routers import (
     activity,
     ai_prospecting,
+    audit,
     auth,
     brand_voice,
     calendar,
@@ -76,6 +77,7 @@ app.include_router(activity.router)
 app.include_router(ch_feed.router)
 app.include_router(win_back.router)
 app.include_router(credit_settings.router)
+app.include_router(audit.router)
 
 
 async def _sequence_scheduler_loop() -> None:

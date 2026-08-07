@@ -37,6 +37,7 @@ def save_limits(body: dict, admin: CurrentUser = Depends(require_admin)) -> dict
             except (ValueError, TypeError):
                 val = "0"
             db.set_user_setting(target_id, key, val, now)
+    db.record_audit(admin.id, admin.name, "credit_limit_change", "user", target_id)
     return {"saved": True}
 
 
