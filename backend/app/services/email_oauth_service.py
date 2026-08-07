@@ -208,15 +208,29 @@ async def refresh_token_if_needed(account_row) -> str:
     return tokens["access_token"]
 
 
+# Reply-based opt-out — no list-management backend or domain yet, so the lawful,
+# always-working unsubscribe is a reply the sending rep can honour (audit / lawful
+# sending). Appended to every outgoing email unless a footer already carries one.
+_UNSUBSCRIBE_TEXT = "\n\n—\nTo stop receiving emails from me, reply with \"unsubscribe\"."
+_UNSUBSCRIBE_HTML = (
+    '<p style="color:#8a8a8a;font-size:12px;margin-top:16px">'
+    'To stop receiving emails from me, reply with <strong>unsubscribe</strong>.</p>'
+)
+
+
 async def send_email(
     account_row, to: str, subject: str, body: str, footer_html: str = "", footer_text: str = ""
 ) -> None:
     """Send an email via the connected Gmail/Outlook account. `footer_html` /
     `footer_text` are optional branded-footer blocks appended by the win-back
-    sender only — other callers (email writer, sequences) leave them empty so no
-    footer is added."""
+    sender only. A reply-based unsubscribe line is added to every email unless a
+    provided footer already includes one."""
     access_token = await refresh_token_if_needed(account_row)
     provider = account_row["provider"]
+
+    has_unsub = "unsubscribe" in (footer_text + footer_html).lower()
+    unsub_text = "" if has_unsub else _UNSUBSCRIBE_TEXT
+    unsub_html = "" if has_unsub else _UNSUBSCRIBE_HTML
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         if provider == "gmail":
@@ -224,9 +238,9 @@ async def send_email(
             message["To"] = to
             message["From"] = account_row["email_address"]
             message["Subject"] = subject
-            message.set_content(html_to_plain_text(body) + footer_text)
-            if footer_html or HTML_ANCHOR_RE.search(body) or "**" in body:
-                message.add_alternative(_build_html_alternative(body) + footer_html, subtype="html")
+            message.set_content(html_to_plain_text(body) + footer_text + unsub_text)
+            if footer_html or unsub_html or HTML_ANCHOR_RE.search(body) or "**" in body:
+                message.add_alternative(_build_html_alternative(body) + footer_html + unsub_html, subtype="html")
             raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
             response = await client.post(
                 "https://gmail.googleapis.com/gmail/v1/users/me/messages/send",
@@ -240,7 +254,7 @@ async def send_email(
                 json={
                     "message": {
                         "subject": subject,
-                        "body": {"contentType": "HTML", "content": markdown_bold_to_html(body) + footer_html},
+                        "body": {"contentType": "HTML", "content": markdown_bold_to_html(body) + footer_html + unsub_html},
                         "toRecipients": [{"emailAddress": {"address": to}}],
                     }
                 },
