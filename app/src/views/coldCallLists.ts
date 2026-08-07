@@ -862,33 +862,50 @@ export function initColdCallLists(): void {
       return;
     }
 
+    // Preserve the working scroll position across re-renders so logging a call
+    // doesn't bounce the broker back to the top of the list (audit H9).
+    const scroller = listResultsBody.closest<HTMLElement>(".call-sheet-table-wrap");
+    const savedScroll = scroller?.scrollTop ?? 0;
+
     renderRows(listResultsBody, visible, {
       onRowClick: (lead) => { setSidePanelCallbacks(listSidePanelCallbacks); openSidePanel(lead); },
-      onIndustryChange: async (lead, value) => { await updateLead(lead.id, { industry: value }); await refreshCurrentList(); },
-      onContactStatusChange: async (lead, value) => { await updateLead(lead.id, { contactStatus: value }); await refreshCurrentList(); },
+      // These update one lead in place and re-render locally — no full-pool
+      // refetch on every edit (audit FE2/H9). refreshCurrentList reconciles on
+      // list open / heavier actions.
+      onIndustryChange: async (lead, value) => { await updateLead(lead.id, { industry: value }); patchLeadLocal(lead.id, { industry: value }); },
+      onContactStatusChange: async (lead, value) => { await updateLead(lead.id, { contactStatus: value }); patchLeadLocal(lead.id, { contact_status: value }); },
       onToggleContacted: async (lead) => {
         const next = lead.contact_status === CONTACT_STATUS_ORDER[0] ? "Contacted" : CONTACT_STATUS_ORDER[0];
-        await updateLead(lead.id, { contactStatus: next }); await refreshCurrentList();
+        await updateLead(lead.id, { contactStatus: next }); patchLeadLocal(lead.id, { contact_status: next });
       },
       onToggleCalled: async (lead) => {
         if (!currentListId) return;
-        await toggleListLeadCalled(currentListId, lead.id); await refreshCurrentList();
+        const called_at = await toggleListLeadCalled(currentListId, lead.id);
+        patchLeadLocal(lead.id, { called_at });
       },
       onLogOutcome: async (lead, outcome) => {
         if (!currentListId || outcome === "__called__") return;
         if (outcome === "") {
           // Clear the called state — lead returns to the active queue.
-          if (lead.called_at) await toggleListLeadCalled(currentListId, lead.id);
-          await refreshCurrentList();
+          const called_at = lead.called_at ? await toggleListLeadCalled(currentListId, lead.id) : null;
+          patchLeadLocal(lead.id, { called_at });
           return;
         }
+        // If they were working by keyboard, advance focus to the next lead after.
+        const advanceFocus = document.activeElement instanceof HTMLElement && document.activeElement.classList.contains("outcome-select");
         try { await createCallLog(lead.id, outcome as CallOutcome, ""); } catch { /* history is non-critical */ }
-        if (!lead.called_at) await toggleListLeadCalled(currentListId, lead.id);
+        let called_at = lead.called_at;
+        if (!called_at) called_at = await toggleListLeadCalled(currentListId, lead.id);
+        const patch: Partial<Lead> = { called_at };
         // They answered → advance a fresh lead out of "New" automatically.
         if (outcome === "connected" && lead.contact_status === CONTACT_STATUS_ORDER[0]) {
           await updateLead(lead.id, { contactStatus: "Contacted" });
+          patch.contact_status = "Contacted";
         }
-        await refreshCurrentList();
+        patchLeadLocal(lead.id, patch);
+        // The just-worked lead sank into "Done today"; the first outcome control is
+        // now the next lead to call — keyboard flow advances there automatically.
+        if (advanceFocus) listResultsBody.querySelector<HTMLSelectElement>(".outcome-select")?.focus();
       },
       onToggleSelect: (lead, selected, shiftKey) => {
         const currentIndex = visible.findIndex((l) => l.id === lead.id);
@@ -943,7 +960,16 @@ export function initColdCallLists(): void {
       });
     }
 
+    if (scroller) scroller.scrollTop = savedScroll;
     updateBulkBar(visible);
+  }
+
+  /** Update one lead in the in-memory list and re-render locally — avoids a
+   * full-pool refetch (and its cost) on every per-lead edit. */
+  function patchLeadLocal(id: string, patch: Partial<Lead>): void {
+    const idx = currentListLeads.findIndex((l) => l.id === id);
+    if (idx >= 0) currentListLeads[idx] = { ...currentListLeads[idx], ...patch };
+    renderListTable();
   }
 
   async function refreshCurrentList(): Promise<void> {
