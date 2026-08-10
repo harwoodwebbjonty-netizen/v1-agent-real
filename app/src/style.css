@@ -656,6 +656,15 @@ body {
   flex: 1;
   min-width: 0;
   height: 100vh;
+  /* Fixed top bar + inner scroll body. Scrolling moved to .app-scroll so each
+     view's own scroll containers (e.g. .table-wrap) are unaffected. */
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.app-scroll {
+  flex: 1;
+  min-height: 0;
   overflow-y: auto;
   background:
     radial-gradient(circle at 92% 2%, #FFE8EE 0, transparent 24%),
@@ -4451,6 +4460,45 @@ button.p-filter-chip.active {
 .stat-label { font-family: var(--font-mono); letter-spacing: 0.08em; }
 /* section titles inside cards read a touch quieter/tighter across pages */
 .card-subtitle { color: var(--text-muted); }
+
+/* compact top bar (fixed above the scroll body, on every page) */
+.app-topbar {
+  flex: 0 0 auto;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0 26px;
+  background: var(--surface, #fff);
+  border-bottom: 1px solid var(--hairline);
+}
+.tb-crumb { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.tb-crumb .tb-loc { color: #8a8f9e; }
+.tb-crumb .tb-sep { color: #b7bcc8; }
+.tb-crumb b { color: var(--text); font-weight: 600; }
+.tb-spacer { flex: 1; }
+.tb-date { font-family: var(--font-mono); font-size: 11px; color: #8a8f9e; letter-spacing: 0.06em; text-transform: uppercase; }
+.tb-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
+.tb-status .tb-dot { width: 7px; height: 7px; border-radius: 50%; background: #25a976; box-shadow: 0 0 0 3px rgba(37, 169, 118, 0.16); }
+@media (max-width: 640px) {
+  .app-scroll { overflow: visible; }
+  .app-topbar { padding: 0 14px; }
+  .tb-date, .tb-status { display: none; }
+}
+
+/* grouped, editorial sidebar nav (eyebrows over each nav cluster) */
+.nav-eyebrow {
+  display: block;
+  font-family: var(--font-mono);
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #5f6577;
+  padding: 12px 12px 5px;
+}
+.top-nav > .nav-eyebrow:first-child { padding-top: 2px; }
+.app-sidebar.collapsed .nav-eyebrow { display: none; }
+@media (max-width: 640px) { .nav-eyebrow { display: none; } }
 
 /* page header (reusable across pages) */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;

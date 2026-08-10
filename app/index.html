@@ -32,6 +32,7 @@
           </div>
 
           <nav class="top-nav">
+            <span class="nav-eyebrow">Workspace</span>
             <a href="#" data-nav="action-centre" class="nav-link">
               <span class="nav-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
@@ -50,6 +51,7 @@
               </span>
               <span class="nav-label">AI Prospecting</span>
             </a>
+            <span class="nav-eyebrow">Pipeline</span>
             <a href="#" data-nav="dashboard" class="nav-link">
               <span class="nav-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
@@ -74,6 +76,7 @@
               </span>
               <span class="nav-label">Win-back</span>
             </a>
+            <span class="nav-eyebrow">Insight</span>
             <a href="#" data-nav="calendar" class="nav-link">
               <span class="nav-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4"/><path d="M8 2v4"/><path d="M3 10h18"/></svg>
@@ -101,6 +104,17 @@
       </aside>
 
       <div class="app-content">
+        <header class="app-topbar">
+          <div class="tb-crumb">
+            <span class="tb-loc">Workspace</span>
+            <svg class="tb-sep" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+            <b id="tb-page">Today</b>
+          </div>
+          <div class="tb-spacer"></div>
+          <span class="tb-date" id="tb-date"></span>
+          <span class="tb-status"><span class="tb-dot"></span>Online</span>
+        </header>
+        <div class="app-scroll">
         <div id="view-action-centre"></div>
         <div id="view-ai-prospecting"></div>
         <div id="view-dashboard">
@@ -251,6 +265,7 @@
         <div id="view-call-queue" style="display:none"></div>
         <div id="view-opportunity-workspace" style="display:none"></div>
         <div id="view-sales-intelligence" style="display:none"></div>
+        </div>
       </div>
     </div>
 
