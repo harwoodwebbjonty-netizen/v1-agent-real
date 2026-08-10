@@ -64,7 +64,11 @@ tools/          # Python scripts for deterministic execution (chat-based WAT too
 workflows/      # Markdown SOPs — chat-tool SOPs AND the live backend prompts (see "Production AI Prompts")
 data/           # Committed logs from chat-based tools (e.g. data/phone_lookups.csv — the manual phone-lookup log)
 outputs/        # Local deliverables / working exports (CSV/XLSX). Gitignored: regenerable, may contain customer data — not committed.
+output/         # Distinct from outputs/ above — funding-tracker exports (Tracker.csv/pdf) with real
+                # client/broker/lender data. Gitignored — not committed.
 n8n/            # Standalone n8n automation(s) — see n8n/README.md (lead auto-responder). Independent of app/ and backend/.
+audits/         # Point-in-time OS-audit reports (is this repo's own doc/memory layer in sync with
+                # reality?). Read-only reports; re-run periodically, not on a schedule.
 app/            # Tauri desktop app  — see "Desktop App + Backend" below
 backend/        # FastAPI backend    — see "Desktop App + Backend" below
 .env            # API keys and environment variables (NEVER store secrets anywhere else). Gitignored.
@@ -142,26 +146,50 @@ New DB migrations run automatically on service restart.
 - **DB**: SQLite at `/opt/v1-agent/backend/data/team.db`, WAL mode,
   migrations in `backend/app/db.py` (bump `CURRENT_SCHEMA_VERSION`, append
   to `MIGRATIONS`, never edit shipped ones). CH feed self-prunes to 30 days.
-- **Design**: makr CRM brand (crimson rebrand, from v0.2.20) — accent
-  crimson #E31346 (core), light #F01D55 / dark #BF0C38 (soft #FFF0F4,
-  border #F5B7C7); ink text #121526, page bg #F5F7FB. Primary buttons =
-  crimson gradient (--accent-gradient) + --shadow-brand. **Dark-navy left
-  nav**: gradient #101221→#0B0D19 with light text, crimson active
-  indicator (--nav-* tokens); the content area is light with a faint
-  crimson corner glow. mark = gradient "C" arc + dot (crimson: favicon.svg
-  is the vector source; logo.png/app icons regenerated with PIL/`tauri
-  icon` — regenerate, don't hand-edit). Light-only (no theme toggle — the
-  [data-theme="dark"] :root block is unused); body font Inter + display
-  font Poppins 500/600/700 for chrome (via --font-display; all bundled
-  woff2). Soft geometry: --radius-sm 9px / --radius-md 13px — nothing
-  sharp. Status: success #25A976, warning #E69D26, info #3974D8, danger =
-  crimson. Coloured per-section nav icons (kept). Shadows are soft/large
-  (--shadow-card 0 10px 35px) — this is the one deliberate departure from
-  the old flat surfaces. No emoji in UI copy (use stroke SVGs). Weight
-  hierarchy: titles 600, labels/buttons 500, body 400. **The palette lives
-  entirely in :root token *values* — restyle by remapping tokens, not
-  renaming.** Legacy token aliases (--primary, --radius, --bg-1…) are
-  defined in :root — never remove them; ~60 view rules depend on them.
+- **Design**: makr CRM brand (crimson rebrand, from v0.2.20), redesigned onto
+  an "editorial operations workspace" language across v0.5.0–v0.6.4 (Aug
+  2026) to match a design-direction artifact — same brand/palette, new
+  layout vocabulary. Accent crimson #E31346 (core), light #F01D55 / dark
+  #BF0C38 (soft #FFF0F4, border #F5B7C7); ink text #121526, page bg #F5F7FB.
+  Primary buttons = crimson gradient (--accent-gradient) + --shadow-brand.
+  **Dark-navy left nav**: gradient #101221→#0B0D19, grouped under mono
+  eyebrows (WORKSPACE / PIPELINE / INSIGHT via `.nav-eyebrow`), sentence-case
+  labels (not uppercase), **uniform thin grey line icons** (`#8a8f9e`,
+  crimson only when active — no more per-section icon colours), active item
+  = soft crimson-tint fill + thin left bar (no hard outline/focus ring). The
+  brand mark in the sidebar is an inline SVG arc + "CoPilotIQ" text wordmark
+  (IQ in crimson), not `logo-light.png`. **User/identity block lives in the
+  sidebar footer** (moved from the top), borderless trigger, dropdown opens
+  upward, below it a system-status line (dot + "Backend online/offline"
+  driven by the real `/health` poll in `connection.ts`, + real app version —
+  never a hardcoded claim). A compact 52px **top bar** (`.app-topbar`, added
+  v0.5.3) sits above the scroll body on every page: breadcrumb, global
+  search (⌘K, routes into the Leads table), notifications bell (→ Today), no
+  date pill. Content area is light with a faint crimson corner glow.
+  Favicon.svg is still the icon vector source; logo.png/app icons still
+  regenerated with PIL/`tauri icon` — regenerate, don't hand-edit; these are
+  unrelated to the sidebar wordmark above. Light-only (no theme toggle — the
+  [data-theme="dark"] :root block is unused). **Typography: a single
+  system-sans stack** (`ui-sans-serif, system-ui, -apple-system…`) for both
+  body and `--font-display` — Poppins and Inter are no longer used anywhere
+  (bundled woff2 files remain but are unreferenced); a mono stack
+  (`--font-mono`) marks operational/data text (section numbers, mono
+  labels, chips, tabular figures) — this "operations" texture is
+  intentional, not a bug. Soft geometry: --radius-sm 9px / --radius-md 13px
+  — nothing sharp. Status: success #25A976, warning #E69D26, info #3974D8,
+  danger = crimson. Shadows are soft/large (--shadow-card 0 10px 35px) —
+  the one deliberate departure from the old flat surfaces. No emoji in UI
+  copy (use stroke SVGs). Weight hierarchy: titles 600, labels/buttons 500,
+  body 400. **Editorial component vocabulary** added by the redesign and
+  reused across pages: numbered `.sec-head` sections (`01`/`02`/…), `.panel`
+  (generic card), `.metrics`/`.cov` (Analytics metric strip + coverage
+  bars), `.calls`/`.funnel` (Today's next-calls + pipeline funnel),
+  editorial `.tbl`-style rows with progress tracks (Cold Call Lists), and
+  the Today worklist's timeline rail (`.wl-row`/`.wl-rail`/`.wl-mk`) with a
+  collapsible "Show N more" past 6 rows. **The palette lives entirely in
+  :root token *values* — restyle by remapping tokens, not renaming.**
+  Legacy token aliases (--primary, --radius, --bg-1…) are defined in :root
+  — never remove them; ~60 view rules depend on them.
 
 ### Known gaps — flag these when relevant
 - No Apple notarization: new Mac users hit Gatekeeper "damaged app"
@@ -205,3 +233,135 @@ Before editing any of them:
 5. Do not substantially rewrite a production prompt without explaining the behavioural impact.
 
 The prompt files themselves are the source of truth for exact prompt content. `CLAUDE.md` documents their purpose and editing rules only.
+# Context Management Rules
+
+## Persistent project state
+
+Maintain a file called `PROJECT_CONTEXT.md` in the project root.
+
+Its purpose is to allow a completely fresh Claude Code session to understand the important current state of this project without needing the previous conversation.
+
+## When to update it
+
+Whenever you complete a meaningful task, feature, fix, architectural change, deployment change, or important project decision:
+
+1. Update `PROJECT_CONTEXT.md`.
+2. Replace outdated information rather than appending another version.
+3. Remove information that is no longer useful.
+4. Keep it concise.
+
+Before context compaction or when preparing for a new session, make sure `PROJECT_CONTEXT.md` accurately represents the latest project state.
+
+## CRITICAL: this is NOT a project history
+
+DO NOT continuously append everything that happens.
+
+`PROJECT_CONTEXT.md` must be maintained as a rolling snapshot of the CURRENT project.
+
+When something changes:
+
+BAD:
+- Authentication originally used X.
+- Then authentication changed to Y.
+- Later authentication changed to Z.
+
+GOOD:
+- Authentication currently uses Z.
+
+Delete superseded decisions unless understanding the previous decision is genuinely necessary.
+
+Do not include:
+- conversation history
+- long debugging logs
+- failed attempts
+- temporary investigation
+- obvious code details Claude can discover quickly
+- completed TODOs
+- repetitive explanations
+- every file in the repository
+- historical versions of architecture
+- large code snippets
+
+## Size limit
+
+Keep `PROJECT_CONTEXT.md` below approximately 3,000 words.
+
+Prefer 1,000–2,000 words when possible.
+
+If it approaches the limit, compress it before adding anything else.
+
+Prioritize information that would be expensive, difficult, or impossible for a fresh Claude session to infer from the codebase.
+
+## Required structure
+
+# Project Overview
+
+Very short explanation of what the application does.
+
+# Current Architecture
+
+Only the current architecture, stack, major services and important data flows.
+
+# Important Components
+
+Only important directories/files/components that a new session needs to know about.
+
+# Data / Database
+
+Important schema relationships and data rules. Do not reproduce the entire schema if Claude can inspect it.
+
+# Integrations
+
+External APIs, authentication systems, services, infrastructure and important implementation constraints.
+
+# Important Project Rules
+
+Non-obvious rules that must not accidentally be broken.
+
+# Current State
+
+What major functionality currently exists.
+
+# Current Work
+
+Only unfinished work that matters right now.
+
+# Known Issues
+
+Only active known issues.
+
+# Decisions
+
+Only architectural/product decisions that still affect future work.
+
+# Next Steps
+
+A short prioritised list of the next likely tasks.
+
+## Updating procedure
+
+Every time you update this file:
+
+1. Read the existing `PROJECT_CONTEXT.md`.
+2. Inspect what actually changed during the task.
+3. Modify the relevant existing sections.
+4. Remove stale or superseded information.
+5. Deduplicate overlapping information.
+6. Compress verbose sections.
+7. Ensure the document describes the PRESENT state, not the history of how we got there.
+8. Do not exceed the size limit.
+
+Never blindly append a "session summary".
+
+## Context efficiency
+
+For every Claude Code session:
+
+- Read `CLAUDE.md`.
+- Read `PROJECT_CONTEXT.md` once near the start when project context is needed.
+- Do not repeatedly reread these files unless they have changed.
+- Search for relevant symbols/files before reading large files.
+- Read targeted sections of files instead of whole large files when possible.
+- Do not scan the whole repository unless necessary.
+- Do not load unrelated components into context.
+- Use subagents for isolated investigations when useful so their detailed context does not pollute the main session.

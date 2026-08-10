@@ -5,6 +5,7 @@ token.json
 
 # Local deliverables / scratch — regenerable, may contain customer data
 outputs/
+output/
 *.inspect.ndjson
 
 # Disposable/intermediate processing files
