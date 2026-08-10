@@ -1,5 +1,11 @@
 # Secrets — never commit
 .env
+credentials.json
+token.json
+
+# Local deliverables / scratch — regenerable, may contain customer data
+outputs/
+*.inspect.ndjson
 
 # Disposable/intermediate processing files
 .tmp/
