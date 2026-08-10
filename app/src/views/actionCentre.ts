@@ -250,6 +250,9 @@ export function initActionCentre(): void {
   const btnEmail = (label: string) => `<button type="button" class="btn btn-ghost btn-sm action-row-email-btn">${escapeHtml(label)}</button>`;
 
   let pendingDrafts: PendingEmailDraft[] = [];
+  // Worklist compaction: show the top rows, collapse the rest behind a toggle.
+  let worklistExpanded = false;
+  const WORKLIST_COLLAPSE_AT = 6;
 
   function setCount(key: string, n: number): void {
     const el = container.querySelector<HTMLSpanElement>(`.sec-count[data-count="${key}"]`);
@@ -270,42 +273,53 @@ export function initActionCentre(): void {
     const overdueFollowIds = new Set(
       getEvents().filter((e) => e.type === "followup" && e.date < today && !!e.lead_id).map((e) => e.lead_id!)
     );
-    const worklistHtml =
-      followUps
-        .map((lead) => {
-          const reason = lead.next_best_action.reason;
-          return wlRow(lead.id, "follow", "—", overdueFollowIds.has(lead.id) ? "OVERDUE" : "",
-            reason ? `Follow up — ${reason}` : "Follow up",
-            companyB(lead.company),
-            wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails);
-        })
-        .join("") +
-      calls
-        .map(({ event, lead }) =>
-          wlRow(lead.id, "call", event.time || "—", "",
-            "Call",
-            companyB(lead.company) + (lead.phone_number ? ` · <span class="mono">${escapeHtml(lead.phone_number)}</span>` : ""),
-            wlChip("Call", "wl-hi"), btnDetails))
-        .join("") +
-      pendingDrafts
-        .map((draft) =>
-          wlRow(draft.lead_id, "email", "—", "",
-            draft.subject ? `Send email — ${draft.subject}` : "Send follow-up email",
-            companyB(draft.lead_company),
-            wlChip("Draft", "wl-purple"), btnEmail("Continue Draft")))
-        .join("") +
-      research
-        .map((lead) => {
-          const reason = lead.next_best_action.reason;
-          return wlRow(lead.id, "research", "—", "",
-            reason ? `Research — ${reason}` : "Research",
-            companyB(lead.company),
-            wlChip("Research", "wl-amber"), btnDetails);
-        })
-        .join("");
-    const worklistCount = followUps.length + calls.length + pendingDrafts.length + research.length;
+    const worklistRows: string[] = [
+      ...followUps.map((lead) => {
+        const reason = lead.next_best_action.reason;
+        return wlRow(lead.id, "follow", "—", overdueFollowIds.has(lead.id) ? "OVERDUE" : "",
+          reason ? `Follow up — ${reason}` : "Follow up",
+          companyB(lead.company),
+          wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails);
+      }),
+      ...calls.map(({ event, lead }) =>
+        wlRow(lead.id, "call", event.time || "—", "",
+          "Call",
+          companyB(lead.company) + (lead.phone_number ? ` · <span class="mono">${escapeHtml(lead.phone_number)}</span>` : ""),
+          wlChip("Call", "wl-hi"), btnDetails)),
+      ...pendingDrafts.map((draft) =>
+        wlRow(draft.lead_id, "email", "—", "",
+          draft.subject ? `Send email — ${draft.subject}` : "Send follow-up email",
+          companyB(draft.lead_company),
+          wlChip("Draft", "wl-purple"), btnEmail("Continue Draft"))),
+      ...research.map((lead) => {
+        const reason = lead.next_best_action.reason;
+        return wlRow(lead.id, "research", "—", "",
+          reason ? `Research — ${reason}` : "Research",
+          companyB(lead.company),
+          wlChip("Research", "wl-amber"), btnDetails);
+      }),
+    ];
+    const worklistCount = worklistRows.length;
     setCount("worklist", worklistCount);
-    sections.worklist.innerHTML = worklistCount ? worklistHtml : emptyRow("Nothing outstanding — a clean slate.");
+    if (!worklistCount) {
+      sections.worklist.innerHTML = emptyRow("Nothing outstanding — a clean slate.");
+    } else if (worklistCount <= WORKLIST_COLLAPSE_AT) {
+      sections.worklist.innerHTML = worklistRows.join("");
+    } else {
+      const hiddenCount = worklistCount - WORKLIST_COLLAPSE_AT;
+      sections.worklist.innerHTML =
+        worklistRows.slice(0, WORKLIST_COLLAPSE_AT).join("") +
+        `<div class="wl-more-rows${worklistExpanded ? "" : " hidden"}" id="wl-more-rows">${worklistRows.slice(WORKLIST_COLLAPSE_AT).join("")}</div>` +
+        `<button type="button" class="wl-more-toggle" id="wl-more-toggle" aria-expanded="${worklistExpanded}">${worklistExpanded ? "Show less" : `Show ${hiddenCount} more`}</button>`;
+      const moreToggle = container.querySelector<HTMLButtonElement>("#wl-more-toggle");
+      const moreRows = container.querySelector<HTMLElement>("#wl-more-rows");
+      moreToggle?.addEventListener("click", () => {
+        worklistExpanded = !worklistExpanded;
+        moreRows?.classList.toggle("hidden", !worklistExpanded);
+        moreToggle.setAttribute("aria-expanded", String(worklistExpanded));
+        moreToggle.textContent = worklistExpanded ? "Show less" : `Show ${hiddenCount} more`;
+      });
+    }
 
     const opportunities = opportunitiesInProgress();
     setCount("opportunities", opportunities.length);

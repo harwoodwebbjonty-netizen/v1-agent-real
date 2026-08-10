@@ -4786,3 +4786,13 @@ button.p-filter-chip.active {
 .app-sidebar.collapsed .sys-line .sys-status,
 .app-sidebar.collapsed .sys-line .sys-sep,
 .app-sidebar.collapsed .sys-line .sidebar-version-label { display: none; }
+
+/* Worklist compaction — "Show N more / Show less" toggle + collapsed rows */
+.wl-more-rows.hidden { display: none; }
+.wl-more-toggle { display: block; width: 100%; text-align: center; padding: 10px 16px; background: transparent;
+  border: 0; border-top: 1px solid var(--hairline); font-family: var(--font-mono); font-size: 0.7rem;
+  letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-core); cursor: pointer; }
+.wl-more-toggle:hover { background: #fafbfd; }
+/* keep the timeline rail trimmed around the collapsed block */
+.today-view .action-section-body > .wl-more-rows > .wl-row:last-child .wl-rail::before { bottom: 50%; }
+.today-view .action-section-body > .wl-row:has(+ .wl-more-rows.hidden) .wl-rail::before { bottom: 50%; }
