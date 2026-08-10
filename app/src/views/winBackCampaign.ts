@@ -210,12 +210,15 @@ function renderCampaignList(container: HTMLElement, campaigns: WinBackCampaign[]
   clearPoll();
   container.innerHTML = `
     <main class="container">
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Win-back</h1>
+          <div class="page-meta"><span>AI-generated re-engagement emails for dormant or lost leads.</span></div>
+        </div>
+      </header>
       <section class="card">
         <div class="card-header-row">
-          <div>
-            <h2 class="card-title">Win-back Campaigns</h2>
-            <p class="card-subtitle">AI-generated re-engagement emails for dormant or lost leads.</p>
-          </div>
+          <div></div>
           <div class="card-header-actions">
             <button id="wb-new-btn" class="btn btn-primary">New campaign</button>
           </div>

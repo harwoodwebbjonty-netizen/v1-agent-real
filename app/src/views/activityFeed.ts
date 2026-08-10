@@ -258,12 +258,14 @@ function render(): void {
   const chActive = s.tab === "ch";
   container.innerHTML = `
     <div class="view-header">
-      <h2>Activity Feed ${chActive ? tp : ""}</h2>
-      <p class="text-muted" style="margin:0">
-        ${chActive
-          ? "Live Companies House filings — all types, streamed in real time"
-          : "Lead activity signals from Companies House for companies in your CRM"}
-      </p>
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Activity Feed ${chActive ? tp : ""}</h1>
+          <div class="page-meta"><span>${chActive
+            ? "Live Companies House filings — all types, streamed in real time"
+            : "Lead activity signals from Companies House for companies in your CRM"}</span></div>
+        </div>
+      </header>
     </div>
     <div class="af-tab-bar">
       <button class="af-tab ${chActive ? "active" : ""}" data-tab="ch">

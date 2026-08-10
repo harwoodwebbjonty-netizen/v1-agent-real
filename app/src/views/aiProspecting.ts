@@ -459,13 +459,12 @@ export function initAiProspecting(): void {
 
     container.innerHTML = `
       <main class="container">
-        <section class="card-title-row">
-          <span class="card-icon-badge" aria-hidden="true">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/><path d="M11 8v6M8 11h6"/></svg>
-          </span>
-          <h2 class="card-title">AI Prospecting</h2>
-        </section>
-        <p class="card-subtitle">Automatically discover new UK businesses from Companies House, enrich their profile, and score them — so your BDEs call better-qualified leads.</p>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title">AI Prospecting</h1>
+            <div class="page-meta"><span>Discover new UK businesses from Companies House, enrich and score them — so your BDEs call better-qualified leads.</span></div>
+          </div>
+        </header>
 
         ${!configured
           ? `<section class="card">

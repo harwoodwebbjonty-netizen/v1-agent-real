@@ -295,9 +295,19 @@ function renderKpis(leads: Lead[]): void {
 
 function renderCoverageStats(leads: Lead[]): void {
   const { phone, companyNumber, enriched } = computeCoverage(leads);
-  document.querySelector("#cov-phone")!.textContent = `${Math.round(phone * 100)}%`;
-  document.querySelector("#cov-company-number")!.textContent = `${Math.round(companyNumber * 100)}%`;
-  document.querySelector("#cov-enriched")!.textContent = `${Math.round(enriched * 100)}%`;
+  const n = leads.length;
+  const setRow = (key: string, ratio: number, count: number): void => {
+    const pct = `${Math.round(ratio * 100)}%`;
+    const pcEl = document.querySelector<HTMLElement>(`#cov-${key}`);
+    const barEl = document.querySelector<HTMLElement>(`#cov-${key}-bar`);
+    const emEl = document.querySelector<HTMLElement>(`#cov-${key}-em`);
+    if (pcEl) pcEl.textContent = pct;
+    if (barEl) barEl.style.width = pct;
+    if (emEl) emEl.textContent = n ? `${count.toLocaleString()} / ${n.toLocaleString()}` : "";
+  };
+  setRow("phone", phone, leads.filter((l) => l.phone_number).length);
+  setRow("company-number", companyNumber, leads.filter((l) => l.company_number).length);
+  setRow("enriched", enriched, leads.filter((l) => l.ch_data).length);
 }
 
 function renderIndustryChart(leads: Lead[]): void {
@@ -480,37 +490,31 @@ export function initAnalytics(): void {
         <p class="empty-state">No leads yet — run some lookups on the Dashboard to see analytics here.</p>
       </div>
       <div id="analytics-content">
-        <section class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">Total Leads</span>
-            <span id="kpi-total" class="stat-value">0</span>
+        <header class="page-head">
+          <div>
+            <h1 class="page-title">Analytics</h1>
+            <div class="page-meta">
+              <span>Performance across the whole lead pool</span>
+              <span class="pm-sep">·</span>
+              <span class="mono pm-sync">LIVE</span>
+            </div>
           </div>
-          <div class="stat-card">
-            <span class="stat-label">Contacted</span>
-            <span id="kpi-contacted" class="stat-value">0</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Reply Rate</span>
-            <span id="kpi-reply-rate" class="stat-value">0%</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Conversion Rate</span>
-            <span id="kpi-conversion-rate" class="stat-value">0%</span>
-          </div>
+        </header>
+
+        <div class="sec-head"><span class="sec-num">A</span><h3 class="action-section-title">Performance summary</h3><span class="sec-rule"></span><span class="sec-count">all-time</span></div>
+        <section class="metrics">
+          <div class="m"><div class="l">Total leads</div><div class="v tnum" id="kpi-total">0</div></div>
+          <div class="m"><div class="l">Contacted</div><div class="v tnum" id="kpi-contacted">0</div></div>
+          <div class="m"><div class="l">Reply rate</div><div class="v tnum" id="kpi-reply-rate">0%</div></div>
+          <div class="m"><div class="l">Conversion</div><div class="v tnum" id="kpi-conversion-rate">0%</div></div>
         </section>
 
-        <section class="stats-grid">
-          <div class="stat-card">
-            <span class="stat-label">Has Phone</span>
-            <span id="cov-phone" class="stat-value">0%</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">Has CH Number</span>
-            <span id="cov-company-number" class="stat-value">0%</span>
-          </div>
-          <div class="stat-card">
-            <span class="stat-label">CH Enriched</span>
-            <span id="cov-enriched" class="stat-value">0%</span>
+        <div class="sec-head"><span class="sec-num">B</span><h3 class="action-section-title">Data coverage</h3><span class="sec-rule"></span><span class="sec-count">count &amp; %</span></div>
+        <section class="panel">
+          <div class="cov">
+            <div class="row"><span class="cl">Has phone number <em id="cov-phone-em"></em></span><span class="bar"><i id="cov-phone-bar" style="width:0%"></i></span><span class="pc" id="cov-phone">0%</span></div>
+            <div class="row"><span class="cl">Companies House number <em id="cov-company-number-em"></em></span><span class="bar b2"><i id="cov-company-number-bar" style="width:0%"></i></span><span class="pc" id="cov-company-number">0%</span></div>
+            <div class="row"><span class="cl">Fully enriched <em id="cov-enriched-em"></em></span><span class="bar b3"><i id="cov-enriched-bar" style="width:0%"></i></span><span class="pc" id="cov-enriched">0%</span></div>
           </div>
         </section>
 

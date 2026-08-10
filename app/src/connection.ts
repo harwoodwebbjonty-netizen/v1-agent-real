@@ -14,6 +14,11 @@ export function initConnectionBanner(): void {
 
   let offline = false;
 
+  // Reflect the same real health signal in the sidebar footer status dot.
+  function setFooterStatus(isOffline: boolean): void {
+    document.getElementById("app-sidebar-bottom")?.classList.toggle("is-offline", isOffline);
+  }
+
   async function poll(): Promise<void> {
     try {
       await checkBackendHealth();
@@ -23,11 +28,13 @@ export function initConnectionBanner(): void {
         // Reload views cheaply by letting the user act — a full auto-refresh
         // of every view is riskier than telling them we're back.
       }
+      setFooterStatus(false);
     } catch {
       if (!offline) {
         offline = true;
         banner.classList.remove("hidden");
       }
+      setFooterStatus(true);
     }
   }
 

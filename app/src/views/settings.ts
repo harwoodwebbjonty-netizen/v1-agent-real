@@ -42,6 +42,12 @@ export function initSettings(): void {
   const container = document.querySelector<HTMLDivElement>("#view-settings")!;
   container.innerHTML = `
     <main class="container">
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Settings</h1>
+          <div class="page-meta"><span>Your account, team, and workspace configuration.</span></div>
+        </div>
+      </header>
       <section class="card">
         <h2 class="card-title">Account</h2>
         <p class="card-subtitle" id="account-info"></p>

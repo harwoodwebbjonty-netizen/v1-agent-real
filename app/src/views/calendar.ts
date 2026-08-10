@@ -61,12 +61,15 @@ export function initCalendar(): void {
   const container = document.querySelector<HTMLDivElement>("#view-calendar")!;
   container.innerHTML = `
     <main class="container">
+      <header class="page-head">
+        <div>
+          <h1 class="page-title">Calendar</h1>
+          <div class="page-meta"><span>Scheduled calls, follow-ups, and tasks — private to your account.</span></div>
+        </div>
+      </header>
       <section class="card">
         <div class="card-header-row">
-          <div>
-            <h2 class="card-title">Calendar</h2>
-            <p class="card-subtitle">Scheduled calls, follow-ups, and tasks — private to your account.</p>
-          </div>
+          <div></div>
           <div class="card-header-actions">
             <button id="cal-prev-btn" class="btn btn-ghost" type="button">←</button>
             <span id="cal-period-label" class="card-subtitle"></span>

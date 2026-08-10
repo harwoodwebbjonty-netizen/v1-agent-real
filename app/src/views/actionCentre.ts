@@ -80,38 +80,11 @@ export function initActionCentre(): void {
           <div class="page-meta">
             <span id="today-date"></span>
             <span class="pm-sep">·</span>
-            <span class="mono pm-sync">WORKLIST — NOT A REPORT</span>
+            <span class="mono pm-sync">WORKLIST</span>
+            <span id="today-status"></span>
           </div>
         </div>
-      </header>
-
-      <div class="brief-strip" id="today-brief"></div>
-
-      <section class="card action-section" data-section="calls">
-        <div class="sec-head">
-          <span class="sec-num">01</span>
-          <h3 class="action-section-title">Calls due today</h3>
-          <span class="sec-rule"></span>
-          <span class="sec-count" data-count="calls"></span>
-        </div>
-        <div class="action-section-body"></div>
-      </section>
-
-      <section class="card action-section" data-section="followups">
-        <div class="sec-head">
-          <span class="sec-num">02</span>
-          <h3 class="action-section-title">Follow-ups due</h3>
-          <span class="sec-rule"></span>
-          <span class="sec-count" data-count="followups"></span>
-        </div>
-        <div class="action-section-body"></div>
-      </section>
-
-      <section class="card action-section" data-section="emails">
-        <div class="sec-head">
-          <span class="sec-num">03</span>
-          <h3 class="action-section-title">Emails requiring action</h3>
-          <span class="sec-rule"></span>
+        <div class="acts">
           <div class="mc-export-panel" id="mc-export-panel">
             <input type="text" id="mc-campaign-name" class="inline-edit mc-campaign-input"
               placeholder="Campaign name…" />
@@ -120,19 +93,38 @@ export function initActionCentre(): void {
             </button>
             <span id="mc-export-status" class="status-message"></span>
           </div>
+          <button type="button" class="btn btn-primary" id="today-start-calling">Start calling</button>
+        </div>
+      </header>
+
+      <div class="sec-head">
+        <span class="sec-num">01</span>
+        <h3 class="action-section-title">Daily brief</h3>
+        <span class="sec-rule"></span>
+        <span class="sec-count" data-count="brief"></span>
+      </div>
+      <div class="brief-strip" id="today-brief"></div>
+
+      <section class="card action-section" data-section="worklist">
+        <div class="sec-head">
+          <span class="sec-num">02</span>
+          <h3 class="action-section-title">Worklist</h3>
+          <span class="sec-rule"></span>
+          <span class="sec-count" data-count="worklist"></span>
         </div>
         <div class="action-section-body"></div>
       </section>
 
-      <section class="card action-section" data-section="research">
-        <div class="sec-head">
-          <span class="sec-num">04</span>
-          <h3 class="action-section-title">Companies requiring research</h3>
-          <span class="sec-rule"></span>
-          <span class="sec-count" data-count="research"></span>
+      <div class="cols today-cols">
+        <div class="panel">
+          <div class="subhead"><h3>Next calls</h3><span class="eyebrow">03 · Calling block</span></div>
+          <ul class="calls" id="today-next-calls"></ul>
         </div>
-        <div class="action-section-body"></div>
-      </section>
+        <div class="panel">
+          <div class="subhead"><h3>Pipeline</h3><span class="eyebrow">04 · This month</span></div>
+          <div class="funnel" id="today-funnel"></div>
+        </div>
+      </div>
 
       <section class="card action-section" data-section="opportunities">
         <div class="sec-head">
@@ -165,13 +157,15 @@ export function initActionCentre(): void {
   }
 
   const sections = {
-    calls: container.querySelector<HTMLDivElement>('[data-section="calls"] .action-section-body')!,
-    followups: container.querySelector<HTMLDivElement>('[data-section="followups"] .action-section-body')!,
-    emails: container.querySelector<HTMLDivElement>('[data-section="emails"] .action-section-body')!,
-    research: container.querySelector<HTMLDivElement>('[data-section="research"] .action-section-body')!,
+    worklist: container.querySelector<HTMLDivElement>('[data-section="worklist"] .action-section-body')!,
     opportunities: container.querySelector<HTMLDivElement>('[data-section="opportunities"] .action-section-body')!,
     replied: container.querySelector<HTMLDivElement>('[data-section="replied"] .action-section-body')!,
   };
+
+  // Page-head "Start calling" opens the calling workspace (existing view).
+  container
+    .querySelector<HTMLButtonElement>("#today-start-calling")
+    ?.addEventListener("click", () => openTab("cold-call-lists", "Cold Call Lists"));
 
   const actionCentreSidePanelCallbacks: SidePanelCallbacks = {
     onSaveNotes: async (id, notes) => {
@@ -259,49 +253,43 @@ export function initActionCentre(): void {
 
   function render(): void {
     refreshIfOpen(getLeads());
+    const today = todayIso();
 
     const calls = callsDueToday();
-    setCount("calls", calls.length);
-    sections.calls.innerHTML = calls.length
-      ? calls
-          .map(({ event, lead }) =>
-            wlRow(lead.id, "call", lead.company,
-              event.time ? `<span class="mono">${escapeHtml(event.time)}</span>` : "",
-              wlChip("Call", "wl-hi"), btnDetails))
-          .join("")
-      : emptyRow("No calls due. Nice and clear.");
-
     const followUps = followUpsDue();
-    setCount("followups", followUps.length);
-    sections.followups.innerHTML = followUps.length
-      ? followUps
-          .map((lead) =>
-            wlRow(lead.id, "follow", lead.company,
-              escapeHtml(lead.next_best_action.reason),
-              wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails))
-          .join("")
-      : emptyRow("No follow-ups due.");
-
-    setCount("emails", pendingDrafts.length);
-    sections.emails.innerHTML = pendingDrafts.length
-      ? pendingDrafts
-          .map((draft) =>
-            wlRow(draft.lead_id, "email", draft.lead_company,
-              escapeHtml(draft.subject || "(no subject yet)"),
-              wlChip("Draft", "wl-purple"), btnEmail("Continue Draft")))
-          .join("")
-      : emptyRow("No unfinished drafts.");
-
     const research = companiesNeedingResearch();
-    setCount("research", research.length);
-    sections.research.innerHTML = research.length
-      ? research
-          .map((lead) =>
-            wlRow(lead.id, "research", lead.company,
-              escapeHtml(lead.next_best_action.reason),
-              wlChip("Research", "wl-amber"), btnDetails))
-          .join("")
-      : emptyRow("Every lead has been researched.");
+
+    // 02 Worklist — one priority-ordered list mixing follow-ups, calls, email
+    // drafts and research. Each row reuses the existing hooks so every action
+    // (View, Send Follow-up, Continue Draft) keeps working exactly as before.
+    const worklistHtml =
+      followUps
+        .map((lead) =>
+          wlRow(lead.id, "follow", lead.company,
+            escapeHtml(lead.next_best_action.reason),
+            wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails))
+        .join("") +
+      calls
+        .map(({ event, lead }) =>
+          wlRow(lead.id, "call", lead.company,
+            event.time ? `<span class="mono">${escapeHtml(event.time)}</span>` : "",
+            wlChip("Call", "wl-hi"), btnDetails))
+        .join("") +
+      pendingDrafts
+        .map((draft) =>
+          wlRow(draft.lead_id, "email", draft.lead_company,
+            escapeHtml(draft.subject || "(no subject yet)"),
+            wlChip("Draft", "wl-purple"), btnEmail("Continue Draft")))
+        .join("") +
+      research
+        .map((lead) =>
+          wlRow(lead.id, "research", lead.company,
+            escapeHtml(lead.next_best_action.reason),
+            wlChip("Research", "wl-amber"), btnDetails))
+        .join("");
+    const worklistCount = followUps.length + calls.length + pendingDrafts.length + research.length;
+    setCount("worklist", worklistCount);
+    sections.worklist.innerHTML = worklistCount ? worklistHtml : emptyRow("Nothing outstanding — a clean slate.");
 
     const opportunities = opportunitiesInProgress();
     setCount("opportunities", opportunities.length);
@@ -323,6 +311,54 @@ export function initActionCentre(): void {
               wlChip("Replied", "wl-ok"), btnEmail("Generate Email") + btnDetails))
           .join("")
       : emptyRow("Nobody marked as Replied right now.");
+
+    // 03 Next calls — the calls-due list in a compact calling-block panel.
+    const nextCallsEl = container.querySelector<HTMLUListElement>("#today-next-calls");
+    if (nextCallsEl) {
+      nextCallsEl.innerHTML = calls.length
+        ? calls
+            .map(({ event, lead }) => {
+              const loc = lead.industry ? escapeHtml(lead.industry) : "";
+              const phone = lead.phone_number ? escapeHtml(lead.phone_number) : "—";
+              const tm = event.time ? escapeHtml(event.time) : "—";
+              return `<li><span class="tm">${tm}</span><span class="co"><b>${escapeHtml(lead.company)}</b><span>${loc}</span></span><span class="phone">${phone}</span></li>`;
+            })
+            .join("")
+        : `<li class="calls-empty">No calls scheduled today.</li>`;
+    }
+
+    // 04 Pipeline — live funnel derived from the real lead pool (no invented data).
+    const funnelEl = container.querySelector<HTMLDivElement>("#today-funnel");
+    if (funnelEl) {
+      const leads = getLeads();
+      const total = leads.length;
+      const contacted = leads.filter((l) => l.contact_status && !/^not/i.test(l.contact_status)).length;
+      const repliedN = leads.filter((l) => l.contact_status === "Replied").length;
+      const won = leads.filter((l) => l.opportunity_stage === "won").length;
+      const pct = (n: number, d: number): number => (d > 0 ? Math.round((n / d) * 100) : 0);
+      const w = (n: number): number => (total > 0 ? Math.max(2, Math.round((n / total) * 100)) : 0);
+      funnelEl.innerHTML = `
+        <div class="stage"><span class="sl">New</span><div class="track"><div class="fill" style="width:100%"><b>${total.toLocaleString()}</b></div></div><span class="cv">—</span></div>
+        <div class="stage"><span class="sl">Contacted</span><div class="track"><div class="fill g2" style="width:${w(contacted)}%"><b>${contacted.toLocaleString()}</b></div></div><span class="cv">${pct(contacted, total)}% <em>of new</em></span></div>
+        <div class="stage"><span class="sl">Replied</span><div class="track"><div class="fill g3" style="width:${w(repliedN)}%"><b>${repliedN.toLocaleString()}</b></div></div><span class="cv">${pct(repliedN, contacted)}% <em>of cont.</em></span></div>
+        <div class="stage"><span class="sl">Won</span><div class="track"><div class="fill g4" style="width:${w(won)}%"><b>${won.toLocaleString()}</b></div></div><span class="cv">${pct(won, repliedN)}% <em>of replied</em></span></div>`;
+    }
+
+    // Status chip (truthful: overdue count or "on track") + brief aside.
+    const overdueCount = getEvents().filter(
+      (e) => (e.type === "call" || e.type === "followup") && e.date < today && !!e.lead_id
+    ).length;
+    const statusEl = container.querySelector<HTMLSpanElement>("#today-status");
+    if (statusEl) {
+      statusEl.innerHTML = overdueCount > 0
+        ? `<span class="wl-chip wl-amber"><span class="wl-cd"></span>${overdueCount} OVERDUE</span>`
+        : `<span class="wl-chip wl-ok"><span class="wl-cd"></span>ON TRACK</span>`;
+    }
+    const briefCountEl = container.querySelector<HTMLSpanElement>('.sec-count[data-count="brief"]');
+    if (briefCountEl) {
+      briefCountEl.textContent =
+        `${worklistCount} item${worklistCount === 1 ? "" : "s"}` + (overdueCount > 0 ? ` · ${overdueCount} overdue` : "");
+    }
 
     // Daily brief — derived entirely from the counts above (no invented data).
     const briefEl = container.querySelector<HTMLDivElement>("#today-brief");

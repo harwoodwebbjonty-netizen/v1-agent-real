@@ -100,7 +100,8 @@
           </nav>
         </div>
 
-        <div class="app-sidebar-bottom">
+        <div class="app-sidebar-bottom" id="app-sidebar-bottom">
+          <span class="sys-dot" id="sys-status-dot" aria-hidden="true"></span>
           <span class="sidebar-version-label">test v1.0</span>
         </div>
       </aside>
@@ -114,7 +115,7 @@
           </div>
           <label class="tb-search">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-            <input id="tb-search-input" type="search" placeholder="Search leads, companies…" autocomplete="off" />
+            <input id="tb-search-input" type="search" placeholder="Search leads, companies, lists…" autocomplete="off" />
             <kbd>⌘K</kbd>
           </label>
           <span class="tb-date" id="tb-date"></span>
@@ -137,6 +138,12 @@
             <div class="dashboard-ambient-blob dashboard-ambient-blob-2"></div>
           </div>
           <main class="container">
+              <header class="page-head">
+                <div>
+                  <h1 class="page-title">Leads</h1>
+                  <div class="page-meta"><span>Your shared team lead pool — look up, enrich, and work companies.</span></div>
+                </div>
+              </header>
               <section class="stats-grid">
                 <div class="stat-card" data-status-filter="" title="Show all leads">
                   <span class="stat-pulse-dot stat-pulse-total" aria-hidden="true"></span>
