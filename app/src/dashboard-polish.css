@@ -4,7 +4,9 @@
 :root {
   --dashboard-canvas: var(--bg);
   --dashboard-border: var(--border);
-  --dashboard-shadow: var(--shadow-card);
+  /* Restrained shadow — panels read as clean editorial surfaces, not floating
+     cards. (Was the heavy --shadow-card 0 10px 35px.) */
+  --dashboard-shadow: 0 1px 2px rgba(18, 21, 38, 0.05);
 }
 
 /* Sidebar appearance (navy gradient + border) is owned by style.css; only keep
@@ -43,13 +45,13 @@
   box-shadow: var(--dashboard-shadow);
 }
 
-.card { border-radius: 12px; }
+.card { border-radius: 10px; }
 
-.card:hover,
+/* Editorial: surfaces don't lift/float. Interactive cards get a quiet border
+   tint on hover, nothing more. */
 .stat-card:hover {
-  border-color: color-mix(in srgb, var(--accent-core) 30%, var(--dashboard-border));
-  box-shadow: 0 2px 3px rgba(17, 24, 39, 0.04), 0 12px 28px rgba(17, 24, 39, 0.07);
-  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent-core) 28%, var(--dashboard-border));
+  box-shadow: 0 1px 2px rgba(18, 21, 38, 0.06);
 }
 
 .btn,
@@ -74,7 +76,8 @@ select:focus-visible {
 }
 
 .table-wrap { border-color: var(--dashboard-border); box-shadow: inset 0 1px 0 rgba(17, 24, 39, 0.02); }
-th { background: #f9fafb; }
+/* Editorial table headers — mono, quiet, "operations" texture. */
+th { background: var(--surface-2, #fafbfd); font-family: var(--font-mono); font-size: 10.5px; letter-spacing: 0.06em; }
 tbody tr { transition: background-color 160ms ease; }
 
 .status-badge,

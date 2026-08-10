@@ -4447,6 +4447,11 @@ button.p-filter-chip.active {
 .mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
 .tnum { font-variant-numeric: tabular-nums; }
 
+/* app-wide editorial texture on metric labels (Analytics, dashboards) */
+.stat-label { font-family: var(--font-mono); letter-spacing: 0.08em; }
+/* section titles inside cards read a touch quieter/tighter across pages */
+.card-subtitle { color: var(--text-muted); }
+
 /* page header (reusable across pages) */
 .page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
   padding-bottom: 14px; border-bottom: 1px solid var(--hairline); margin-bottom: 20px; }
@@ -4466,12 +4471,12 @@ button.p-filter-chip.active {
 .today-view .action-section { margin: 22px 0 0; background: transparent; border: 0; box-shadow: none; padding: 0; }
 .today-view .action-section-title { font-family: var(--font-display); font-size: 0.82rem; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
 .today-view .action-section-body { gap: 0; background: var(--surface, #fff); border: 1px solid var(--border);
-  border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-card); }
+  border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--dashboard-shadow); }
 .today-view .action-section-body .empty-hint { padding: 14px 16px; margin: 0; }
 
 /* daily brief strip */
 .brief-strip { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; background: var(--surface, #fff);
-  border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-card); margin-bottom: 6px; }
+  border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--dashboard-shadow); margin-bottom: 6px; }
 .brief-strip .bs-cell { padding: 13px 16px; border-left: 1px solid var(--hairline); }
 .brief-strip .bs-cell:first-child { border-left: 0; background: #fafbfd; }
 .brief-strip .bs-l { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8f9e; }
