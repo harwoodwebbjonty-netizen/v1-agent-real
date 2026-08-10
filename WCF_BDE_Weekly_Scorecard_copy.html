@@ -1,0 +1,2075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>WCF BDE Weekly Performance Scorecard</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/png" sizes="192x192" href="wcf-icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="wcf-icon-512.png">
+<link rel="apple-touch-icon" href="wcf-icon-192.png">
+<meta name="theme-color" content="#D73751">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="WCF Scorecard">
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+  :root{
+    --accent:#D73751;--accent-deep:#b02a41;--accent-soft:rgba(215,55,81,.09);--accent-line:rgba(215,55,81,.28);
+    --bg:#eef1f7;--surface:#fff;--surface-2:#f7f8fc;--border:#e6e8f0;--border-2:#eef0f6;
+    --ink:#1a1f2e;--muted:#667085;--faint:#98a0b3;
+    --green:#159a5b;--green-soft:#e6f6ee;--amber:#c97a04;--amber-soft:#fbf1de;--red:#d23c4e;--red-soft:#fbe8ea;
+    --radius:16px;--radius-sm:11px;
+    --shadow:0 1px 2px rgba(16,24,40,.05),0 12px 28px -16px rgba(16,24,40,.18);
+    --shadow-sm:0 1px 2px rgba(16,24,40,.06);
+    --font:"Plus Jakarta Sans",-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    /* legacy aliases so any un-restyled rule still uses the new palette */
+    --navy:var(--accent);--input-bg:#f4f6fb;
+    --green-bg:var(--green-soft);--green-fg:var(--green);--amber-bg:var(--amber-soft);--amber-fg:var(--amber);--red-bg:var(--red-soft);--red-fg:var(--red);
+  }
+  *{box-sizing:border-box;}
+  body{font-family:var(--font);background:var(--bg);color:var(--ink);margin:0;padding:22px;-webkit-font-smoothing:antialiased;font-variant-numeric:tabular-nums;}
+  .layout{max-width:1360px;margin:0 auto;display:flex;gap:22px;align-items:flex-start;}
+  .sidebar{width:252px;flex-shrink:0;position:sticky;top:22px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;}
+  .sidebar h2{margin:0 0 14px;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);}
+  .nav-tabs{display:flex;gap:4px;margin-bottom:18px;background:var(--surface-2);padding:4px;border-radius:12px;}
+  .nav-tabs button{flex:1 1 0;min-width:0;background:transparent;color:var(--muted);padding:8px 2px;font-size:.72rem;font-weight:600;border-radius:8px;border:none;font-family:var(--font);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .15s,color .15s,box-shadow .15s;}
+  .nav-tabs button:hover{color:var(--ink);}
+  .nav-tabs button.active{background:var(--surface);color:var(--accent-deep);box-shadow:var(--shadow-sm);}
+  .sidebar label{display:block;font-size:.66rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:7px;}
+  select.native-select-hidden{display:none;}
+  .custom-select{position:relative;margin-bottom:14px;}
+  .custom-select-trigger{width:100%;padding:10px 34px 10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:.92rem;background:var(--surface);color:var(--ink);font-family:var(--font);font-weight:500;display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;text-align:left;transition:border-color .15s,box-shadow .15s;}
+  .custom-select-trigger .label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .custom-select-trigger .arrow{width:9px;height:9px;flex-shrink:0;border:solid var(--muted);border-width:0 2px 2px 0;transform:rotate(45deg);margin-top:-4px;}
+  .custom-select-trigger:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .custom-select-trigger:disabled{background:var(--surface-2);color:var(--faint);cursor:not-allowed;}
+  .custom-select-trigger:disabled .arrow{border-color:var(--faint);}
+  .custom-select-menu{position:absolute;top:calc(100% + 6px);left:0;right:0;z-index:30;background:var(--surface);border:1px solid var(--border);border-radius:12px;box-shadow:0 16px 40px -12px rgba(16,24,40,.28);max-height:260px;overflow-y:auto;padding:6px;display:none;}
+  .custom-select-menu.open{display:block;}
+  .custom-select-option{padding:9px 10px;border-radius:8px;cursor:pointer;font-size:.9rem;color:var(--ink);}
+  .custom-select-option:hover{background:var(--surface-2);}
+  .custom-select-option.selected{background:var(--accent-soft);color:var(--accent-deep);font-weight:700;}
+  .sidebar button.action{width:100%;margin-bottom:8px;}
+  .sidebar .hint{font-size:.72rem;color:var(--faint);margin-top:12px;line-height:1.5;}
+  .card{flex:1;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);overflow:hidden;}
+  .header{padding:22px 26px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;border-bottom:1px solid var(--border);}
+  .header h1{margin:0;font-size:1.2rem;font-weight:800;letter-spacing:-.02em;color:var(--ink);display:flex;align-items:center;}
+  .header h1::before{content:"";display:inline-block;width:9px;height:20px;border-radius:3px;background:linear-gradient(180deg,#ff6b81,var(--accent));margin-right:12px;}
+  .header .saved-indicator{font-size:.78rem;color:var(--muted);font-weight:500;}
+  .meta{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;padding:20px 26px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .meta label{display:block;font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;}
+  .meta input{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font-size:.92rem;font-family:var(--font);}
+  .meta input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .meta input:disabled{background:var(--surface-2);color:var(--faint);}
+  .table-wrap{padding:10px 26px 24px;overflow-x:auto;}
+  table{width:100%;border-collapse:separate;border-spacing:0;font-size:.9rem;min-width:880px;}
+  thead th{background:var(--surface-2);color:var(--muted);font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;text-align:left;padding:11px 12px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+  thead th:first-child{border-left:1px solid var(--border);border-radius:var(--radius-sm) 0 0 0;}
+  thead th:last-child{border-right:1px solid var(--border);border-radius:0 var(--radius-sm) 0 0;}
+  tbody td{padding:9px 12px;border-bottom:1px solid var(--border-2);vertical-align:middle;}
+  tbody tr:hover{background:var(--surface-2);}
+  td.metric{font-weight:600;color:var(--ink);}
+  td.readonly{color:var(--muted);font-weight:600;}
+  td input[type="number"],td input[type="text"]{width:100%;border:1px solid var(--border);border-radius:9px;padding:8px 10px;font-size:.88rem;font-family:var(--font);background:var(--surface);color:var(--ink);}
+  td input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  td input[type="number"]{max-width:130px;}
+  .pct{text-align:left;font-weight:700;}
+  .rag{display:inline-flex;align-items:center;gap:7px;font-weight:700;font-size:.75rem;border-radius:999px;padding:5px 12px;}
+  .rag::before{content:"";width:7px;height:7px;border-radius:50%;background:currentColor;}
+  .rag.green{color:var(--green);background:var(--green-soft);}
+  .rag.amber{color:var(--amber);background:var(--amber-soft);}
+  .rag.red{color:var(--red);background:var(--red-soft);}
+  .rag.blank{color:var(--faint);background:transparent;}
+  .rag.blank::before{opacity:.4;}
+  .chip{display:inline-block;min-width:44px;text-align:center;border-radius:999px;padding:4px 10px;font-size:.76rem;font-weight:700;}
+  .chip.green{color:var(--green);background:var(--green-soft);}
+  .chip.amber{color:var(--amber);background:var(--amber-soft);}
+  .chip.red{color:var(--red);background:var(--red-soft);}
+  .chip.blank{background:var(--surface-2);color:var(--faint);}
+  .toolbar{display:flex;align-items:center;gap:12px;padding:4px 26px 24px;flex-wrap:wrap;}
+  .weight-toggle{display:flex;align-items:center;gap:8px;font-size:.82rem;color:var(--muted);margin-left:auto;cursor:pointer;font-weight:500;}
+  .weight-toggle input{cursor:pointer;accent-color:var(--accent);}
+  .weight-col{display:none;}
+  table.show-weight .weight-col{display:table-cell;}
+  button{border:1px solid var(--border);border-radius:var(--radius-sm);padding:10px 16px;font-size:.83rem;font-weight:700;font-family:var(--font);cursor:pointer;color:var(--ink);background:var(--surface);transition:background .15s,border-color .15s,transform .1s,box-shadow .15s;}
+  button:hover:not(:disabled){background:var(--surface-2);}
+  button:active:not(:disabled){transform:translateY(1px);}
+  button:disabled{opacity:.5;cursor:not-allowed;}
+  .btn-primary{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:0 6px 16px -8px var(--accent-line);}
+  .btn-primary:hover:not(:disabled){background:var(--accent-deep);border-color:var(--accent-deep);}
+  .btn-secondary{background:var(--surface);color:var(--ink);}
+  .btn-danger{background:#fff;border-color:var(--red-soft);color:var(--red);}
+  .btn-danger:hover:not(:disabled){background:var(--red-soft);}
+  .link-danger{background:none;border:none;color:var(--red);font-size:.72rem;text-decoration:underline;padding:2px 0;width:auto;display:block;margin:6px 0 0 auto;cursor:pointer;font-weight:600;opacity:.75;}
+  .link-danger:hover{opacity:1;}
+  .link-danger:disabled{opacity:.35;cursor:not-allowed;text-decoration:none;}
+  .dashboard-filters{display:flex;align-items:flex-end;gap:16px;flex-wrap:wrap;padding:18px 26px;border-bottom:1px solid var(--border);background:var(--surface);}
+  .dashboard-filters>div{min-width:160px;}
+  .dashboard-filters label{display:block;font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;}
+  .dashboard-filters input[type="date"]{width:100%;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);font-size:.9rem;font-family:var(--font);color:var(--ink);}
+  .dashboard-filters input[type="date"]:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .dashboard-filters select{margin-bottom:0;}
+  .dashboard-filters .custom-select{margin-bottom:0;min-width:170px;}
+  .chart-section{margin-bottom:8px;}
+  .chart-section h2,.dashboard-section h2{margin:0 0 4px;font-size:1.05rem;font-weight:800;letter-spacing:-.01em;color:var(--ink);}
+  .chart-grid{display:flex;gap:20px;flex-wrap:wrap;margin-bottom:20px;}
+  .chart-card{flex:1;min-width:320px;border:1px solid var(--border);border-radius:var(--radius);padding:18px;background:var(--surface);box-shadow:var(--shadow-sm);}
+  .chart-card h3{margin:0 0 12px;font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;}
+  .chart-card canvas{max-height:260px;}
+  .dashboard-section{padding:24px 26px;}
+  .dashboard-section .sub{font-size:.8rem;color:var(--faint);margin-bottom:16px;}
+  .stat-cards{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:22px;}
+  .stat-card{flex:1;min-width:120px;border:1px solid var(--border);border-radius:var(--radius);padding:16px;text-align:center;background:var(--surface);box-shadow:var(--shadow-sm);}
+  .stat-card .num{font-size:1.7rem;font-weight:800;color:var(--ink);letter-spacing:-.02em;}
+  .stat-card .label{font-size:.68rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-top:4px;}
+  .stat-card.green .num{color:var(--green);}
+  .stat-card.amber .num{color:var(--amber);}
+  .stat-card.red .num{color:var(--red);}
+  .person-block{margin-bottom:28px;}
+  .person-block h3{margin:0 0 10px;font-size:.95rem;font-weight:700;}
+  .empty-note{color:var(--faint);font-size:.85rem;padding:18px 0;}
+  .settings-section{padding:24px 26px;}
+  .settings-intro{color:var(--muted);font-size:.88rem;line-height:1.55;margin:0 0 20px;max-width:760px;}
+  .set-row{display:grid;grid-template-columns:1fr auto;gap:16px;align-items:center;padding:15px 0;border-top:1px solid var(--border-2);}
+  .set-row:first-child{border-top:none;}
+  .set-label{display:flex;flex-direction:column;gap:3px;}
+  .set-name{font-size:.94rem;font-weight:700;color:var(--ink);}
+  .set-unit{font-size:.76rem;color:var(--faint);font-weight:500;}
+  .set-input{display:flex;align-items:center;gap:12px;}
+  .set-input input{width:140px;padding:10px 12px;border:1px solid var(--border);border-radius:var(--radius-sm);font-family:var(--font);font-size:.95rem;font-weight:600;text-align:right;color:var(--ink);background:var(--surface);}
+  .set-input input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft);}
+  .set-default{font-size:.74rem;color:var(--faint);white-space:nowrap;min-width:96px;}
+  .set-actions{margin-top:22px;padding-top:20px;border-top:1px solid var(--border);}
+  @media print{body{background:#fff;padding:0;}.sidebar,.toolbar,.dashboard-filters{display:none;}.card{box-shadow:none;border:none;}}
+  @media (max-width:820px){.layout{flex-direction:column;}.sidebar{width:100%;position:static;}}
+  .week-nav{display:flex;align-items:center;gap:6px;margin-bottom:14px;}
+  .week-nav .custom-select{flex:1;margin-bottom:0;}
+  .wk-arrow{flex:0 0 auto;width:34px;height:38px;padding:0;font-size:1.15rem;line-height:1;border:1px solid var(--border);border-radius:10px;background:transparent;color:inherit;cursor:pointer;}
+  .wk-arrow:hover:not(:disabled){background:rgba(127,127,127,0.10);}
+  .wk-arrow:disabled{opacity:.4;cursor:not-allowed;}
+  .summary-card{background:var(--accent-soft);border:1px solid var(--accent-line);border-radius:var(--radius);padding:18px 20px;margin-bottom:24px;}
+  .summary-card h2{margin:0 0 8px;}
+  .summary-card p{margin:0 0 14px;color:var(--ink);font-size:.95rem;line-height:1.55;max-width:820px;}
+  .summary-card button{padding:8px 14px;font-size:.78rem;}
+  .leaderboard{display:flex;flex-direction:column;gap:8px;max-width:520px;}
+  .lb-row{display:flex;align-items:center;gap:14px;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);box-shadow:var(--shadow-sm);}
+  .lb-rank{flex:0 0 auto;width:26px;height:26px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface-2);color:var(--muted);font-weight:800;font-size:.82rem;}
+  .lb-rank.lead{background:var(--accent);color:#fff;}
+  .lb-name{flex:1;min-width:0;font-weight:700;color:var(--ink);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .lb-score{flex:0 0 auto;}
+  .drop-zone{margin:10px 0 4px;padding:16px 12px;border:1.5px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--muted);font-size:.74rem;line-height:1.45;text-align:center;cursor:pointer;transition:border-color .15s,background .15s,color .15s;}
+  .drop-zone strong{display:block;font-weight:700;color:var(--ink);font-size:.82rem;margin-bottom:3px;}
+  .drop-zone:hover{border-color:var(--accent-line);color:var(--ink);}
+  .drop-zone.dragover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-deep);}
+  .drop-zone.disabled{opacity:.5;cursor:not-allowed;pointer-events:none;}
+  .cell-actual{font-size:.68rem;color:var(--faint);font-weight:600;margin-top:3px;line-height:1.2;}
+</style>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <h2>Scorecards</h2>
+      <div class="nav-tabs">
+        <button id="navScorecard" class="active">Scorecard</button>
+        <button id="navDashboard">Dashboard</button>
+        <button id="navSettings">Settings</button>
+      </div>
+
+      <div id="scorecardNav">
+        <label for="profileSelect">Select person</label>
+        <select id="profileSelect" disabled></select>
+        <label for="weekSelect">Select week</label>
+        <div class="week-nav">
+          <button type="button" class="wk-arrow" id="weekPrevBtn" title="Previous week" disabled>&lsaquo;</button>
+          <select id="weekSelect" disabled></select>
+          <button type="button" class="wk-arrow" id="weekNextBtn" title="Next week" disabled>&rsaquo;</button>
+        </div>
+        <button class="btn-secondary action" id="addWeekBtn" disabled>+ Add past week</button>
+        <button class="link-danger" id="deleteWeekBtn" disabled style="margin-bottom:4px">Delete this week&hellip;</button>
+        <button class="btn-primary action" id="newProfileBtn" disabled>+ New scorecard</button>
+        <div class="drop-zone disabled" id="importCallsDrop">
+          <strong>Import calls (CSV)</strong>
+          Drag the phone-stats CSV here, or click to choose. Fills Calls &amp; Talk Time for everyone in the file.
+        </div>
+        <input type="file" id="importCallsInput" accept=".csv,text/csv" style="display:none">
+        <div class="hint">Each person has their own scorecard. Saving a week locks it into their history, which you can revisit and correct any time. Everything syncs to the cloud across devices.</div>
+        <button class="link-danger" id="deleteProfileBtn" disabled>Delete this person&hellip;</button>
+      </div>
+    </aside>
+
+    <div class="card">
+      <div id="scorecardView">
+        <div class="header">
+          <h1>WCF BDE Weekly Performance Scorecard</h1>
+          <span class="saved-indicator" id="savedIndicator">Connecting...</span>
+        </div>
+
+        <div class="meta">
+          <div>
+            <label for="weekCommencing">Week commencing</label>
+            <input type="date" id="weekCommencing">
+          </div>
+          <div>
+            <label for="bdeName">BDE name</label>
+            <input type="text" id="bdeName" placeholder="Enter name">
+          </div>
+          <div>
+            <label for="manager">Manager</label>
+            <input type="text" id="manager" value="Michael Canavan">
+          </div>
+          <div>
+            <label for="reviewDate">Review date</label>
+            <input type="date" id="reviewDate">
+          </div>
+        </div>
+
+        <div class="table-wrap">
+          <table id="scorecardTable">
+            <thead>
+              <tr>
+                <th>Metric</th>
+                <th>Weekly Target</th>
+                <th>Actual</th>
+                <th class="weight-col">Priority / Weight</th>
+                <th>% of Target</th>
+                <th>RAG</th>
+                <th>Manager Notes</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody id="tableBody"></tbody>
+          </table>
+        </div>
+
+        <div class="toolbar">
+          <button class="btn-primary" id="saveWeekBtn" disabled>Save this week</button>
+          <button class="btn-secondary" onclick="window.print()">Print / Save as PDF</button>
+          <button class="btn-secondary" id="resetBtn" disabled>Reset this week</button>
+          <label class="weight-toggle">
+            <input type="checkbox" id="toggleWeight">
+            Show Priority / Weight column
+          </label>
+        </div>
+      </div>
+
+      <div id="dashboardView" style="display:none">
+        <div class="header">
+          <h1>Team Dashboard</h1>
+          <span class="saved-indicator" id="dashboardIndicator"></span>
+        </div>
+        <div class="dashboard-filters" id="dashboardFilters">
+          <div>
+            <label for="personFilter">Person</label>
+            <select id="personFilter"></select>
+          </div>
+          <div>
+            <label for="metricFilter">Statistic</label>
+            <select id="metricFilter"></select>
+          </div>
+          <div>
+            <label for="dateFromFilter">From</label>
+            <input type="date" id="dateFromFilter">
+          </div>
+          <div>
+            <label for="dateToFilter">To</label>
+            <input type="date" id="dateToFilter">
+          </div>
+          <button class="btn-secondary" id="allTimeBtn">All time</button>
+          <button class="btn-secondary" id="monthViewBtn">Group by month</button>
+        </div>
+        <div id="dashboardBody" class="dashboard-section"></div>
+      </div>
+
+      <div id="settingsView" style="display:none">
+        <div class="header">
+          <h1>Settings &mdash; Weekly Goals</h1>
+          <span class="saved-indicator" id="settingsIndicator"></span>
+        </div>
+        <div class="settings-section">
+          <p class="settings-intro">Set the weekly goal for each metric. These targets drive the % of Target, the RAG status and the whole dashboard for every person. Changes save automatically and sync to every device. Actuals you have already recorded are never changed &mdash; only how they are scored against target.</p>
+          <div id="settingsList"></div>
+          <p class="settings-intro" style="margin-top:24px">RAG thresholds &mdash; tune how strict the colours are for every person and metric.</p>
+          <div class="set-row">
+            <div class="set-label"><span class="set-name">Green threshold</span><span class="set-unit">At or above this % of target counts as Green. Between this and the amber threshold counts as Amber.</span></div>
+            <div class="set-input"><input type="number" step="any" min="1" id="greenThreshold"><span class="set-default">default 100%</span></div>
+          </div>
+          <div class="set-row">
+            <div class="set-label"><span class="set-name">Amber threshold</span><span class="set-unit">At or above this % of target counts as Amber (up to the green threshold); below it is Red.</span></div>
+            <div class="set-input"><input type="number" step="any" min="1" max="99" id="amberThreshold"><span class="set-default">default 85%</span></div>
+          </div>
+          <p class="settings-intro" style="margin-top:26px">Backup &amp; restore &mdash; download a copy of every scorecard, saved week and goal as a file you can keep safe, or restore everything from a backup file.</p>
+          <div style="display:flex;gap:12px;flex-wrap:wrap">
+            <button class="btn-secondary" id="exportBackupBtn">Download backup (.json)</button>
+            <button class="btn-secondary" id="importBackupBtn">Restore from backup&hellip;</button>
+            <input type="file" id="importBackupInput" accept="application/json,.json" style="display:none">
+          </div>
+          <div class="set-actions">
+            <button class="btn-danger" id="resetGoalsBtn">Reset to defaults</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script type="module">
+import { initializeApp } from "https://www.gstatic.com/firebasejs/12.15.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, setDoc, onSnapshot
+} from "https://www.gstatic.com/firebasejs/12.15.0/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyAlcPBofiX_p2si-FOz5Pf1iGFLsIvN0Vk",
+  authDomain: "wcf-scorecard.firebaseapp.com",
+  projectId: "wcf-scorecard",
+  storageBucket: "wcf-scorecard.firebasestorage.app",
+  messagingSenderId: "328466706251",
+  appId: "1:328466706251:web:73e6d515ada80f2e4242ce",
+};
+
+const app = initializeApp(firebaseConfig);
+const db = getFirestore(app);
+const storeDocRef = doc(db, "scorecardApp", "store");
+// Editable goals live in a SEPARATE document so recorded scorecard data
+// (profiles / rows / saved history) is never touched by the goals feature.
+const settingsDocRef = doc(db, "scorecardApp", "settings");
+
+// targetValue is the number used for the % of Target calc. For the two
+// percentage-based metrics, "Actual" is entered as a percent (e.g. 95
+// for 95%) and compared against a target of 100.
+const METRICS = [
+  { key: "calls",     name: "Calls",                target: 675,    targetValue: 675, weight: "15%" },
+  { key: "talkTime",  name: "Talk Time (hours)",     target: 10,     targetValue: 10,  weight: "25%" },
+  { key: "leads",     name: "Qualified Leads Passed",target: 3,      targetValue: 3,   weight: "30%" },
+  { key: "campaigns", name: "Mass Email Campaigns",  target: 3,      targetValue: 3,   weight: "5%" },
+  { key: "followUp",  name: "Follow-up Emails",      target: "100%", targetValue: 100, weight: "5%", isPercent: true },
+  { key: "crm",       name: "CRM Compliance",        target: "100%", targetValue: 100, weight: "Required", isPercent: true },
+];
+
+const CURRENT_KEY = "__current__";
+const LEGACY_MULTI_KEY = "wcfScorecardStore";   // local multi-profile version, pre-cloud
+const LEGACY_SINGLE_KEY = "wcfWeeklyScorecard"; // original single-scorecard version
+const WEIGHT_PREF_KEY = "wcfWeeklyScorecardShowWeight";
+
+let STORE = null;
+let SETTINGS = { targets: {} };
+let currentWeekKey = CURRENT_KEY;
+let persistTimer = null;
+let settingsTimer = null;
+let suppressRemoteRefresh = false;
+let suppressSettingsRefresh = false;
+let mode = "scorecard"; // "dashboard" or "settings"
+
+const METRIC_UNITS = {
+  calls: "calls per week", talkTime: "hours per week", leads: "qualified leads per week",
+  campaigns: "campaigns per week", followUp: "% of follow-ups sent", crm: "% CRM compliance",
+};
+
+function genId() {
+  return "p_" + Date.now().toString(36) + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+function blankProfile(id, name) {
+  return {
+    id, name: name || "Untitled", bdeName: name || "", manager: "Michael Canavan",
+    weekCommencing: "", reviewDate: "", rows: {}, history: {}
+  };
+}
+
+function ensureProfileShape(p) {
+  p.rows = p.rows || {};
+  p.history = p.history || {};
+  return p;
+}
+
+function buildSeedStore() {
+  // One-time migration path for anyone who used the earlier local-only versions
+  // of this app, so existing data isn't lost when moving to cloud storage.
+  try {
+    const multiRaw = localStorage.getItem(LEGACY_MULTI_KEY);
+    if (multiRaw) {
+      const parsed = JSON.parse(multiRaw);
+      if (parsed && parsed.profiles && Object.keys(parsed.profiles).length) {
+        Object.values(parsed.profiles).forEach(ensureProfileShape);
+        return parsed;
+      }
+    }
+  } catch (e) { /* ignore corrupt data */ }
+
+  try {
+    const singleRaw = localStorage.getItem(LEGACY_SINGLE_KEY);
+    if (singleRaw) {
+      const legacy = JSON.parse(singleRaw);
+      const id = genId();
+      const store = { profiles: {}, activeId: id };
+      store.profiles[id] = ensureProfileShape({
+        id,
+        name: legacy.bdeName || "Migrated scorecard",
+        weekCommencing: legacy.weekCommencing || "",
+        bdeName: legacy.bdeName || "",
+        manager: legacy.manager || "Michael Canavan",
+        reviewDate: legacy.reviewDate || "",
+        rows: legacy.rows || {},
+        history: {},
+      });
+      return store;
+    }
+  } catch (e) { /* ignore corrupt data */ }
+
+  const id = genId();
+  return { profiles: { [id]: blankProfile(id, "") }, activeId: id };
+}
+
+function getActiveProfile() {
+  return STORE.profiles[STORE.activeId];
+}
+
+function getWeekData() {
+  const profile = getActiveProfile();
+  if (currentWeekKey === CURRENT_KEY) {
+    return { weekCommencing: profile.weekCommencing, reviewDate: profile.reviewDate, rows: profile.rows };
+  }
+  return profile.history[currentWeekKey] || { weekCommencing: "", reviewDate: "", rows: {} };
+}
+
+function setIndicator(text) {
+  document.querySelectorAll(".saved-indicator").forEach(el => { el.textContent = text; });
+}
+
+function setControlsEnabled(enabled) {
+  document.getElementById("profileSelect").disabled = !enabled;
+  document.getElementById("weekSelect").disabled = !enabled;
+  document.getElementById("newProfileBtn").disabled = !enabled;
+  document.getElementById("deleteProfileBtn").disabled = !enabled;
+  document.getElementById("resetBtn").disabled = !enabled;
+  document.getElementById("saveWeekBtn").disabled = !enabled;
+  document.getElementById("addWeekBtn").disabled = !enabled;
+  document.getElementById("importCallsDrop").classList.toggle("disabled", !enabled);
+  refreshDeleteWeekBtn();
+  updateWeekNavButtons();
+}
+
+function refreshDeleteWeekBtn() {
+  const btn = document.getElementById("deleteWeekBtn");
+  const profilesReady = document.getElementById("weekSelect") && !document.getElementById("weekSelect").disabled;
+  btn.disabled = !profilesReady || currentWeekKey === CURRENT_KEY;
+}
+
+function ragFor(pct) {
+  if (pct === "" || pct === null || pct === undefined || isNaN(pct)) return { label: "", cls: "blank" };
+  if (pct >= getGreen()) return { label: "Green", cls: "green" };
+  if (pct >= getAmber()) return { label: "Amber", cls: "amber" };
+  return { label: "Red", cls: "red" };
+}
+
+function computeCell(m, actualValue) {
+  const actual = parseFloat(actualValue);
+  if (actualValue === "" || actualValue === undefined || actualValue === null || isNaN(actual)) {
+    return { pct: null, rag: ragFor(null) };
+  }
+  const pct = actual / getTarget(m);
+  return { pct, rag: ragFor(pct) };
+}
+
+function buildTable() {
+  const body = document.getElementById("tableBody");
+  body.innerHTML = "";
+  METRICS.forEach(m => {
+    const tr = document.createElement("tr");
+
+    const tdMetric = document.createElement("td");
+    tdMetric.className = "metric";
+    tdMetric.textContent = m.name;
+    tr.appendChild(tdMetric);
+
+    const tdTarget = document.createElement("td");
+    tdTarget.className = "readonly";
+    tdTarget.id = "target_" + m.key;
+    tdTarget.textContent = targetLabel(m);
+    tr.appendChild(tdTarget);
+
+    const tdActual = document.createElement("td");
+    const actualInput = document.createElement("input");
+    actualInput.type = "number";
+    actualInput.className = "editable";
+    actualInput.id = "actual_" + m.key;
+    actualInput.step = "any";
+    if (m.isPercent) actualInput.placeholder = "% actual";
+    tdActual.appendChild(actualInput);
+    tr.appendChild(tdActual);
+
+    const tdWeight = document.createElement("td");
+    tdWeight.className = "readonly weight-col";
+    tdWeight.textContent = m.weight;
+    tr.appendChild(tdWeight);
+
+    const tdPct = document.createElement("td");
+    tdPct.className = "pct";
+    tdPct.id = "pct_" + m.key;
+    tr.appendChild(tdPct);
+
+    const tdRag = document.createElement("td");
+    const ragSpan = document.createElement("div");
+    ragSpan.className = "rag blank";
+    ragSpan.id = "rag_" + m.key;
+    tdRag.appendChild(ragSpan);
+    tr.appendChild(tdRag);
+
+    const tdNotes = document.createElement("td");
+    const notesInput = document.createElement("input");
+    notesInput.type = "text";
+    notesInput.className = "editable";
+    notesInput.id = "notes_" + m.key;
+    tdNotes.appendChild(notesInput);
+    tr.appendChild(tdNotes);
+
+    const tdAction = document.createElement("td");
+    const actionInput = document.createElement("input");
+    actionInput.type = "text";
+    actionInput.className = "editable";
+    actionInput.id = "action_" + m.key;
+    tdAction.appendChild(actionInput);
+    tr.appendChild(tdAction);
+
+    body.appendChild(tr);
+
+    actualInput.addEventListener("input", () => updateRow(m, true));
+    notesInput.addEventListener("input", persistWeek);
+    actionInput.addEventListener("input", persistWeek);
+  });
+}
+
+function updateRow(m, shouldPersist) {
+  const actualInput = document.getElementById("actual_" + m.key);
+  const pctCell = document.getElementById("pct_" + m.key);
+  const ragCell = document.getElementById("rag_" + m.key);
+  const { pct, rag } = computeCell(m, actualInput.value);
+
+  if (pct === null) {
+    pctCell.textContent = "";
+    ragCell.textContent = "";
+    ragCell.className = "rag blank";
+  } else {
+    pctCell.textContent = (pct * 100).toFixed(0) + "%";
+    ragCell.textContent = rag.label;
+    ragCell.className = "rag " + rag.cls;
+  }
+  if (shouldPersist) persistWeek();
+}
+
+// Saves identity fields (name/manager) which always live on the profile,
+// regardless of which week is being viewed.
+function persistIdentity() {
+  const profile = getActiveProfile();
+  profile.bdeName = document.getElementById("bdeName").value;
+  profile.manager = document.getElementById("manager").value;
+  profile.name = profile.bdeName.trim() || "Untitled";
+  refreshProfileDropdown();
+  schedulePersist();
+}
+
+// Saves week-specific fields into either the live "current" slot or the
+// selected historical record, so editing an old week corrects it in place.
+function persistWeek() {
+  const profile = getActiveProfile();
+  const rows = {};
+  METRICS.forEach(m => {
+    rows[m.key] = {
+      actual: document.getElementById("actual_" + m.key).value,
+      notes: document.getElementById("notes_" + m.key).value,
+      action: document.getElementById("action_" + m.key).value,
+    };
+  });
+
+  if (currentWeekKey === CURRENT_KEY) {
+    profile.weekCommencing = document.getElementById("weekCommencing").value;
+    profile.reviewDate = document.getElementById("reviewDate").value;
+    profile.rows = rows;
+  } else {
+    const entry = profile.history[currentWeekKey] || {};
+    entry.rows = rows;
+    profile.history[currentWeekKey] = entry;
+  }
+  schedulePersist();
+}
+
+function schedulePersist() {
+  setIndicator("Saving...");
+  clearTimeout(persistTimer);
+  persistTimer = setTimeout(writeStore, 500);
+}
+
+function writeStore() {
+  suppressRemoteRefresh = true;
+  setDoc(storeDocRef, STORE)
+    .then(() => setIndicator("Synced " + new Date().toLocaleTimeString()))
+    .catch(err => {
+      console.error(err);
+      setIndicator("Sync failed - check your internet connection");
+    })
+    .finally(() => { suppressRemoteRefresh = false; });
+}
+
+function loadWeekIntoForm() {
+  const profile = getActiveProfile();
+  const week = getWeekData();
+  const isCurrent = currentWeekKey === CURRENT_KEY;
+
+  document.getElementById("bdeName").value = profile.bdeName || "";
+  document.getElementById("manager").value = profile.manager || "Michael Canavan";
+  document.getElementById("weekCommencing").value = week.weekCommencing || "";
+  document.getElementById("reviewDate").value = week.reviewDate || "";
+  document.getElementById("weekCommencing").disabled = !isCurrent;
+  document.getElementById("reviewDate").disabled = !isCurrent;
+  document.getElementById("saveWeekBtn").disabled = !isCurrent;
+  document.getElementById("resetBtn").disabled = !isCurrent;
+
+  METRICS.forEach(m => {
+    const row = (week.rows || {})[m.key] || {};
+    document.getElementById("actual_" + m.key).value = row.actual || "";
+    document.getElementById("notes_" + m.key).value = row.notes || "";
+    document.getElementById("action_" + m.key).value = row.action || "";
+    updateRow(m, false);
+  });
+  updateWeekNavButtons();
+}
+
+function refreshProfileDropdown() {
+  const select = document.getElementById("profileSelect");
+  const ids = Object.keys(STORE.profiles);
+  select.innerHTML = "";
+  ids.forEach(id => {
+    const opt = document.createElement("option");
+    opt.value = id;
+    opt.textContent = STORE.profiles[id].name || "Untitled";
+    if (id === STORE.activeId) opt.selected = true;
+    select.appendChild(opt);
+  });
+}
+
+function refreshWeekDropdown() {
+  const select = document.getElementById("weekSelect");
+  const profile = getActiveProfile();
+  select.innerHTML = "";
+
+  const currentOpt = document.createElement("option");
+  currentOpt.value = CURRENT_KEY;
+  currentOpt.textContent = "Current (unsaved)";
+  select.appendChild(currentOpt);
+
+  const weekKeys = Object.keys(profile.history).sort().reverse();
+  weekKeys.forEach(key => {
+    const entry = profile.history[key];
+    const opt = document.createElement("option");
+    opt.value = key;
+    opt.textContent = "Week of " + (entry.weekCommencing || key);
+    select.appendChild(opt);
+  });
+
+  select.value = currentWeekKey;
+}
+
+function switchProfile(id) {
+  STORE.activeId = id;
+  currentWeekKey = CURRENT_KEY;
+  refreshProfileDropdown();
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  writeStore();
+}
+
+function switchWeek(key) {
+  currentWeekKey = key;
+  loadWeekIntoForm();
+  refreshDeleteWeekBtn();
+}
+
+function createProfile() {
+  const name = prompt("Name for the new scorecard (e.g. the BDE's name):", "");
+  if (name === null) return; // cancelled
+  const id = genId();
+  STORE.profiles[id] = blankProfile(id, name.trim());
+  STORE.activeId = id;
+  currentWeekKey = CURRENT_KEY;
+  refreshProfileDropdown();
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  writeStore();
+}
+
+function deleteProfile() {
+  const profile = getActiveProfile();
+  const name = profile.name || "Untitled";
+  const typed = prompt(
+    'This permanently deletes "' + name + '" and every week of their saved history.\n\n' +
+    'Type their name exactly to confirm: ' + name
+  );
+  if (typed === null) return; // cancelled
+  if (typed !== name) {
+    alert("That didn't match - nothing was deleted.");
+    return;
+  }
+  delete STORE.profiles[STORE.activeId];
+  const remaining = Object.keys(STORE.profiles);
+  if (remaining.length === 0) {
+    const id = genId();
+    STORE.profiles[id] = blankProfile(id, "");
+    STORE.activeId = id;
+  } else {
+    STORE.activeId = remaining[0];
+  }
+  currentWeekKey = CURRENT_KEY;
+  refreshProfileDropdown();
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  writeStore();
+}
+
+function deleteWeek(profileId, weekKey) {
+  const profile = STORE.profiles[profileId];
+  if (!profile) return;
+  const entry = profile.history[weekKey];
+  const label = (entry && entry.weekCommencing) || weekKey;
+  if (!confirm('Delete the saved week of ' + label + ' for "' + (profile.name || "Untitled") + '"? This cannot be undone.')) return;
+  delete profile.history[weekKey];
+  if (profileId === STORE.activeId && currentWeekKey === weekKey) {
+    currentWeekKey = CURRENT_KEY;
+    refreshWeekDropdown();
+    loadWeekIntoForm();
+    refreshDeleteWeekBtn();
+  } else if (profileId === STORE.activeId) {
+    refreshWeekDropdown();
+  }
+  writeStore();
+}
+
+function saveThisWeek() {
+  const profile = getActiveProfile();
+  const weekCommencing = document.getElementById("weekCommencing").value;
+  if (!weekCommencing) {
+    alert("Please set a \"Week commencing\" date before saving.");
+    return;
+  }
+  if (profile.history[weekCommencing] &&
+      !confirm("A saved record for the week of " + weekCommencing + " already exists. Overwrite it?")) {
+    return;
+  }
+
+  profile.history[weekCommencing] = {
+    weekCommencing,
+    reviewDate: document.getElementById("reviewDate").value,
+    rows: JSON.parse(JSON.stringify(profile.rows)),
+    savedAt: new Date().toISOString(),
+  };
+
+  // Reset the live "current" slot ready for next week.
+  profile.weekCommencing = "";
+  profile.reviewDate = "";
+  profile.rows = {};
+  currentWeekKey = CURRENT_KEY;
+
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  writeStore();
+}
+
+function resetThisWeek() {
+  if (currentWeekKey !== CURRENT_KEY) return;
+  if (!confirm("Clear the current (unsaved) week's entries? This cannot be undone.")) return;
+  const profile = getActiveProfile();
+  profile.weekCommencing = "";
+  profile.reviewDate = "";
+  profile.rows = {};
+  loadWeekIntoForm();
+  writeStore();
+}
+
+// ---------------- Dashboard ----------------
+
+let dashboardPersonFilter = "all";
+let dashboardMetricFilter = "all";
+let dashboardDateFrom = "";
+let dashboardDateTo = "";
+let dashboardGroupByMonth = false;
+let ragChart = null;
+let personChart = null;
+let trendChart = null;
+let dashboardFiltersReady = false;
+
+function metricsToConsider() {
+  return dashboardMetricFilter === "all" ? METRICS : METRICS.filter(m => m.key === dashboardMetricFilter);
+}
+
+function inDateRange(weekCommencing) {
+  if (!weekCommencing) return false;
+  if (dashboardDateFrom && weekCommencing < dashboardDateFrom) return false;
+  if (dashboardDateTo && weekCommencing > dashboardDateTo) return false;
+  return true;
+}
+
+// All weeks (saved history + the live in-progress entry, if dated) for a
+// profile that fall within the current date filter.
+function getFilteredWeeks(profile) {
+  const weeks = [];
+  Object.values(profile.history || {}).forEach(entry => {
+    if (inDateRange(entry.weekCommencing)) weeks.push({ weekCommencing: entry.weekCommencing, rows: entry.rows || {} });
+  });
+  if (profile.weekCommencing && inDateRange(profile.weekCommencing)) {
+    weeks.push({ weekCommencing: profile.weekCommencing, rows: profile.rows || {} });
+  }
+  return weeks;
+}
+
+function computeCellForEntry(m, actual, weekCount) {
+  if (m.isPercent || !weekCount || weekCount <= 1) return computeCell(m, actual);
+  const num = parseFloat(actual);
+  if (actual === "" || actual === undefined || actual === null || isNaN(num)) return { pct: null, rag: ragFor(null) };
+  const pct = num / (getTarget(m) * weekCount);
+  return { pct, rag: ragFor(pct) };
+}
+
+function avgPctForRows(rows, metrics, weekCount) {
+  const vals = [];
+  metrics.forEach(m => {
+    const { pct } = computeCellForEntry(m, (rows[m.key] || {}).actual, weekCount || 1);
+    if (pct !== null) vals.push(pct);
+  });
+  if (!vals.length) return null;
+  return vals.reduce((a, b) => a + b, 0) / vals.length;
+}
+
+/* ---------------- Weighted score, leaderboard & summary ---------------- */
+// The weight of a metric as a fraction (e.g. "25%" -> 0.25). Non-% weights
+// like CRM's "Required" have no numeric weight, so they don't move the score.
+function weightFraction(m) {
+  const w = parseFloat(m.weight);
+  return isNaN(w) ? 0 : w / 100;
+}
+// One weighted "% of target" for a set of rows, using the metric weights.
+// Normalised by the weight actually present, so a blank metric doesn't drag
+// the score down. Returns null when nothing weighted has data.
+function weightedPctForRows(rows, metrics, weekCount) {
+  let acc = 0, wsum = 0;
+  metrics.forEach(m => {
+    const w = weightFraction(m);
+    if (w <= 0) return;
+    const { pct } = computeCellForEntry(m, (rows[m.key] || {}).actual, weekCount || 1);
+    if (pct === null) return;
+    acc += pct * w;
+    wsum += w;
+  });
+  return wsum > 0 ? acc / wsum : null;
+}
+// A profile's average weighted score across the weeks in the current date filter.
+function periodWeightedScore(profile) {
+  const scores = getFilteredEntries(profile)
+    .map(e => weightedPctForRows(e.rows, METRICS, e.weekCount || 1))
+    .filter(v => v !== null);
+  if (!scores.length) return null;
+  return scores.reduce((a, b) => a + b, 0) / scores.length;
+}
+function pctText(frac) { return Math.round(frac * 100) + "%"; }
+function summaryRangeText() {
+  if (dashboardDateFrom || dashboardDateTo) return " between " + (dashboardDateFrom || "the start") + " and " + (dashboardDateTo || "now");
+  return "";
+}
+// Average % of target per metric across the filtered entries of the given profiles.
+function summaryMetricStats(profiles) {
+  const acc = METRICS.map(m => ({ name: m.name, vals: [] }));
+  profiles.forEach(p => getFilteredEntries(p).forEach(e => {
+    METRICS.forEach((m, i) => {
+      const { pct } = computeCellForEntry(m, (e.rows[m.key] || {}).actual, e.weekCount || 1);
+      if (pct !== null) acc[i].vals.push(pct);
+    });
+  }));
+  return acc.filter(x => x.vals.length).map(x => ({ name: x.name, avg: x.vals.reduce((a, b) => a + b, 0) / x.vals.length }));
+}
+// Plain-English recap of the current dashboard scope (no AI, just the data).
+function buildWeeklySummary(profiles, personLabel) {
+  const section = document.createElement("div");
+  section.className = "summary-card";
+  const scored = profiles
+    .map(p => ({ name: p.name || "Untitled", score: periodWeightedScore(p) }))
+    .filter(x => x.score !== null);
+  const metricStats = summaryMetricStats(profiles);
+  let text;
+  if (!scored.length || !metricStats.length) {
+    text = "No saved data in the selected range yet. Add or save some weeks to see a written summary here.";
+  } else {
+    const overall = scored.reduce((a, b) => a + b.score, 0) / scored.length;
+    const best = metricStats.reduce((a, b) => b.avg > a.avg ? b : a);
+    const worst = metricStats.reduce((a, b) => b.avg < a.avg ? b : a);
+    const who = personLabel || "The team";
+    const parts = [who + " is averaging " + pctText(overall) + " of target (weighted)" + summaryRangeText() + "."];
+    if (best.name !== worst.name) {
+      parts.push(best.name + " is the strongest area at " + pctText(best.avg) + ", while " + worst.name + " is the biggest gap at " + pctText(worst.avg) + ".");
+    } else {
+      parts.push("Strongest area: " + best.name + " at " + pctText(best.avg) + ".");
+    }
+    if (!personLabel && scored.length > 1) {
+      const ranked = scored.slice().sort((a, b) => b.score - a.score);
+      parts.push(ranked[0].name + " is top at " + pctText(ranked[0].score) + "; " + ranked[ranked.length - 1].name + " needs the most support at " + pctText(ranked[ranked.length - 1].score) + ".");
+    }
+    text = parts.join(" ");
+  }
+  const h = document.createElement("h2");
+  h.textContent = personLabel ? personLabel + " \u2014 Summary" : "Weekly Summary";
+  const p = document.createElement("p");
+  p.textContent = text;
+  const btn = document.createElement("button");
+  btn.className = "btn-secondary";
+  btn.type = "button";
+  btn.textContent = "Copy summary";
+  btn.addEventListener("click", () => {
+    const done = () => { btn.textContent = "Copied"; setTimeout(() => { btn.textContent = "Copy summary"; }, 1500); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(done).catch(() => {});
+    else done();
+  });
+  section.appendChild(h);
+  section.appendChild(p);
+  section.appendChild(btn);
+  return section;
+}
+// People ranked by their weighted score for the current filter.
+function buildLeaderboard(profiles, personLabel) {
+  const section = document.createElement("div");
+  section.style.marginTop = "8px";
+  const scored = profiles
+    .map(p => ({ name: p.name || "Untitled", score: periodWeightedScore(p) }))
+    .filter(x => x.score !== null)
+    .sort((a, b) => b.score - a.score);
+  const heading = document.createElement("h2");
+  heading.textContent = "Leaderboard";
+  section.appendChild(heading);
+  const sub = document.createElement("div");
+  sub.className = "sub";
+  sub.textContent = "Ranked by weighted % of target" + summaryRangeText() + (personLabel ? " (filtered to " + personLabel + ")" : "");
+  section.appendChild(sub);
+  if (!scored.length) {
+    const note = document.createElement("div");
+    note.className = "empty-note";
+    note.textContent = "No saved weeks in this range yet.";
+    section.appendChild(note);
+    return section;
+  }
+  const list = document.createElement("div");
+  list.className = "leaderboard";
+  scored.forEach((row, i) => {
+    const item = document.createElement("div");
+    item.className = "lb-row";
+    const rank = document.createElement("span");
+    rank.className = "lb-rank" + (i === 0 ? " lead" : "");
+    rank.textContent = String(i + 1);
+    const name = document.createElement("span");
+    name.className = "lb-name";
+    name.textContent = row.name;
+    const score = chip(pctText(row.score), ragFor(row.score).cls);
+    score.classList.add("lb-score");
+    item.appendChild(rank);
+    item.appendChild(name);
+    item.appendChild(score);
+    list.appendChild(item);
+  });
+  section.appendChild(list);
+  return section;
+}
+
+function getMonthlyAggregated(profile) {
+  const byMonth = {};
+  Object.entries(profile.history).forEach(([key, entry]) => {
+    if (!inDateRange(entry.weekCommencing)) return;
+    const wc = entry.weekCommencing || key;
+    const mk = wc.slice(0, 7);
+    if (!byMonth[mk]) byMonth[mk] = { weekCount: 0, sums: {}, counts: {} };
+    byMonth[mk].weekCount++;
+    METRICS.forEach(m => {
+      const actual = parseFloat((entry.rows[m.key] || {}).actual);
+      if (!isNaN(actual)) {
+        byMonth[mk].sums[m.key] = (byMonth[mk].sums[m.key] || 0) + actual;
+        byMonth[mk].counts[m.key] = (byMonth[mk].counts[m.key] || 0) + 1;
+      }
+    });
+  });
+  return Object.entries(byMonth).sort(([a], [b]) => a < b ? -1 : 1).map(([mk, data]) => {
+    const rows = {};
+    METRICS.forEach(m => {
+      if (data.sums[m.key] !== undefined) {
+        rows[m.key] = {
+          actual: m.isPercent
+            ? (data.sums[m.key] / data.counts[m.key]).toFixed(1)
+            : data.sums[m.key].toString()
+        };
+      }
+    });
+    const label = new Date(mk + "-15").toLocaleString("default", { month: "long", year: "numeric" });
+    return { monthKey: mk, label, rows, weekCount: data.weekCount };
+  });
+}
+
+function getFilteredEntries(profile) {
+  if (dashboardGroupByMonth) return getMonthlyAggregated(profile);
+  return getFilteredWeeks(profile).map(w => ({ label: w.weekCommencing, rows: w.rows, weekCount: 1 }));
+}
+
+function refreshPersonFilterOptions() {
+  const personSelect = document.getElementById("personFilter");
+  const previousValue = personSelect.value || "all";
+  personSelect.innerHTML = "";
+
+  const allOpt = document.createElement("option");
+  allOpt.value = "all";
+  allOpt.textContent = "All people";
+  personSelect.appendChild(allOpt);
+
+  Object.values(STORE.profiles).forEach(p => {
+    const opt = document.createElement("option");
+    opt.value = p.id;
+    opt.textContent = p.name || "Untitled";
+    personSelect.appendChild(opt);
+  });
+
+  const stillExists = Array.from(personSelect.options).some(o => o.value === previousValue);
+  personSelect.value = stillExists ? previousValue : "all";
+  dashboardPersonFilter = personSelect.value;
+}
+
+function initDashboardFilters() {
+  if (dashboardFiltersReady) return;
+  dashboardFiltersReady = true;
+
+  const personSelect = document.getElementById("personFilter");
+  refreshPersonFilterOptions();
+  enhanceSelect(personSelect);
+  personSelect.addEventListener("change", () => {
+    dashboardPersonFilter = personSelect.value;
+    renderDashboardResults();
+  });
+
+  const metricSelect = document.getElementById("metricFilter");
+  const allOpt = document.createElement("option");
+  allOpt.value = "all";
+  allOpt.textContent = "All metrics";
+  metricSelect.appendChild(allOpt);
+  METRICS.forEach(m => {
+    const opt = document.createElement("option");
+    opt.value = m.key;
+    opt.textContent = m.name;
+    metricSelect.appendChild(opt);
+  });
+  enhanceSelect(metricSelect);
+
+  metricSelect.addEventListener("change", () => {
+    dashboardMetricFilter = metricSelect.value;
+    renderDashboardResults();
+  });
+
+  document.getElementById("dateFromFilter").addEventListener("change", e => {
+    dashboardDateFrom = e.target.value;
+    renderDashboardResults();
+  });
+  document.getElementById("dateToFilter").addEventListener("change", e => {
+    dashboardDateTo = e.target.value;
+    renderDashboardResults();
+  });
+  document.getElementById("allTimeBtn").addEventListener("click", () => {
+    dashboardDateFrom = "";
+    dashboardDateTo = "";
+    document.getElementById("dateFromFilter").value = "";
+    document.getElementById("dateToFilter").value = "";
+    renderDashboardResults();
+  });
+  document.getElementById("monthViewBtn").addEventListener("click", () => {
+    dashboardGroupByMonth = !dashboardGroupByMonth;
+    const btn = document.getElementById("monthViewBtn");
+    btn.style.background = dashboardGroupByMonth ? "var(--accent)" : "";
+    btn.style.color = dashboardGroupByMonth ? "#fff" : "";
+    renderDashboardResults();
+  });
+}
+
+function destroyCharts() {
+  [ragChart, personChart, trendChart].forEach(c => { if (c) c.destroy(); });
+  ragChart = personChart = trendChart = null;
+}
+
+function renderCharts(profiles) {
+  const metrics = metricsToConsider();
+  const GREEN = "#159a5b", AMBER = "#c97a04", RED = "#d23c4e", ACCENT = "#D73751";
+  const AXIS = "#6b7280", GRID = "rgba(16,24,40,0.06)", INK = "#1a1f2e";
+  const FONT = "'Plus Jakarta Sans', -apple-system, sans-serif";
+
+  // --- Inline chart plugins (readability helpers) ---
+  // Value labels above each bar/point.
+  const valueLabels = {
+    id: "valueLabels",
+    afterDatasetsDraw(chart) {
+      const { ctx } = chart;
+      const meta = chart.getDatasetMeta(0);
+      const ds = chart.data.datasets[0];
+      ctx.save();
+      ctx.font = "700 11px " + FONT;
+      ctx.fillStyle = INK;
+      ctx.textAlign = "center";
+      ctx.textBaseline = "bottom";
+      meta.data.forEach((el, i) => {
+        const val = ds.data[i];
+        if (val === null || val === undefined) return;
+        ctx.fillText(val + "%", el.x, el.y - 6);
+      });
+      ctx.restore();
+    },
+  };
+  // Dashed reference line at 100% of target.
+  const targetLine = {
+    id: "targetLine",
+    afterDatasetsDraw(chart) {
+      const y = chart.scales.y;
+      if (!y) return;
+      const yPix = y.getPixelForValue(100);
+      const { ctx, chartArea } = chart;
+      if (yPix < chartArea.top || yPix > chartArea.bottom) return;
+      ctx.save();
+      ctx.strokeStyle = ACCENT;
+      ctx.setLineDash([5, 4]);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.moveTo(chartArea.left, yPix);
+      ctx.lineTo(chartArea.right, yPix);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = ACCENT;
+      ctx.font = "700 10px " + FONT;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "bottom";
+      ctx.fillText("Target 100%", chartArea.right - 2, yPix - 3);
+      ctx.restore();
+    },
+  };
+  // Doughnut: total in the centre + count on each segment.
+  const doughnutInfo = (total) => ({
+    id: "doughnutInfo",
+    afterDatasetsDraw(chart) {
+      const { ctx, chartArea } = chart;
+      const cx = (chartArea.left + chartArea.right) / 2;
+      const cy = (chartArea.top + chartArea.bottom) / 2;
+      ctx.save();
+      ctx.textAlign = "center";
+      ctx.fillStyle = INK;
+      ctx.font = "800 26px " + FONT;
+      ctx.textBaseline = "alphabetic";
+      ctx.fillText(String(total), cx, cy);
+      ctx.fillStyle = "#667085";
+      ctx.font = "600 9px " + FONT;
+      ctx.fillText("RATINGS", cx, cy + 15);
+      // segment counts
+      const meta = chart.getDatasetMeta(0);
+      const ds = chart.data.datasets[0];
+      ctx.fillStyle = "#fff";
+      ctx.font = "700 12px " + FONT;
+      ctx.textBaseline = "middle";
+      meta.data.forEach((arc, i) => {
+        const val = ds.data[i];
+        if (!val) return;
+        const p = arc.tooltipPosition();
+        ctx.fillText(String(val), p.x, p.y);
+      });
+      ctx.restore();
+    },
+  });
+
+  // ---- RAG distribution (doughnut) across all filtered entries ----
+  const tallies = { green: 0, amber: 0, red: 0 };
+  profiles.forEach(p => {
+    getFilteredEntries(p).forEach(entry => {
+      metrics.forEach(m => {
+        const { rag } = computeCellForEntry(m, (entry.rows[m.key] || {}).actual, entry.weekCount || 1);
+        if (rag.cls === "green") tallies.green++;
+        else if (rag.cls === "amber") tallies.amber++;
+        else if (rag.cls === "red") tallies.red++;
+      });
+    });
+  });
+
+  const ragCanvas = document.getElementById("ragChart");
+  const ragTotal = tallies.green + tallies.amber + tallies.red;
+  ragChart = new Chart(ragCanvas, {
+    type: "doughnut",
+    data: {
+      labels: ["Green", "Amber", "Red"],
+      datasets: [{ data: [tallies.green, tallies.amber, tallies.red], backgroundColor: [GREEN, AMBER, RED], borderColor: "#fff", borderWidth: 2, hoverOffset: 6 }],
+    },
+    options: {
+      cutout: "60%",
+      layout: { padding: 6 },
+      plugins: {
+        legend: { position: "bottom", labels: { usePointStyle: true, pointStyle: "circle", padding: 16, color: INK, font: { size: 12, family: FONT } } },
+        tooltip: { callbacks: { label: (c) => { const tot = c.dataset.data.reduce((a, b) => a + b, 0) || 1; return " " + c.label + ": " + c.parsed + " (" + Math.round(c.parsed / tot * 100) + "%)"; } } },
+      },
+    },
+    plugins: [doughnutInfo(ragTotal)],
+  });
+
+  // ---- Average % to target: by person (team view), or by metric (single-person view) ----
+  let barData;
+  if (profiles.length === 1) {
+    const entries = getFilteredEntries(profiles[0]);
+    barData = metrics.map(m => {
+      const vals = entries.map(e => computeCellForEntry(m, (e.rows[m.key] || {}).actual, e.weekCount || 1).pct).filter(v => v !== null);
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      return { name: m.name, avg };
+    }).filter(d => d.avg !== null);
+  } else {
+    barData = profiles.map(p => {
+      const entries = getFilteredEntries(p);
+      const entryAverages = entries.map(e => avgPctForRows(e.rows, metrics, e.weekCount || 1)).filter(v => v !== null);
+      const avg = entryAverages.length ? entryAverages.reduce((a, b) => a + b, 0) / entryAverages.length : null;
+      return { name: p.name || "Untitled", avg };
+    }).filter(d => d.avg !== null);
+  }
+
+  const personCanvas = document.getElementById("personChart");
+  personChart = new Chart(personCanvas, {
+    type: "bar",
+    data: {
+      labels: barData.map(d => d.name),
+      datasets: [{
+        label: "Avg % of target",
+        data: barData.map(d => Math.round(d.avg * 100)),
+        backgroundColor: barData.map(d => d.avg >= getGreen() ? GREEN : d.avg >= getAmber() ? AMBER : RED),
+        borderRadius: 6, maxBarThickness: 48,
+      }],
+    },
+    options: {
+      layout: { padding: { top: 22 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => " " + c.parsed.y + "% of target" } },
+      },
+      scales: {
+        y: { beginAtZero: true, suggestedMax: 120, grid: { color: GRID }, border: { display: false }, ticks: { callback: v => v + "%", color: AXIS, font: { family: FONT } } },
+        x: { grid: { display: false }, ticks: { color: AXIS, font: { family: FONT } } },
+      },
+    },
+    plugins: [targetLine, valueLabels],
+  });
+
+  // ---- Trend over time: average % per week or month (line) ----
+  const entryMap = {};
+  profiles.forEach(p => {
+    getFilteredEntries(p).forEach(entry => {
+      const avg = avgPctForRows(entry.rows, metrics, entry.weekCount || 1);
+      if (avg === null) return;
+      const key = dashboardGroupByMonth ? entry.monthKey : entry.label;
+      if (!entryMap[key]) entryMap[key] = { displayLabel: entry.label, avgs: [] };
+      entryMap[key].avgs.push(avg);
+    });
+  });
+  const sortedKeys = Object.keys(entryMap).sort();
+  const trendCanvas = document.getElementById("trendChart");
+  trendChart = new Chart(trendCanvas, {
+    type: "line",
+    data: {
+      labels: sortedKeys.map(k => entryMap[k].displayLabel),
+      datasets: [{
+        label: profiles.length === 1 ? (profiles[0].name || "Untitled") + "'s average % of target" : "Team average % of target",
+        data: sortedKeys.map(k => Math.round((entryMap[k].avgs.reduce((a, b) => a + b, 0) / entryMap[k].avgs.length) * 100)),
+        borderColor: ACCENT,
+        backgroundColor: "rgba(215,55,81,0.12)",
+        fill: true, tension: 0.3, borderWidth: 2.5,
+        pointRadius: 4, pointHoverRadius: 6, pointBackgroundColor: ACCENT, pointBorderColor: "#fff", pointBorderWidth: 2,
+      }],
+    },
+    options: {
+      layout: { padding: { top: 22 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: c => " " + c.parsed.y + "% of target" } },
+      },
+      scales: {
+        y: { beginAtZero: true, suggestedMax: 120, grid: { color: GRID }, border: { display: false }, ticks: { callback: v => v + "%", color: AXIS, font: { family: FONT } } },
+        x: { grid: { display: false }, ticks: { color: AXIS, font: { family: FONT } } },
+      },
+    },
+    plugins: [targetLine, valueLabels],
+  });
+}
+
+function latestSnapshot(profile) {
+  const keys = Object.keys(profile.history).sort();
+  if (keys.length) {
+    const entry = profile.history[keys[keys.length - 1]];
+    return { weekCommencing: entry.weekCommencing, rows: entry.rows || {}, isLive: false };
+  }
+  return { weekCommencing: profile.weekCommencing, rows: profile.rows || {}, isLive: true };
+}
+
+// The raw actual entered for a metric, tidied for display (percent metrics get a %).
+function actualLabel(m, raw) {
+  if (raw === "" || raw === undefined || raw === null) return "";
+  const n = parseFloat(raw);
+  if (isNaN(n)) return String(raw);
+  const num = Math.round(n * 100) / 100;
+  return m.isPercent ? num + "%" : String(num);
+}
+// Add the actual figure under a % chip as small print (nothing added if blank).
+function appendActual(td, m, raw) {
+  const a = actualLabel(m, raw);
+  if (a === "") return;
+  const small = document.createElement("div");
+  small.className = "cell-actual";
+  small.textContent = a;
+  td.appendChild(small);
+}
+function chip(label, cls) {
+  const span = document.createElement("span");
+  span.className = "chip " + cls;
+  span.textContent = label || "-";
+  return span;
+}
+
+function renderDashboardResults() {
+  const container = document.getElementById("dashboardBody");
+  container.innerHTML = "";
+  destroyCharts();
+  refreshPersonFilterOptions();
+  const allProfiles = Object.values(STORE.profiles);
+
+  if (!allProfiles.length) {
+    container.innerHTML = '<div class="empty-note">No scorecards yet.</div>';
+    return;
+  }
+
+  const selectedPerson = dashboardPersonFilter === "all" ? null : STORE.profiles[dashboardPersonFilter];
+  const profiles = selectedPerson ? [selectedPerson] : allProfiles;
+  const personLabel = selectedPerson ? (selectedPerson.name || "Untitled") : null;
+
+  // ---- Weekly summary (plain-English recap of the current scope) ----
+  container.appendChild(buildWeeklySummary(profiles, personLabel));
+
+  // ---- Charts (respect the person + statistic + date filters) ----
+  const chartSection = document.createElement("div");
+  chartSection.className = "chart-section";
+  const rangeLabel = (dashboardDateFrom || dashboardDateTo)
+    ? "Filtered: " + (dashboardDateFrom || "the start") + " to " + (dashboardDateTo || "now")
+    : "All time";
+  chartSection.innerHTML =
+    '<h2>Charts' + (personLabel ? " &mdash; " + personLabel : "") + '</h2><div class="sub">' + rangeLabel + " &middot; " +
+    (dashboardMetricFilter === "all" ? "All metrics (averaged)" : METRICS.find(m => m.key === dashboardMetricFilter).name) +
+    '</div>';
+  const chartGrid = document.createElement("div");
+  chartGrid.className = "chart-grid";
+  chartGrid.innerHTML =
+    '<div class="chart-card"><h3>RAG Distribution</h3><canvas id="ragChart"></canvas></div>' +
+    '<div class="chart-card"><h3>Average % of Target by ' + (personLabel ? "Metric" : "Person") + '</h3><canvas id="personChart"></canvas></div>';
+  chartSection.appendChild(chartGrid);
+  const trendCard = document.createElement("div");
+  trendCard.className = "chart-card";
+  trendCard.style.marginBottom = "8px";
+  trendCard.innerHTML = '<h3>Trend Over Time (' + (personLabel ? personLabel : "Team Average") + ')</h3><canvas id="trendChart"></canvas>';
+  chartSection.appendChild(trendCard);
+  container.appendChild(chartSection);
+  renderCharts(profiles);
+
+  // ---- Team snapshot ----
+  const teamSection = document.createElement("div");
+  teamSection.innerHTML = '<h2>' + (personLabel ? personLabel + "'s Snapshot" : "Team Snapshot") + '</h2><div class="sub">' +
+    (personLabel ? "Their" : "Each person's") + " most recently saved week (or current in-progress entry if nothing's been saved yet)</div>";
+
+  const tallies = { green: 0, amber: 0, red: 0 };
+  const snapshots = profiles.map(p => ({ profile: p, snap: latestSnapshot(p) }));
+
+  const statRow = document.createElement("div");
+  statRow.className = "stat-cards";
+  snapshots.forEach(({ snap }) => {
+    METRICS.forEach(m => {
+      const { rag } = computeCell(m, (snap.rows[m.key] || {}).actual);
+      if (rag.cls === "green") tallies.green++;
+      else if (rag.cls === "amber") tallies.amber++;
+      else if (rag.cls === "red") tallies.red++;
+    });
+  });
+  statRow.appendChild(makeStatCard(tallies.green, "Green", "green"));
+  statRow.appendChild(makeStatCard(tallies.amber, "Amber", "amber"));
+  statRow.appendChild(makeStatCard(tallies.red, "Red", "red"));
+  statRow.appendChild(makeStatCard(profiles.length, "People", ""));
+  teamSection.appendChild(statRow);
+
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const headRow = document.createElement("tr");
+  headRow.appendChild(document.createElement("th")).textContent = "Person";
+  METRICS.forEach(m => {
+    const th = document.createElement("th");
+    th.textContent = m.name;
+    headRow.appendChild(th);
+  });
+  const wScoreTh = document.createElement("th");
+  wScoreTh.textContent = "Weighted";
+  headRow.appendChild(wScoreTh);
+  const weekTh = document.createElement("th");
+  weekTh.textContent = "As of week";
+  headRow.appendChild(weekTh);
+  thead.appendChild(headRow);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  snapshots.forEach(({ profile, snap }) => {
+    const tr = document.createElement("tr");
+    const nameTd = document.createElement("td");
+    nameTd.className = "metric";
+    nameTd.textContent = profile.name || "Untitled";
+    tr.appendChild(nameTd);
+
+    METRICS.forEach(m => {
+      const td = document.createElement("td");
+      const raw = (snap.rows[m.key] || {}).actual;
+      const { pct, rag } = computeCell(m, raw);
+      const label = pct === null ? "" : (pct * 100).toFixed(0) + "%";
+      td.appendChild(chip(label, rag.cls));
+      appendActual(td, m, raw);
+      tr.appendChild(td);
+    });
+
+    const wScoreTd = document.createElement("td");
+    const wScore = weightedPctForRows(snap.rows, METRICS, 1);
+    wScoreTd.appendChild(chip(wScore === null ? "" : pctText(wScore), ragFor(wScore).cls));
+    tr.appendChild(wScoreTd);
+    const weekTd = document.createElement("td");
+    weekTd.className = "readonly";
+    weekTd.textContent = snap.weekCommencing ? snap.weekCommencing + (snap.isLive ? " (in progress)" : "") : "-";
+    tr.appendChild(weekTd);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  teamSection.appendChild(table);
+  container.appendChild(teamSection);
+
+  // ---- Leaderboard (ranked by weighted score for the current filter) ----
+  container.appendChild(buildLeaderboard(profiles, personLabel));
+
+  // ---- Per-person history ----
+  const historySection = document.createElement("div");
+  historySection.style.marginTop = "32px";
+  const histPeriod = dashboardGroupByMonth ? "months" : "weeks";
+  historySection.innerHTML = '<h2>' + (personLabel ? "History" : "Per-Person History") + '</h2><div class="sub">Saved ' + histPeriod + ' within the selected date range, oldest to newest</div>';
+
+  profiles.forEach(profile => {
+    const block = document.createElement("div");
+    block.className = "person-block";
+    const heading = document.createElement("h3");
+    heading.textContent = profile.name || "Untitled";
+    block.appendChild(heading);
+
+    const entries = dashboardGroupByMonth
+      ? getMonthlyAggregated(profile)
+      : Object.keys(profile.history).filter(k => inDateRange(profile.history[k].weekCommencing)).sort()
+          .map(k => ({ _weekKey: k, label: profile.history[k].weekCommencing || k, rows: profile.history[k].rows || {}, weekCount: 1 }));
+
+    if (!entries.length) {
+      const note = document.createElement("div");
+      note.className = "empty-note";
+      note.textContent = (dashboardDateFrom || dashboardDateTo) ? "No saved " + histPeriod + " in this range." : "No saved " + histPeriod + " yet.";
+      block.appendChild(note);
+      historySection.appendChild(block);
+      return;
+    }
+
+    const ptable = document.createElement("table");
+    const phead = document.createElement("thead");
+    const phr = document.createElement("tr");
+    phr.appendChild(document.createElement("th")).textContent = dashboardGroupByMonth ? "Month" : "Week";
+    METRICS.forEach(m => {
+      const th = document.createElement("th");
+      th.textContent = m.name;
+      phr.appendChild(th);
+    });
+    const pwTh = document.createElement("th");
+    pwTh.textContent = "Weighted";
+    phr.appendChild(pwTh);
+    if (!dashboardGroupByMonth) phr.appendChild(document.createElement("th"));
+    phead.appendChild(phr);
+    ptable.appendChild(phead);
+
+    const pbody = document.createElement("tbody");
+    entries.forEach(entry => {
+      const tr = document.createElement("tr");
+      const periodTd = document.createElement("td");
+      periodTd.className = "metric";
+      periodTd.textContent = entry.label;
+      tr.appendChild(periodTd);
+      METRICS.forEach(m => {
+        const td = document.createElement("td");
+        const raw = (entry.rows[m.key] || {}).actual;
+        const { pct, rag } = computeCellForEntry(m, raw, entry.weekCount || 1);
+        const label = pct === null ? "" : (pct * 100).toFixed(0) + "%";
+        td.appendChild(chip(label, rag.cls));
+        appendActual(td, m, raw);
+        tr.appendChild(td);
+      });
+      const pwTd = document.createElement("td");
+      const pwScore = weightedPctForRows(entry.rows, METRICS, entry.weekCount || 1);
+      pwTd.appendChild(chip(pwScore === null ? "" : pctText(pwScore), ragFor(pwScore).cls));
+      tr.appendChild(pwTd);
+      if (!dashboardGroupByMonth) {
+        const delTd = document.createElement("td");
+        const delBtn = document.createElement("button");
+        delBtn.className = "link-danger";
+        delBtn.style.cssText = "font-size:0.75rem;padding:0 2px";
+        delBtn.textContent = "Delete";
+        delBtn.addEventListener("click", () => {
+          deleteWeek(profile.id, entry._weekKey);
+          renderDashboardResults();
+        });
+        delTd.appendChild(delBtn);
+        tr.appendChild(delTd);
+      }
+      pbody.appendChild(tr);
+    });
+    ptable.appendChild(pbody);
+    block.appendChild(ptable);
+    historySection.appendChild(block);
+  });
+
+  container.appendChild(historySection);
+}
+
+function makeStatCard(num, label, cls) {
+  const div = document.createElement("div");
+  div.className = "stat-card " + cls;
+  const n = document.createElement("div");
+  n.className = "num";
+  n.textContent = num;
+  const l = document.createElement("div");
+  l.className = "label";
+  l.textContent = label;
+  div.appendChild(n);
+  div.appendChild(l);
+  return div;
+}
+
+function switchMode(next) {
+  mode = next;
+  document.getElementById("scorecardView").style.display = next === "scorecard" ? "" : "none";
+  document.getElementById("dashboardView").style.display = next === "dashboard" ? "" : "none";
+  document.getElementById("settingsView").style.display = next === "settings" ? "" : "none";
+  document.getElementById("scorecardNav").style.display = next === "scorecard" ? "" : "none";
+  document.getElementById("navScorecard").classList.toggle("active", next === "scorecard");
+  document.getElementById("navDashboard").classList.toggle("active", next === "dashboard");
+  document.getElementById("navSettings").classList.toggle("active", next === "settings");
+  if (next === "dashboard") {
+    initDashboardFilters();
+    renderDashboardResults();
+  }
+  if (next === "settings") syncGoalInputs();
+}
+
+// Native <select> dropdown menus are rendered by the OS and can't be
+// restyled with CSS. This wraps a hidden native <select> (kept as the
+// source of truth so existing value/change/disabled logic needs no
+// changes) with a custom-styled trigger + menu that mirrors it exactly.
+function enhanceSelect(selectEl) {
+  selectEl.classList.add("native-select-hidden");
+
+  const wrap = document.createElement("div");
+  wrap.className = "custom-select";
+  selectEl.parentNode.insertBefore(wrap, selectEl);
+  wrap.appendChild(selectEl);
+
+  const trigger = document.createElement("button");
+  trigger.type = "button";
+  trigger.className = "custom-select-trigger";
+  const label = document.createElement("span");
+  label.className = "label";
+  const arrow = document.createElement("span");
+  arrow.className = "arrow";
+  trigger.appendChild(label);
+  trigger.appendChild(arrow);
+
+  const menu = document.createElement("div");
+  menu.className = "custom-select-menu";
+
+  wrap.appendChild(trigger);
+  wrap.appendChild(menu);
+
+  function closeMenu() {
+    menu.classList.remove("open");
+    document.removeEventListener("click", onDocClick);
+    document.removeEventListener("keydown", onKeydown);
+  }
+
+  function onDocClick(e) {
+    if (!wrap.contains(e.target)) closeMenu();
+  }
+
+  function onKeydown(e) {
+    if (e.key === "Escape") closeMenu();
+  }
+
+  function openMenu() {
+    if (selectEl.disabled) return;
+    menu.classList.add("open");
+    document.addEventListener("click", onDocClick);
+    document.addEventListener("keydown", onKeydown);
+  }
+
+  function render() {
+    const selected = selectEl.options[selectEl.selectedIndex];
+    label.textContent = selected ? selected.textContent : "";
+    trigger.disabled = selectEl.disabled;
+    menu.innerHTML = "";
+    Array.from(selectEl.options).forEach(opt => {
+      const item = document.createElement("div");
+      item.className = "custom-select-option" + (opt.value === selectEl.value ? " selected" : "");
+      item.textContent = opt.textContent;
+      item.addEventListener("click", () => {
+        selectEl.value = opt.value;
+        selectEl.dispatchEvent(new Event("change", { bubbles: true }));
+        closeMenu();
+      });
+      menu.appendChild(item);
+    });
+  }
+
+  trigger.addEventListener("click", () => {
+    if (menu.classList.contains("open")) {
+      closeMenu();
+    } else {
+      render();
+      openMenu();
+    }
+  });
+
+  new MutationObserver(render).observe(selectEl, { childList: true, attributes: true, subtree: true });
+  render();
+}
+
+/* ---------------- Week navigation & past-week entry ---------------- */
+function fmtDate(d) {
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return d.getFullYear() + "-" + m + "-" + day;
+}
+// Any date -> the Monday (week commencing) of that week, so weeks stay aligned.
+function snapToMonday(str) {
+  const mm = /^(\d{4})-(\d{2})-(\d{2})$/.exec((str || "").trim());
+  if (!mm) return null;
+  const d = new Date(+mm[1], +mm[2] - 1, +mm[3]);
+  if (isNaN(d.getTime())) return null;
+  const wd = d.getDay();
+  d.setDate(d.getDate() + (wd === 0 ? -6 : 1 - wd));
+  return fmtDate(d);
+}
+function defaultNewWeekDate() {
+  const d = new Date();
+  d.setDate(d.getDate() - 7);
+  return snapToMonday(fmtDate(d));
+}
+// Weeks oldest -> newest for the prev/next arrows, with the current slot last.
+function orderedWeekKeys() {
+  const profile = getActiveProfile();
+  return Object.keys(profile.history || {}).sort().concat([CURRENT_KEY]);
+}
+function updateWeekNavButtons() {
+  const prev = document.getElementById("weekPrevBtn");
+  const next = document.getElementById("weekNextBtn");
+  if (!prev || !next || !STORE) return;
+  const ready = !document.getElementById("weekSelect").disabled;
+  const keys = orderedWeekKeys();
+  const idx = keys.indexOf(currentWeekKey);
+  prev.disabled = !ready || idx <= 0;
+  next.disabled = !ready || idx < 0 || idx >= keys.length - 1;
+}
+function stepWeek(delta) {
+  const keys = orderedWeekKeys();
+  let idx = keys.indexOf(currentWeekKey);
+  if (idx < 0) idx = keys.length - 1;
+  const target = idx + delta;
+  if (target < 0 || target >= keys.length) return;
+  currentWeekKey = keys[target];
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  refreshDeleteWeekBtn();
+}
+function snapWeekCommencing() {
+  const el = document.getElementById("weekCommencing");
+  if (el.value) { const m = snapToMonday(el.value); if (m && m !== el.value) el.value = m; }
+  persistWeek();
+}
+function addPastWeek() {
+  const profile = getActiveProfile();
+  const input = prompt("Add a week to fill in.\n\nEnter its Monday (week commencing) as YYYY-MM-DD:", defaultNewWeekDate());
+  if (input === null) return;
+  const date = snapToMonday(input);
+  if (!date) { alert("Please enter a valid date like 2026-07-06."); return; }
+  if (!profile.history[date]) {
+    profile.history[date] = { weekCommencing: date, reviewDate: "", rows: {} };
+  }
+  currentWeekKey = date;
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  refreshDeleteWeekBtn();
+  writeStore();
+}
+
+/* ---------------- Editable goals (Settings) ---------------- */
+// Effective (possibly overridden) weekly target for a metric.
+function getTarget(m) {
+  const t = SETTINGS.targets ? SETTINGS.targets[m.key] : undefined;
+  const num = parseFloat(t);
+  return (t === undefined || t === null || t === "" || isNaN(num) || num <= 0) ? m.targetValue : num;
+}
+function getGreen() {
+  const g = parseFloat(SETTINGS.green);
+  return (isNaN(g) || g <= 0) ? 1 : g / 100;
+}
+function getAmber() {
+  const a = parseFloat(SETTINGS.amber);
+  return (isNaN(a) || a <= 0 || a >= 100) ? 0.85 : a / 100;
+}
+function targetLabel(m) {
+  const t = getTarget(m);
+  return m.isPercent ? t + "%" : t;
+}
+// Re-render the scorecard target column + % cells after a goal changes.
+function refreshTargetDisplays() {
+  METRICS.forEach(m => {
+    const c = document.getElementById("target_" + m.key);
+    if (c) c.textContent = targetLabel(m);
+    updateRow(m, false);
+  });
+}
+function buildSettings() {
+  const list = document.getElementById("settingsList");
+  list.innerHTML = "";
+  METRICS.forEach(m => {
+    const row = document.createElement("div");
+    row.className = "set-row";
+    row.innerHTML =
+      '<div class="set-label"><span class="set-name">' + m.name + '</span>' +
+        '<span class="set-unit">' + (METRIC_UNITS[m.key] || "") + '</span></div>' +
+      '<div class="set-input"><input type="number" step="any" min="0" id="goal_' + m.key + '">' +
+        '<span class="set-default">default ' + m.targetValue + (m.isPercent ? '%' : '') + '</span></div>';
+    list.appendChild(row);
+  });
+  METRICS.forEach(m => document.getElementById("goal_" + m.key).addEventListener("input", onGoalInput));
+}
+function syncGoalInputs() {
+  METRICS.forEach(m => {
+    const g = document.getElementById("goal_" + m.key);
+    if (g) g.value = getTarget(m);
+  });
+  const a = document.getElementById("amberThreshold");
+  if (a) a.value = Math.round(getAmber() * 100);
+  const gr = document.getElementById("greenThreshold");
+  if (gr) gr.value = Math.round(getGreen() * 100);
+}
+function onGoalInput() {
+  const targets = {};
+  METRICS.forEach(m => {
+    const v = document.getElementById("goal_" + m.key).value;
+    const num = parseFloat(v);
+    if (v !== "" && !isNaN(num) && num > 0) targets[m.key] = num;
+  });
+  SETTINGS.targets = targets;
+  refreshTargetDisplays();
+  if (mode === "dashboard") renderDashboardResults();
+  scheduleSettingsPersist();
+}
+function onGreenInput() {
+  const v = parseFloat(document.getElementById("greenThreshold").value);
+  if (!isNaN(v) && v > 0) SETTINGS.green = v;
+  else delete SETTINGS.green;
+  refreshTargetDisplays();
+  if (mode === "dashboard") renderDashboardResults();
+  scheduleSettingsPersist();
+}
+function onAmberInput() {
+  const v = parseFloat(document.getElementById("amberThreshold").value);
+  if (!isNaN(v) && v > 0 && v < 100) SETTINGS.amber = v;
+  else delete SETTINGS.amber;
+  refreshTargetDisplays();
+  if (mode === "dashboard") renderDashboardResults();
+  scheduleSettingsPersist();
+}
+function scheduleSettingsPersist() {
+  setIndicator("Saving...");
+  clearTimeout(settingsTimer);
+  settingsTimer = setTimeout(writeSettings, 500);
+}
+function writeSettings() {
+  suppressSettingsRefresh = true;
+  setDoc(settingsDocRef, SETTINGS)
+    .then(() => setIndicator("Goals saved " + new Date().toLocaleTimeString()))
+    .catch(err => { console.error(err); setIndicator("Couldn't save goals - check your internet connection"); })
+    .finally(() => { suppressSettingsRefresh = false; });
+}
+function resetGoals() {
+  if (!confirm("Reset all weekly goals and the amber threshold back to the defaults?")) return;
+  SETTINGS = { targets: {} };
+  syncGoalInputs();
+  refreshTargetDisplays();
+  if (mode === "dashboard") renderDashboardResults();
+  writeSettings();
+}
+
+/* ---------------- Backup & restore ---------------- */
+function exportBackup() {
+  const payload = { app: "WCF BDE Weekly Scorecard", version: 1, exportedAt: new Date().toISOString(), store: STORE, settings: SETTINGS };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "scorecard-backup-" + new Date().toISOString().slice(0, 10) + ".json";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+  setIndicator("Backup downloaded " + new Date().toLocaleTimeString());
+}
+function importBackup(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    let data;
+    try { data = JSON.parse(reader.result); } catch (e) { alert("That file isn't valid backup JSON. Nothing was changed."); return; }
+    const store = (data && data.store) ? data.store : data;
+    if (!store || typeof store !== "object" || !store.profiles || typeof store.profiles !== "object" || !Object.keys(store.profiles).length) {
+      alert("That file doesn't look like a scorecard backup (no scorecards found). Nothing was changed.");
+      return;
+    }
+    const incoming = Object.keys(store.profiles).length;
+    const current = Object.keys((STORE && STORE.profiles) || {}).length;
+    if (!confirm("Restore this backup?\n\nThis REPLACES all current scorecards (" + current + " now) with " + incoming + " from the file, for everyone on the team. This can't be undone.")) return;
+    STORE = store;
+    Object.values(STORE.profiles).forEach(ensureProfileShape);
+    if (!STORE.profiles[STORE.activeId]) { STORE.activeId = Object.keys(STORE.profiles)[0]; currentWeekKey = CURRENT_KEY; }
+    writeStore();
+    if (data && data.settings && typeof data.settings === "object") {
+      const st = data.settings;
+      SETTINGS = { targets: (st.targets && typeof st.targets === "object") ? st.targets : {} };
+      if (typeof st.amber === "number") SETTINGS.amber = st.amber;
+      writeSettings();
+      syncGoalInputs();
+      refreshTargetDisplays();
+    }
+    refreshProfileDropdown();
+    refreshWeekDropdown();
+    loadWeekIntoForm();
+    if (mode === "dashboard") renderDashboardResults();
+    setIndicator("Backup restored " + new Date().toLocaleTimeString());
+  };
+  reader.readAsText(file);
+}
+
+/* ---------------- Import calls & talk time from a phone CSV ---------------- */
+// Decode an uploaded file that may be UTF-16 (the phone export) or UTF-8, honouring the BOM.
+function decodeUploadedText(buffer) {
+  const bytes = new Uint8Array(buffer);
+  if (bytes.length >= 2 && bytes[0] === 0xFF && bytes[1] === 0xFE) return new TextDecoder("utf-16le").decode(buffer);
+  if (bytes.length >= 2 && bytes[0] === 0xFE && bytes[1] === 0xFF) return new TextDecoder("utf-16be").decode(buffer);
+  return new TextDecoder("utf-8").decode(buffer);
+}
+// "00d 05h 35m 41s" -> decimal hours (2dp). Null if it can't be parsed.
+function durationToHours(str) {
+  const m = /(\d+)\s*d\s*(\d+)\s*h\s*(\d+)\s*m\s*(\d+)\s*s/i.exec(str || "");
+  if (!m) return null;
+  const hours = (+m[1]) * 24 + (+m[2]) + (+m[3]) / 60 + (+m[4]) / 3600;
+  return Math.round(hours * 100) / 100;
+}
+// Strip a trailing extension like " (208)" and tidy whitespace.
+function cleanCsvName(raw) {
+  return (raw || "").replace(/\(\s*\d+\s*\)\s*$/, "").replace(/\s+/g, " ").trim();
+}
+// Parse the phone export into [{ name, calls, talkHours }], one entry per person summary row.
+function parseCallsCsv(text) {
+  const out = [];
+  text.split(/\r?\n/).forEach(line => {
+    if (!line.trim()) return;
+    const cells = line.split("\t").map(c => c.trim());
+    const first = cells[0] || "";
+    if (!first || first.toLowerCase() === "extension") return; // header or per-direction sub-row
+    const name = cleanCsvName(first);
+    if (!name) return;
+    const callsNum = parseInt((cells[2] || "").replace(/[^\d]/g, ""), 10);
+    out.push({ name, calls: isNaN(callsNum) ? null : callsNum, talkHours: durationToHours(cells[5] || "") });
+  });
+  return out;
+}
+// Match a CSV name to an existing profile: exact -> prefix -> first name. Null if none/ambiguous.
+function matchProfileByName(csvName) {
+  const norm = v => (v || "").toLowerCase().replace(/\s+/g, " ").trim();
+  const target = norm(csvName);
+  if (!target) return null;
+  const first = target.split(" ")[0];
+  const profs = Object.values(STORE.profiles || {});
+  let m = profs.filter(p => norm(p.name) === target);
+  if (m.length === 1) return m[0];
+  m = profs.filter(p => { const nm = norm(p.name); return nm && (target.startsWith(nm) || nm.startsWith(target)); });
+  if (m.length === 1) return m[0];
+  m = profs.filter(p => norm(p.name).split(" ")[0] === first);
+  if (m.length === 1) return m[0];
+  return null;
+}
+function importCallsCsv(file) {
+  if (!STORE || !STORE.profiles) { alert("Still loading the scorecards - give it a second and try again."); return; }
+  const reader = new FileReader();
+  reader.onload = () => {
+    let text;
+    try { text = decodeUploadedText(reader.result); } catch (e) { alert("Couldn't read that file."); return; }
+    const parsed = parseCallsCsv(text);
+    if (!parsed.length) { alert("No people found in that file. Make sure it's the phone system's extension overview export (CSV)."); return; }
+    persistWeek(); // flush any in-progress typing on the active profile first
+    const applied = [], skipped = [];
+    parsed.forEach(r => {
+      const profile = matchProfileByName(r.name);
+      if (profile) applied.push({ profile, r }); else skipped.push(r.name);
+    });
+    if (!applied.length) {
+      alert("None of the names in the file matched a scorecard.\n\nIn the file: " + parsed.map(p => p.name).join(", ") + "\nScorecards: " + Object.values(STORE.profiles).map(p => p.name).join(", "));
+      return;
+    }
+    const lines = applied.map(({ profile, r }) => {
+      const parts = [];
+      if (r.calls !== null) parts.push(r.calls + " calls");
+      if (r.talkHours !== null) parts.push(r.talkHours + "h talk time");
+      return "• " + profile.name + ": " + (parts.length ? parts.join(", ") : "no values found");
+    });
+    let msg = "Fill the CURRENT week's Calls and Talk Time for these people from the file?\n\n" + lines.join("\n");
+    if (skipped.length) msg += "\n\nNot in the scorecard (skipped): " + skipped.join(", ");
+    msg += "\n\nOnly Calls and Talk Time are changed - every other metric, note and action is left as it is. Existing Calls/Talk Time for the current week will be overwritten.";
+    if (!confirm(msg)) return;
+    applied.forEach(({ profile, r }) => {
+      profile.rows = profile.rows || {};
+      if (r.calls !== null) { const c = profile.rows.calls || {}; c.actual = String(r.calls); profile.rows.calls = c; }
+      if (r.talkHours !== null) { const t = profile.rows.talkTime || {}; t.actual = String(r.talkHours); profile.rows.talkTime = t; }
+    });
+    writeStore();
+    if (currentWeekKey === CURRENT_KEY) loadWeekIntoForm();
+    setIndicator("Imported calls for " + applied.length + " " + (applied.length === 1 ? "person" : "people") + " " + new Date().toLocaleTimeString());
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+async function init() {
+  buildTable();
+
+  const table = document.getElementById("scorecardTable");
+  const toggle = document.getElementById("toggleWeight");
+  const showWeight = localStorage.getItem(WEIGHT_PREF_KEY) === "true";
+  toggle.checked = showWeight;
+  table.classList.toggle("show-weight", showWeight);
+  toggle.addEventListener("change", () => {
+    table.classList.toggle("show-weight", toggle.checked);
+    localStorage.setItem(WEIGHT_PREF_KEY, toggle.checked);
+  });
+
+  try {
+    const snap = await getDoc(storeDocRef);
+    if (snap.exists()) {
+      STORE = snap.data();
+      Object.values(STORE.profiles).forEach(ensureProfileShape);
+    } else {
+      STORE = buildSeedStore();
+      await setDoc(storeDocRef, STORE);
+    }
+  } catch (err) {
+    console.error(err);
+    setIndicator("Could not connect to cloud database - check your internet connection");
+    return;
+  }
+
+  // Load editable goals (separate doc; absent = defaults, nothing written).
+  try {
+    const sSnap = await getDoc(settingsDocRef);
+    if (sSnap.exists()) { const d = sSnap.data() || {}; SETTINGS = { targets: (d && d.targets) ? d.targets : {} }; if (typeof d.amber === "number") SETTINGS.amber = d.amber; if (typeof d.green === "number") SETTINGS.green = d.green; }
+  } catch (err) { console.error(err); }
+  buildSettings();
+  syncGoalInputs();
+
+  refreshProfileDropdown();
+  refreshWeekDropdown();
+  loadWeekIntoForm();
+  refreshTargetDisplays();
+  setControlsEnabled(true);
+  setIndicator("Synced " + new Date().toLocaleTimeString());
+
+  enhanceSelect(document.getElementById("profileSelect"));
+  enhanceSelect(document.getElementById("weekSelect"));
+
+  document.getElementById("bdeName").addEventListener("input", persistIdentity);
+  document.getElementById("manager").addEventListener("input", persistIdentity);
+  document.getElementById("weekCommencing").addEventListener("input", persistWeek);
+  document.getElementById("reviewDate").addEventListener("input", persistWeek);
+
+  document.getElementById("profileSelect").addEventListener("change", e => switchProfile(e.target.value));
+  document.getElementById("weekSelect").addEventListener("change", e => switchWeek(e.target.value));
+  document.getElementById("newProfileBtn").addEventListener("click", createProfile);
+  document.getElementById("deleteProfileBtn").addEventListener("click", deleteProfile);
+  document.getElementById("deleteWeekBtn").addEventListener("click", () => deleteWeek(STORE.activeId, currentWeekKey));
+  document.getElementById("saveWeekBtn").addEventListener("click", saveThisWeek);
+  document.getElementById("resetBtn").addEventListener("click", resetThisWeek);
+  document.getElementById("weekPrevBtn").addEventListener("click", () => stepWeek(-1));
+  document.getElementById("weekNextBtn").addEventListener("click", () => stepWeek(1));
+  document.getElementById("addWeekBtn").addEventListener("click", addPastWeek);
+  document.getElementById("weekCommencing").addEventListener("change", snapWeekCommencing);
+
+  document.getElementById("navScorecard").addEventListener("click", () => switchMode("scorecard"));
+  document.getElementById("navDashboard").addEventListener("click", () => switchMode("dashboard"));
+  document.getElementById("navSettings").addEventListener("click", () => switchMode("settings"));
+  document.getElementById("resetGoalsBtn").addEventListener("click", resetGoals);
+  document.getElementById("amberThreshold").addEventListener("input", onAmberInput);
+  document.getElementById("greenThreshold").addEventListener("input", onGreenInput);
+  document.getElementById("exportBackupBtn").addEventListener("click", exportBackup);
+  document.getElementById("importBackupBtn").addEventListener("click", () => document.getElementById("importBackupInput").click());
+  document.getElementById("importBackupInput").addEventListener("change", e => { if (e.target.files && e.target.files[0]) importBackup(e.target.files[0]); e.target.value = ""; });
+  (() => {
+    const drop = document.getElementById("importCallsDrop");
+    const input = document.getElementById("importCallsInput");
+    drop.addEventListener("click", () => { if (!drop.classList.contains("disabled")) input.click(); });
+    input.addEventListener("change", e => { if (e.target.files && e.target.files[0]) importCallsCsv(e.target.files[0]); e.target.value = ""; });
+    ["dragenter", "dragover"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); if (!drop.classList.contains("disabled")) drop.classList.add("dragover"); }));
+    ["dragleave", "dragend"].forEach(ev => drop.addEventListener(ev, e => { e.preventDefault(); e.stopPropagation(); drop.classList.remove("dragover"); }));
+    drop.addEventListener("drop", e => {
+      e.preventDefault(); e.stopPropagation();
+      drop.classList.remove("dragover");
+      if (drop.classList.contains("disabled")) return;
+      const f = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
+      if (f) importCallsCsv(f);
+    });
+  })();
+
+  onSnapshot(storeDocRef, snap => {
+    if (suppressRemoteRefresh || snap.metadata.hasPendingWrites || !snap.exists()) return;
+    STORE = snap.data();
+    Object.values(STORE.profiles).forEach(ensureProfileShape);
+    if (!STORE.profiles[STORE.activeId]) {
+      STORE.activeId = Object.keys(STORE.profiles)[0];
+      currentWeekKey = CURRENT_KEY;
+    }
+    refreshProfileDropdown();
+    refreshWeekDropdown();
+    loadWeekIntoForm();
+    setIndicator("Updated from another device " + new Date().toLocaleTimeString());
+    if (mode === "dashboard") renderDashboardResults();
+  });
+
+  onSnapshot(settingsDocRef, snap => {
+    if (suppressSettingsRefresh || snap.metadata.hasPendingWrites || !snap.exists()) return;
+    const d = snap.data() || {};
+    SETTINGS = { targets: (d && d.targets) ? d.targets : {} };
+    if (typeof d.amber === "number") SETTINGS.amber = d.amber;
+    if (typeof d.green === "number") SETTINGS.green = d.green;
+    syncGoalInputs();
+    refreshTargetDisplays();
+    if (mode === "dashboard") renderDashboardResults();
+  });
+}
+
+document.addEventListener("DOMContentLoaded", init);
+
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
+</body>
+</html>

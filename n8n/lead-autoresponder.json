@@ -1,0 +1,221 @@
+{
+  "name": "Lead Auto-Qualify & Reply (draft-first)",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "simple": false,
+        "filters": {
+          "q": "label:Leads -in:chats"
+        },
+        "options": {}
+      },
+      "id": "7b2fa7e4-3b75-4346-8659-1d7ac281f6a0",
+      "name": "Gmail Trigger",
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        240,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n// EDIT ME \u2014 your qualification criteria + reply instructions.\n// This is the ONLY probabilistic step; everything else is deterministic.\n// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\nconst SYSTEM_PROMPT = `You are a lead-qualification assistant for <YOUR COMPANY>.\nRead the inbound email and decide if the sender is a QUALIFIED sales lead.\n\nQUALIFY (qualified=true) only when ALL of these hold:\n- The sender shows genuine interest in what we offer: <DESCRIBE YOUR OFFER>\n- They look like a real prospect / decision-maker (not a job seeker, recruiter, vendor pitch, or spam)\n- There is a concrete need or question we can help with\n\nDISQUALIFY (qualified=false) when the email is an auto-reply, out-of-office,\nunsubscribe request, newsletter, spam, or clearly not a buying signal.\n\nWhen qualified, write the reply following these instructions:\n- Warm, concise, professional; reference their specific message\n- <YOUR CALL TO ACTION \u2014 e.g. propose a 15-minute call this week, or ask 1-2 qualifying questions>\n- Sign off as <YOUR NAME>, <YOUR COMPANY>\n- NEVER invent pricing, features, timelines, or commitments you are unsure about\n\nReturn STRICT JSON only (no markdown, no prose), exactly:\n{\"qualified\": true|false, \"reason\": \"<one short sentence>\", \"reply\": \"<full reply text, or empty string if not qualified>\"}`;\n// \u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\u2500\n\nconst msg = $input.item.json;\n\nfunction b64(data) {\n  return Buffer.from(String(data).replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');\n}\nfunction decodeBody(payload) {\n  if (!payload) return '';\n  if (payload.mimeType === 'text/plain' && payload.body && payload.body.data) return b64(payload.body.data);\n  if (payload.body && payload.body.data && !payload.parts) return b64(payload.body.data);\n  if (payload.parts) {\n    for (const p of payload.parts) {\n      if (p.mimeType === 'text/plain' && p.body && p.body.data) return b64(p.body.data);\n    }\n    for (const p of payload.parts) {\n      const t = decodeBody(p);\n      if (t) return t;\n    }\n  }\n  return '';\n}\n\nconst headers = {};\n(msg.payload && msg.payload.headers ? msg.payload.headers : []).forEach(h => {\n  headers[h.name.toLowerCase()] = h.value;\n});\n\nlet body = decodeBody(msg.payload);\nif (!body) body = msg.text || msg.snippet || '';\nbody = body.slice(0, 6000); // cap tokens\n\nconst from = headers['from'] || msg.from || '';\nconst subject = headers['subject'] || msg.subject || '';\n\nreturn {\n  json: {\n    from,\n    subject,\n    body,\n    threadId: msg.threadId || '',\n    messageId: msg.id || '',\n    system: SYSTEM_PROMPT,\n    userContent: `FROM: ${from}\\nSUBJECT: ${subject}\\n\\nBODY:\\n${body}`\n  }\n};"
+      },
+      "id": "fe53f9a7-b2c8-4c53-880b-08ba6fd88e8e",
+      "name": "Prepare & Build Prompt",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        460,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.anthropic.com/v1/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "anthropic-version",
+              "value": "2023-06-01"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'claude-sonnet-5', max_tokens: 1024, system: $json.system, messages: [ { role: 'user', content: $json.userContent } ] }) }}",
+        "options": {}
+      },
+      "id": "1acde91e-7145-423d-8730-414dc02788e4",
+      "name": "Qualify with Claude",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        680,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.item.json;\nconst prep = $('Prepare & Build Prompt').item.json;\n\nlet text = '';\ntry { text = resp.content[0].text; } catch (e) { text = resp.text || ''; }\ntext = String(text).trim()\n  .replace(/^```json/i, '')\n  .replace(/^```/, '')\n  .replace(/```$/, '')\n  .trim();\n\nlet parsed;\ntry { parsed = JSON.parse(text); }\ncatch (e) { parsed = { qualified: false, reason: 'Could not parse model output', reply: '' }; }\n\nreturn {\n  json: {\n    from: prep.from,\n    subject: prep.subject,\n    threadId: prep.threadId,\n    messageId: prep.messageId,\n    qualified: parsed.qualified === true,\n    reason: parsed.reason || '',\n    reply: parsed.reply || ''\n  }\n};"
+      },
+      "id": "176dbfee-dee6-4ef4-afd9-18213433bd8b",
+      "name": "Parse Claude Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        900,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "cond-qualified",
+              "leftValue": "={{ $json.qualified }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "a670fd73-a056-4b9c-be85-32197a91e121",
+      "name": "Qualified?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        300
+      ]
+    },
+    {
+      "parameters": {
+        "resource": "draft",
+        "operation": "create",
+        "subject": "={{ 'Re: ' + $json.subject }}",
+        "emailType": "text",
+        "message": "={{ $json.reply }}",
+        "options": {
+          "threadId": "={{ $json.threadId }}",
+          "sendTo": "={{ $json.from }}"
+        }
+      },
+      "id": "14549b2c-a3ad-4d71-ab0a-89eb13c4d977",
+      "name": "Create Draft Reply",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        1340,
+        200
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "bbfe812e-2f44-424c-9213-b7c74f952d24",
+      "name": "Skip - not a lead",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        1340,
+        400
+      ]
+    }
+  ],
+  "connections": {
+    "Gmail Trigger": {
+      "main": [
+        [
+          {
+            "node": "Prepare & Build Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare & Build Prompt": {
+      "main": [
+        [
+          {
+            "node": "Qualify with Claude",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualify with Claude": {
+      "main": [
+        [
+          {
+            "node": "Parse Claude Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse Claude Reply": {
+      "main": [
+        [
+          {
+            "node": "Qualified?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Qualified?": {
+      "main": [
+        [
+          {
+            "node": "Create Draft Reply",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Skip - not a lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "pinData": {},
+  "meta": {
+    "templateId": "lead-autoresponder"
+  }
+}
