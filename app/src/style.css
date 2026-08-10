@@ -4746,3 +4746,43 @@ button.p-filter-chip.active {
 
 /* Outreach page header aligns with its tab bar (no double border) */
 .outreach-head { padding: 22px 26px 0; margin-bottom: 12px; border-bottom: 0; }
+
+/* ================================================================
+   Sidebar exact-match to the artifact — brand wordmark, bottom user
+   block, soft active state (no ring / no hover shift), status line.
+   ================================================================ */
+
+/* Brand: red arc mark + "CoPilotIQ" wordmark (IQ crimson) */
+.brand-mark { width: 22px; height: 22px; flex: 0 0 auto; }
+.brand-word { font-family: var(--font-display); font-weight: 650; font-size: 0.98rem; letter-spacing: -0.01em; color: #fff; white-space: nowrap; }
+.brand-word span { color: var(--accent-core); }
+.app-sidebar.collapsed .brand-word { display: none; }
+
+/* Nav interactivity: no hover shift, soft crimson active fill + left bar, no focus ring */
+.app-sidebar .nav-link:hover { transform: none; }
+.app-sidebar .nav-link.active {
+  background: rgba(227, 19, 70, 0.12);
+  box-shadow: inset 3px 0 var(--accent-core);
+}
+.app-sidebar .nav-link:focus-visible { outline: none; background: var(--nav-hover); }
+
+/* Footer: user block on top, system line below (artifact layout) */
+.app-sidebar-bottom { flex-direction: column; align-items: stretch; justify-content: flex-start; gap: 8px; }
+.app-sidebar-bottom .identity-switcher { padding: 0; }
+/* Borderless "who" trigger like the artifact */
+.app-sidebar-bottom .identity-trigger { background: transparent; border-color: transparent; padding: 7px 8px; }
+.app-sidebar-bottom .identity-trigger:hover { background: var(--nav-hover); border-color: transparent; }
+/* Dropdown opens upward from the footer */
+.app-sidebar-bottom .identity-panel { top: auto; bottom: calc(100% + 6px); }
+
+/* System status line: dot (live /health) + "Backend online · vX" */
+.sys-line { display: flex; align-items: center; gap: 6px; padding: 0 8px; }
+.sys-line .sys-dot { width: 6px; height: 6px; border-radius: 50%; flex: 0 0 auto;
+  background: #25a976; box-shadow: 0 0 0 3px rgba(37, 169, 118, 0.16); transition: background 0.2s, box-shadow 0.2s; }
+.app-sidebar-bottom.is-offline .sys-line .sys-dot { background: #e69d26; box-shadow: 0 0 0 3px rgba(230, 157, 38, 0.16); }
+.sys-line .sys-status, .sys-line .sys-sep, .sys-line .sidebar-version-label {
+  font-family: var(--font-mono); font-size: 10.5px; color: #6b7080; letter-spacing: 0.02em; text-transform: none;
+}
+.app-sidebar.collapsed .sys-line .sys-status,
+.app-sidebar.collapsed .sys-line .sys-sep,
+.app-sidebar.collapsed .sys-line .sidebar-version-label { display: none; }

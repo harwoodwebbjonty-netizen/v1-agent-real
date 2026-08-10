@@ -11,24 +11,12 @@
       <aside class="app-sidebar">
         <div class="app-sidebar-top">
           <div class="brand">
-            <img src="/logo-light.png" alt="CoPilotIQ" class="brand-logo" />
+            <svg class="brand-mark" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+              <path d="M18.5 6.4A8 8 0 1 0 20 12" stroke="#e31346" stroke-width="3.4" stroke-linecap="round"/>
+              <circle cx="18.2" cy="12" r="2.3" fill="#e31346"/>
+            </svg>
+            <span class="brand-word">CoPilot<span>IQ</span></span>
             <button id="sidebar-toggle-btn" class="sidebar-toggle-btn" type="button" title="Collapse sidebar">«</button>
-          </div>
-
-          <div class="identity-switcher">
-            <button id="identity-trigger" class="identity-trigger" type="button">
-              <span id="identity-trigger-avatar"></span>
-              <span id="identity-trigger-label">Who are you?</span>
-              <span class="identity-trigger-caret" aria-hidden="true">▾</span>
-            </button>
-            <div id="identity-panel" class="identity-panel hidden">
-              <ul id="identity-panel-list" class="identity-panel-list"></ul>
-              <div class="identity-panel-new">
-                <input id="identity-new-name" type="text" class="search-input" placeholder="Your name" />
-                <button id="identity-join-btn" class="btn btn-secondary btn-sm">Join</button>
-              </div>
-              <button id="identity-change-photo-btn" class="btn btn-ghost btn-sm hidden">Change my photo</button>
-            </div>
           </div>
 
           <nav class="top-nav">
@@ -101,8 +89,27 @@
         </div>
 
         <div class="app-sidebar-bottom" id="app-sidebar-bottom">
-          <span class="sys-dot" id="sys-status-dot" aria-hidden="true"></span>
-          <span class="sidebar-version-label">test v1.0</span>
+          <div class="identity-switcher">
+            <button id="identity-trigger" class="identity-trigger" type="button">
+              <span id="identity-trigger-avatar"></span>
+              <span id="identity-trigger-label">Who are you?</span>
+              <span class="identity-trigger-caret" aria-hidden="true">▾</span>
+            </button>
+            <div id="identity-panel" class="identity-panel hidden">
+              <ul id="identity-panel-list" class="identity-panel-list"></ul>
+              <div class="identity-panel-new">
+                <input id="identity-new-name" type="text" class="search-input" placeholder="Your name" />
+                <button id="identity-join-btn" class="btn btn-secondary btn-sm">Join</button>
+              </div>
+              <button id="identity-change-photo-btn" class="btn btn-ghost btn-sm hidden">Change my photo</button>
+            </div>
+          </div>
+          <div class="sys-line">
+            <span class="sys-dot" id="sys-status-dot" aria-hidden="true"></span>
+            <span class="sys-status" id="sys-status-text">Backend online</span>
+            <span class="sys-sep">·</span>
+            <span class="sidebar-version-label">test v1.0</span>
+          </div>
         </div>
       </aside>
 

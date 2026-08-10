@@ -14,9 +14,11 @@ export function initConnectionBanner(): void {
 
   let offline = false;
 
-  // Reflect the same real health signal in the sidebar footer status dot.
+  // Reflect the same real health signal in the sidebar footer status dot + text.
   function setFooterStatus(isOffline: boolean): void {
     document.getElementById("app-sidebar-bottom")?.classList.toggle("is-offline", isOffline);
+    const text = document.getElementById("sys-status-text");
+    if (text) text.textContent = isOffline ? "Backend offline" : "Backend online";
   }
 
   async function poll(): Promise<void> {
