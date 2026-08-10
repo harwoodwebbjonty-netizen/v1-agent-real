@@ -34,6 +34,9 @@
   font-family: "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
   /* Display face for chrome (nav, titles, buttons, tooltips) — data stays Inter */
   --font-display: "Poppins", "Inter", -apple-system, sans-serif;
+  /* Mono face for operational data/metadata/labels — the "operations" texture */
+  --font-mono: ui-monospace, "SF Mono", "Roboto Mono", Menlo, Consolas, monospace;
+  --hairline: #E7EAF1;
 
   /* Spacing scale */
   --space-1: 4px;
@@ -4433,3 +4436,79 @@ button.p-filter-chip.active {
   cursor: pointer;
 }
 .share-toggle input { cursor: pointer; }
+
+/* ============================================================
+   REDESIGN LAYER — "editorial operations" (v0.5.0)
+   Presentation only. Reuses existing tokens; adds --font-mono/--hairline.
+   Scoped to the new classes so no other view's behaviour is affected.
+   ============================================================ */
+
+/* utilities */
+.mono { font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.tnum { font-variant-numeric: tabular-nums; }
+
+/* page header (reusable across pages) */
+.page-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px;
+  padding-bottom: 14px; border-bottom: 1px solid var(--hairline); margin-bottom: 20px; }
+.page-title { margin: 0; font-family: var(--font-display); font-size: 1.5rem; font-weight: 600; letter-spacing: -0.02em; }
+.page-meta { display: flex; align-items: center; gap: 10px; margin-top: 6px; color: var(--text-muted); font-size: 0.8rem; }
+.page-meta .pm-sep { color: #8a8f9e; }
+.page-meta .pm-sync { font-family: var(--font-mono); font-size: 0.66rem; letter-spacing: 0.1em; color: #8a8f9e; }
+
+/* numbered section header */
+.sec-head { display: flex; align-items: center; gap: 10px; margin: 0 0 8px; }
+.sec-num { font-family: var(--font-mono); font-size: 0.7rem; color: var(--accent-core); letter-spacing: 0.06em; width: 18px; flex: 0 0 auto; }
+.sec-rule { flex: 1; height: 1px; background: var(--hairline); }
+.sec-count { font-family: var(--font-mono); font-size: 0.7rem; color: #8a8f9e; flex: 0 0 auto; }
+
+/* ---- Today ---- */
+.today-view.container { max-width: 1180px; }
+.today-view .action-section { margin: 22px 0 0; background: transparent; border: 0; box-shadow: none; padding: 0; }
+.today-view .action-section-title { font-family: var(--font-display); font-size: 0.82rem; font-weight: 600; margin: 0; letter-spacing: 0.01em; }
+.today-view .action-section-body { gap: 0; background: var(--surface, #fff); border: 1px solid var(--border);
+  border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-card); }
+.today-view .action-section-body .empty-hint { padding: 14px 16px; margin: 0; }
+
+/* daily brief strip */
+.brief-strip { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; background: var(--surface, #fff);
+  border: 1px solid var(--border); border-radius: var(--radius-md); overflow: hidden; box-shadow: var(--shadow-card); margin-bottom: 6px; }
+.brief-strip .bs-cell { padding: 13px 16px; border-left: 1px solid var(--hairline); }
+.brief-strip .bs-cell:first-child { border-left: 0; background: #fafbfd; }
+.brief-strip .bs-l { font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8f9e; }
+.brief-strip .bs-k { font-size: 1.6rem; font-weight: 650; letter-spacing: -0.02em; margin-top: 4px; font-variant-numeric: tabular-nums; }
+.brief-strip .bs-lead .bs-k { font-size: 0.9rem; font-weight: 500; line-height: 1.4; letter-spacing: 0; color: var(--text); }
+@media (max-width: 820px) { .brief-strip { grid-template-columns: 1fr 1fr; } }
+
+/* worklist row (grid: marker · body · actions) */
+.wl-row { display: grid !important; grid-template-columns: 16px 1fr auto; align-items: center; gap: 12px;
+  padding: 11px 16px !important; border-radius: 0 !important; background: transparent !important;
+  border-top: 1px solid var(--hairline); }
+.today-view .action-section-body > .wl-row:first-child { border-top: 0; }
+.wl-row:hover { background: #fafbfd !important; }
+.wl-mk { width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 2px solid #8a8f9e; }
+.wl-mk.wl-call { border-color: var(--accent-core); background: var(--accent-core); }
+.wl-mk.wl-follow { border-color: #3974d8; }
+.wl-mk.wl-email { border-color: #7c5cf0; }
+.wl-mk.wl-research { border-color: #e69d26; }
+.wl-mk.wl-opp { border-color: #12a594; }
+.wl-mk.wl-ok { border-color: #1f9d6d; }
+.wl-body { min-width: 0; }
+.wl-t { font-weight: 550; font-size: 0.9rem; white-space: normal; }
+.wl-s { color: var(--text-muted); font-size: 0.78rem; margin-top: 1px; }
+.wl-s .mono { color: #8a8f9e; }
+.wl-end { display: flex; align-items: center; gap: 9px; }
+
+/* compact status chips (single accent each) */
+.wl-chip { display: inline-flex; align-items: center; gap: 5px; height: 20px; padding: 0 8px; border-radius: 5px;
+  font-family: var(--font-mono); font-size: 0.66rem; font-weight: 600; letter-spacing: 0.02em; border: 1px solid transparent; white-space: nowrap; }
+.wl-chip .wl-cd { width: 5px; height: 5px; border-radius: 50%; }
+.wl-chip.wl-hi { background: var(--accent-glow); color: var(--accent-text); border-color: #f5b7c7; } .wl-chip.wl-hi .wl-cd { background: var(--accent-core); }
+.wl-chip.wl-info { background: #eaf0fb; color: #2b57a8; border-color: #cfdcf5; } .wl-chip.wl-info .wl-cd { background: #3974d8; }
+.wl-chip.wl-purple { background: #f1ecfb; color: #5b3bc4; border-color: #ded0f5; } .wl-chip.wl-purple .wl-cd { background: #7c5cf0; }
+.wl-chip.wl-amber { background: #fdf3e3; color: #9a6414; border-color: #f2dcb8; } .wl-chip.wl-amber .wl-cd { background: #e69d26; }
+.wl-chip.wl-ok { background: #eaf7f1; color: #137a53; border-color: #c7e9d8; } .wl-chip.wl-ok .wl-cd { background: #1f9d6d; }
+
+@media (max-width: 640px) {
+  .wl-row { grid-template-columns: 14px 1fr; }
+  .wl-end { grid-column: 1 / -1; padding-left: 26px; flex-wrap: wrap; }
+}
