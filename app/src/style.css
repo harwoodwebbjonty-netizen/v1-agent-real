@@ -4506,13 +4506,14 @@ button.p-filter-chip.active {
 .app-sidebar .nav-link.active .nav-count { color: #fff; }
 .app-sidebar.collapsed .nav-count { display: none; }
 
-/* Today worklist timeline rail (connects the markers) */
+/* Today worklist timeline rail (rail lives in its own cell, artifact layout) */
 .today-view .action-section-body .wl-row { position: relative; }
-.today-view .action-section-body .wl-row::before {
-  content: ""; position: absolute; left: 23px; top: 0; bottom: 0; width: 1.5px; background: var(--hairline);
+.wl-rail { position: relative; align-self: stretch; display: grid; place-items: center; }
+.wl-rail::before {
+  content: ""; position: absolute; top: -11px; bottom: -11px; width: 1.5px; background: var(--hairline);
 }
-.today-view .action-section-body > .wl-row:first-child::before { top: 50%; }
-.today-view .action-section-body > .wl-row:last-child::before { bottom: 50%; }
+.today-view .action-section-body > .wl-row:first-child .wl-rail::before { top: 50%; }
+.today-view .action-section-body > .wl-row:last-child .wl-rail::before { bottom: 50%; }
 .wl-mk { position: relative; z-index: 1; }
 
 /* grouped, editorial sidebar nav (eyebrows over each nav cluster) */
@@ -4561,12 +4562,16 @@ button.p-filter-chip.active {
 .brief-strip .bs-lead .bs-k { font-size: 0.9rem; font-weight: 500; line-height: 1.4; letter-spacing: 0; color: var(--text); }
 @media (max-width: 820px) { .brief-strip { grid-template-columns: 1fr 1fr; } }
 
-/* worklist row (grid: marker · body · actions) */
-.wl-row { display: grid !important; grid-template-columns: 16px 1fr auto; align-items: center; gap: 12px;
-  padding: 11px 16px !important; border-radius: 0 !important; background: transparent !important;
+/* worklist row (grid: when · rail/marker · body · actions — artifact layout) */
+.wl-row { display: grid !important; grid-template-columns: 60px 26px 1fr auto; align-items: center; gap: 12px;
+  padding: 11px 16px 11px 12px !important; border-radius: 0 !important; background: transparent !important;
   border-top: 1px solid var(--hairline); }
 .today-view .action-section-body > .wl-row:first-child { border-top: 0; }
 .wl-row:hover { background: #fafbfd !important; }
+.wl-when { font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-muted); text-align: right;
+  font-variant-numeric: tabular-nums; line-height: 1.25; }
+.wl-when em { display: block; color: #8a8f9e; font-style: normal; font-size: 0.6rem; letter-spacing: 0.05em; }
+.wl-s b { color: var(--text); font-weight: 600; }
 .wl-mk { width: 11px; height: 11px; border-radius: 50%; background: #fff; border: 2px solid #8a8f9e; }
 .wl-mk.wl-call { border-color: var(--accent-core); background: var(--accent-core); }
 .wl-mk.wl-follow { border-color: #3974d8; }
@@ -4591,8 +4596,8 @@ button.p-filter-chip.active {
 .wl-chip.wl-ok { background: #eaf7f1; color: #137a53; border-color: #c7e9d8; } .wl-chip.wl-ok .wl-cd { background: #1f9d6d; }
 
 @media (max-width: 640px) {
-  .wl-row { grid-template-columns: 14px 1fr; }
-  .wl-end { grid-column: 1 / -1; padding-left: 26px; flex-wrap: wrap; }
+  .wl-row { grid-template-columns: 44px 20px 1fr; }
+  .wl-end { grid-column: 1 / -1; padding-left: 64px; flex-wrap: wrap; }
 }
 
 /* ---- Today: page-head actions + sections 03/04 panels ---- */
@@ -4690,3 +4695,48 @@ button.p-filter-chip.active {
   .ccl-list-row { grid-template-columns: 1fr auto; row-gap: 8px; }
   .ccl-list-row .clr-own, .ccl-list-row .clr-replies { display: none; }
 }
+
+/* ================================================================
+   Artifact-match refinements — bring the finish in line with the
+   approved CoPilotIQ redesign direction. These deliberately override
+   the earlier uppercase/coloured rail styling.
+   ================================================================ */
+
+/* Sidebar nav labels: plain sans, sentence case (not uppercase Poppins) */
+.app-sidebar .nav-label {
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-size: 0.82rem;
+  font-weight: 450;
+  letter-spacing: 0.005em;
+  text-transform: none;
+}
+.app-sidebar .nav-link.active .nav-label { font-weight: 550; }
+
+/* Nav icons: uniform thin grey line icons — no coloured tile; crimson only when active */
+.app-sidebar .nav-icon {
+  width: 18px; height: 18px; border-radius: 0; background: none; color: #8a8f9e;
+  transition: color 0.15s ease;
+}
+.app-sidebar .nav-link:hover .nav-icon { background: none; transform: none; color: #c2c6d0; }
+.app-sidebar [data-nav] .nav-icon { color: #8a8f9e; }
+.app-sidebar [data-nav].nav-link:hover .nav-icon { color: #c2c6d0; }
+.app-sidebar [data-nav].nav-link.active .nav-icon { color: var(--accent-core); }
+
+/* Active nav item: soft crimson tint + thin left bar, no hard outline box */
+.app-sidebar .nav-link.active {
+  background: rgba(227, 19, 70, 0.12);
+  box-shadow: inset 2.5px 0 var(--accent-core);
+}
+.app-sidebar .nav-link:focus:not(:focus-visible) { outline: none; }
+
+/* Daily-brief labels: sentence-case sans (the Priority cell stays mono/uppercase) */
+.brief-strip .bs-l {
+  font-family: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  font-size: 0.75rem; letter-spacing: normal; text-transform: none; color: var(--text-muted); font-weight: 400;
+}
+.brief-strip .bs-lead .bs-l {
+  font-family: var(--font-mono); font-size: 0.62rem; letter-spacing: 0.1em; text-transform: uppercase; color: #8a8f9e;
+}
+
+/* Top bar: the artifact has no date pill */
+.tb-date { display: none; }

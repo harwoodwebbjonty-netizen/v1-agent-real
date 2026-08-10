@@ -227,17 +227,22 @@ export function initActionCentre(): void {
 
   // Editorial worklist row. Keeps the exact hooks the click handlers rely on:
   // .action-row[data-lead-id], .action-row-title, and the button classes.
-  function wlRow(leadId: string, mk: string, title: string, metaHtml: string, chipHtml: string, buttonsHtml: string): string {
+  function wlRow(
+    leadId: string, mk: string, when: string, whenSub: string,
+    title: string, subHtml: string, chipHtml: string, buttonsHtml: string
+  ): string {
     return `
       <div class="action-row wl-row" data-lead-id="${escapeHtml(leadId)}">
-        <span class="wl-mk wl-${mk}"></span>
+        <div class="wl-when">${escapeHtml(when)}${whenSub ? `<em>${escapeHtml(whenSub)}</em>` : ""}</div>
+        <div class="wl-rail"><span class="wl-mk wl-${mk}"></span></div>
         <div class="wl-body">
           <div class="action-row-title wl-t">${escapeHtml(title)}</div>
-          ${metaHtml ? `<div class="wl-s">${metaHtml}</div>` : ""}
+          ${subHtml ? `<div class="wl-s">${subHtml}</div>` : ""}
         </div>
         <div class="wl-end">${chipHtml}${buttonsHtml}</div>
       </div>`;
   }
+  const companyB = (name: string): string => `<b>${escapeHtml(name)}</b>`;
   function wlChip(text: string, cls: string): string {
     return `<span class="wl-chip ${cls}"><span class="wl-cd"></span>${escapeHtml(text)}</span>`;
   }
@@ -262,30 +267,41 @@ export function initActionCentre(): void {
     // 02 Worklist — one priority-ordered list mixing follow-ups, calls, email
     // drafts and research. Each row reuses the existing hooks so every action
     // (View, Send Follow-up, Continue Draft) keeps working exactly as before.
+    const overdueFollowIds = new Set(
+      getEvents().filter((e) => e.type === "followup" && e.date < today && !!e.lead_id).map((e) => e.lead_id!)
+    );
     const worklistHtml =
       followUps
-        .map((lead) =>
-          wlRow(lead.id, "follow", lead.company,
-            escapeHtml(lead.next_best_action.reason),
-            wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails))
+        .map((lead) => {
+          const reason = lead.next_best_action.reason;
+          return wlRow(lead.id, "follow", "—", overdueFollowIds.has(lead.id) ? "OVERDUE" : "",
+            reason ? `Follow up — ${reason}` : "Follow up",
+            companyB(lead.company),
+            wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails);
+        })
         .join("") +
       calls
         .map(({ event, lead }) =>
-          wlRow(lead.id, "call", lead.company,
-            event.time ? `<span class="mono">${escapeHtml(event.time)}</span>` : "",
+          wlRow(lead.id, "call", event.time || "—", "",
+            "Call",
+            companyB(lead.company) + (lead.phone_number ? ` · <span class="mono">${escapeHtml(lead.phone_number)}</span>` : ""),
             wlChip("Call", "wl-hi"), btnDetails))
         .join("") +
       pendingDrafts
         .map((draft) =>
-          wlRow(draft.lead_id, "email", draft.lead_company,
-            escapeHtml(draft.subject || "(no subject yet)"),
+          wlRow(draft.lead_id, "email", "—", "",
+            draft.subject ? `Send email — ${draft.subject}` : "Send follow-up email",
+            companyB(draft.lead_company),
             wlChip("Draft", "wl-purple"), btnEmail("Continue Draft")))
         .join("") +
       research
-        .map((lead) =>
-          wlRow(lead.id, "research", lead.company,
-            escapeHtml(lead.next_best_action.reason),
-            wlChip("Research", "wl-amber"), btnDetails))
+        .map((lead) => {
+          const reason = lead.next_best_action.reason;
+          return wlRow(lead.id, "research", "—", "",
+            reason ? `Research — ${reason}` : "Research",
+            companyB(lead.company),
+            wlChip("Research", "wl-amber"), btnDetails);
+        })
         .join("");
     const worklistCount = followUps.length + calls.length + pendingDrafts.length + research.length;
     setCount("worklist", worklistCount);
@@ -296,7 +312,9 @@ export function initActionCentre(): void {
     sections.opportunities.innerHTML = opportunities.length
       ? opportunities
           .map((lead) =>
-            wlRow(lead.id, "opp", lead.company, "",
+            wlRow(lead.id, "opp", "—", "",
+              "Opportunity",
+              companyB(lead.company),
               `<span class="status-badge cal-type-task">${escapeHtml(lead.opportunity_stage)}</span>`,
               btnDetails))
           .join("")
@@ -307,7 +325,9 @@ export function initActionCentre(): void {
     sections.replied.innerHTML = replied.length
       ? replied
           .map((lead) =>
-            wlRow(lead.id, "ok", lead.company, "",
+            wlRow(lead.id, "ok", "—", "",
+              "Replied",
+              companyB(lead.company),
               wlChip("Replied", "wl-ok"), btnEmail("Generate Email") + btnDetails))
           .join("")
       : emptyRow("Nobody marked as Replied right now.");
