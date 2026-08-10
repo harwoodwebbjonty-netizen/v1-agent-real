@@ -57,12 +57,14 @@
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
               </span>
               <span class="nav-label">Leads</span>
+              <span class="nav-count" id="nav-count-dashboard"></span>
             </a>
             <a href="#" data-nav="cold-call-lists" class="nav-link">
               <span class="nav-icon" aria-hidden="true">
                 <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
               </span>
               <span class="nav-label">Cold Call Lists</span>
+              <span class="nav-count" id="nav-count-cold-call-lists"></span>
             </a>
             <a href="#" data-nav="outreach" class="nav-link">
               <span class="nav-icon" aria-hidden="true">
@@ -110,9 +112,20 @@
             <svg class="tb-sep" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
             <b id="tb-page">Today</b>
           </div>
-          <div class="tb-spacer"></div>
+          <label class="tb-search">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+            <input id="tb-search-input" type="search" placeholder="Search leads, companies…" autocomplete="off" />
+            <kbd>⌘K</kbd>
+          </label>
           <span class="tb-date" id="tb-date"></span>
-          <span class="tb-status"><span class="tb-dot"></span>Online</span>
+          <button class="tb-icon" id="tb-notif" type="button" title="Today's worklist" aria-label="Today's worklist">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+            <span class="tb-badge hidden" id="tb-notif-badge"></span>
+          </button>
+          <button class="tb-user" id="tb-user" type="button" title="Your profile">
+            <span id="tb-user-ava"></span>
+            <span id="tb-user-name"></span>
+          </button>
         </header>
         <div class="app-scroll">
         <div id="view-action-centre"></div>

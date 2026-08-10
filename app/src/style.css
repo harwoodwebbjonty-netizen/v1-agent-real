@@ -4464,27 +4464,56 @@ button.p-filter-chip.active {
 /* compact top bar (fixed above the scroll body, on every page) */
 .app-topbar {
   flex: 0 0 auto;
-  height: 50px;
+  height: 52px;
   display: flex;
   align-items: center;
-  gap: 14px;
-  padding: 0 26px;
+  gap: 12px;
+  padding: 0 18px 0 26px;
   background: var(--surface, #fff);
   border-bottom: 1px solid var(--hairline);
 }
-.tb-crumb { display: flex; align-items: center; gap: 7px; font-size: 13px; }
+.tb-crumb { display: flex; align-items: center; gap: 7px; font-size: 13px; flex: 0 0 auto; }
 .tb-crumb .tb-loc { color: #8a8f9e; }
 .tb-crumb .tb-sep { color: #b7bcc8; }
 .tb-crumb b { color: var(--text); font-weight: 600; }
-.tb-spacer { flex: 1; }
-.tb-date { font-family: var(--font-mono); font-size: 11px; color: #8a8f9e; letter-spacing: 0.06em; text-transform: uppercase; }
-.tb-status { display: inline-flex; align-items: center; gap: 6px; font-size: 12px; color: var(--text-muted); }
-.tb-status .tb-dot { width: 7px; height: 7px; border-radius: 50%; background: #25a976; box-shadow: 0 0 0 3px rgba(37, 169, 118, 0.16); }
+.tb-search { flex: 1; max-width: 440px; display: flex; align-items: center; gap: 8px; height: 34px;
+  padding: 0 10px; background: var(--bg, #f4f6fb); border: 1px solid var(--border); border-radius: 8px; color: #8a8f9e; }
+.tb-search:focus-within { border-color: var(--accent-core); box-shadow: 0 0 0 3px rgba(227, 19, 70, 0.10); background: var(--surface, #fff); }
+.tb-search svg { flex: 0 0 auto; }
+.tb-search input { flex: 1; min-width: 0; border: 0; outline: 0; background: transparent; font: inherit; font-size: 13px; color: var(--text); }
+.tb-search input::-webkit-search-cancel-button { display: none; }
+.tb-search kbd { flex: 0 0 auto; font-family: var(--font-mono); font-size: 10px; color: #8a8f9e; border: 1px solid var(--border); border-bottom-width: 2px; border-radius: 4px; padding: 1px 5px; }
+.tb-date { flex: 0 0 auto; font-family: var(--font-mono); font-size: 11px; color: #8a8f9e; letter-spacing: 0.06em; text-transform: uppercase; }
+.tb-icon { position: relative; flex: 0 0 auto; width: 32px; height: 32px; display: grid; place-items: center;
+  border: 1px solid var(--border); background: var(--surface, #fff); border-radius: 8px; color: var(--text-muted); cursor: pointer; }
+.tb-icon:hover { color: var(--text); border-color: #d0d5e0; }
+.tb-badge { position: absolute; top: -4px; right: -4px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 8px;
+  background: var(--accent-core); color: #fff; font-family: var(--font-mono); font-size: 9px; display: grid; place-items: center; border: 2px solid var(--surface, #fff); }
+.tb-badge.hidden { display: none; }
+.tb-user { display: flex; align-items: center; gap: 8px; flex: 0 0 auto; height: 34px; padding: 0 8px 0 4px;
+  border: 1px solid transparent; background: transparent; border-radius: 8px; cursor: pointer; color: var(--text); }
+.tb-user:hover { background: var(--bg, #f4f6fb); }
+.tb-user #tb-user-name { font-size: 12.5px; font-weight: 550; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 860px) { .tb-search { max-width: 240px; } .tb-user #tb-user-name { display: none; } }
 @media (max-width: 640px) {
   .app-scroll { overflow: visible; }
-  .app-topbar { padding: 0 14px; }
-  .tb-date, .tb-status { display: none; }
+  .app-topbar { padding: 0 12px; gap: 8px; }
+  .tb-search, .tb-date { display: none; }
 }
+
+/* live nav counts on the sidebar */
+.nav-count { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: #6b7080; font-variant-numeric: tabular-nums; flex: 0 0 auto; padding-left: 6px; }
+.app-sidebar .nav-link.active .nav-count { color: #fff; }
+.app-sidebar.collapsed .nav-count { display: none; }
+
+/* Today worklist timeline rail (connects the markers) */
+.today-view .action-section-body .wl-row { position: relative; }
+.today-view .action-section-body .wl-row::before {
+  content: ""; position: absolute; left: 23px; top: 0; bottom: 0; width: 1.5px; background: var(--hairline);
+}
+.today-view .action-section-body > .wl-row:first-child::before { top: 50%; }
+.today-view .action-section-body > .wl-row:last-child::before { bottom: 50%; }
+.wl-mk { position: relative; z-index: 1; }
 
 /* grouped, editorial sidebar nav (eyebrows over each nav cluster) */
 .nav-eyebrow {
