@@ -144,6 +144,7 @@ function renderChRow(c: ChCharge): string {
     <div class="charge-feed-row" data-charge-id="${c.id}">
       <div class="charge-feed-row-main">
         <span class="charge-company">${escapeHtml(c.company_name ?? c.company_number)}</span>
+        ${c.company_name ? `<span class="company-number mono">${escapeHtml(c.company_number)}</span>` : ""}
         ${chBadge(c.filing_type)}
         <span class="charge-desc">${escapeHtml(c.charge_description ?? "")}</span>
       </div>
@@ -201,6 +202,7 @@ function renderDgRow(ev: ActivityEvent): string {
       <div class="activity-event-body">
         <div class="activity-event-header">
           <span class="activity-feed-company">${escapeHtml(ev.company_name)}</span>
+          <span class="company-number mono">${escapeHtml(ev.company_number)}</span>
           <span class="event-badge event-badge-${ev.event_type}">${escapeHtml(label)}</span>
           <span class="activity-event-desc">${escapeHtml(ev.description)}</span>
           <span class="activity-event-time">${formatTime(ev.detected_at)}</span>

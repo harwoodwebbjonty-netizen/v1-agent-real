@@ -4067,6 +4067,11 @@ button.p-filter-chip.active {
   color: var(--text-muted);
 }
 
+.company-number {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+}
+
 .charge-feed-row-meta {
   display: flex;
   align-items: center;
