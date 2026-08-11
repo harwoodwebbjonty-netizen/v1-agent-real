@@ -39,11 +39,11 @@ SQLite at `/opt/v1-agent/backend/data/team.db` on the VPS, WAL mode. Migrations 
 
 # Current State
 
-App is at **v0.6.4**. A multi-release frontend redesign (v0.5.0 → v0.6.4, ~10 releases) moved the whole CRM to an "editorial operations workspace" look matching an approved design artifact — presentation-only, no feature/backend changes. See `CLAUDE.md`'s Design section for the current visual system (grouped nav, footer identity block, system-sans typography, numbered sections, timeline-rail worklist, editorial tables/panels).
+App is at **v0.6.6** (frontend); backend has NOT yet been redeployed to the VPS with the v0.6.6 auth.py change (see Next Steps — deploy command must be run manually, Claude is blocked from running it). A multi-release frontend redesign (v0.5.0 → v0.6.4, ~10 releases) moved the whole CRM to an "editorial operations workspace" look matching an approved design artifact — presentation-only, no feature/backend changes. See `CLAUDE.md`'s Design section for the current visual system (grouped nav, footer identity block, system-sans typography, numbered sections, timeline-rail worklist, editorial tables/panels).
 
 # Current Work
 
-A full 18-section production-readiness audit was completed (2026-08-11, read-only, not saved to a file — exists only in that chat session). Its "Immediately" tier: (1) close open self-registration, (2) fix unguarded `Promise.all` calls, (3) confirm/fix identity-panel clipping regression. Item 2 is done (see Decisions). Self-registration and identity-panel clipping are still open — not yet investigated.
+A full 18-section production-readiness audit was completed (2026-08-11, read-only, not saved to a file — exists only in that chat session). Its "Immediately" tier: (1) close open self-registration — done, (2) fix unguarded `Promise.all` calls — done, (3) confirm/fix identity-panel clipping regression — still open, not yet investigated.
 
 Also open: `activityFeed.ts` rows show company name or number, never both — `renderChRow` (~line 146, falls back via `??`) and `renderDgRow` (~line 203, name only, no fallback). Documented, not fixed.
 
@@ -53,19 +53,20 @@ Also open: `activityFeed.ts` rows show company name or number, never both — `r
 - No HTTPS (backend is plain HTTP to an IP) — needs a domain first.
 - No automated DB backups on the VPS.
 - Win-back emails have no unsubscribe link (blocked on domain/HTTPS).
-- Self-registration reportedly still open (from the 2026-08-11 audit) — not yet independently verified in this session.
 - Identity-panel clipping regression (from the 2026-08-11 audit) — not yet investigated.
+- **v0.6.6 backend fix not yet deployed to the VPS** — `auth.py`'s self-registration close only takes effect once `backend/app/` is rsynced and the service restarted (see CLAUDE.md "Deploying the backend").
 
 # Decisions
 
 - Redesign is presentation-only by explicit instruction: keep every existing feature/button/action; only the visual layer changes.
 - `output/` and `outputs/` both stay as separate, gitignored, uncommitted local dirs (not merged/renamed) — their real client data must never enter git history.
 - `AGENTS.md` stays a thin pointer, not a duplicate manual — re-collapsed 2026-08-10 after silently reverting once already (see `audits/os-audit-2026-08-10.md`).
-- Root-caused and fixed the "no leads/no worklist" regression (2026-08-11): three call sites (`dashboard.ts`, `actionCentre.ts`, `callQueue.ts`) ran `Promise.all([refreshLeads(), ...])` with no `.catch`; a single rejection (e.g. session expiry / non-2xx from the backend) silently left `dashboard.ts`'s `isInitialLoad` flag stuck `true` forever, so the Leads table showed permanent loading skeletons with no error surfaced. Fixed by catching and calling `showToast`, and in `dashboard.ts` still flipping `isInitialLoad = false` on failure so it falls through to the proper empty state. Verified with a Playwright script against the real frontend (mocked `window.__TAURI_INTERNALS__.invoke` to reject `get_log_entries`) showing before/after: before = stuck on 4 skeleton rows, no toast; after = empty state renders, toast shows the error. Not yet released (no version bump/tag/deploy done this session).
+- Fixed the "no leads/no worklist" regression, shipped as **v0.6.5**: three call sites (`dashboard.ts`, `actionCentre.ts`, `callQueue.ts`) ran `Promise.all([refreshLeads(), ...])` with no `.catch`; a single rejection (e.g. session expiry) silently left `dashboard.ts`'s `isInitialLoad` flag stuck `true` forever, so the Leads table showed permanent loading skeletons with no error. Now caught + surfaced via `showToast`, and `isInitialLoad` still flips on failure so it falls through to the proper empty state. Verified live with Playwright (mocked `window.__TAURI_INTERNALS__.invoke` to reject) showing the before/after contrast.
+- Closed self-registration, shipped as **v0.6.6** (frontend) — backend not yet deployed: `POST /auth/identify` ([auth.py](backend/app/routers/auth.py)) used to silently create a new "member" account for any unrecognized name+password with no admin involvement; since the backend is plain HTTP on a public IP and the lead pool is shared across all members, anyone reaching it could self-register into real client data. Now only the very first account on a fresh deployment (bootstrap-token gated) can be created this way — everyone else must already exist (admin creates via `POST /users` + `POST /users/{id}/set-password`, the pre-existing safe path). Frontend gate added in `identitySwitcher.ts`'s `join()` so the "Create profile" modal no longer opens for unknown names once the team roster is non-empty; shows a toast instead. Covered by a new regression suite, `backend/tests/test_auth_self_registration.py` (4 tests, all passing alongside the other 30 backend tests). Also verified live with Playwright against the real frontend.
 
 # Next Steps
 
-1. Bump version + tag + release the `Promise.all` fix (not yet shipped — see Decisions).
-2. Investigate and fix the two remaining items from the 2026-08-11 audit's "Immediately" tier: open self-registration, and the identity-panel clipping regression.
+1. **Deploy the backend** — the v0.6.6 `auth.py` self-registration fix is committed but not live on the VPS. Hand the user the rsync+restart command from CLAUDE.md, then verify `/health` and do a quick manual check that an unknown name is now rejected.
+2. Investigate and fix the identity-panel clipping regression (last open item from the 2026-08-11 audit's "Immediately" tier).
 3. Fix the Activity Feed name/number finding (see Current Work).
 4. Keep this file updated after each meaningful change (see CLAUDE.md's Context Management Rules) — it was created 2026-08-10 and has no history before that.

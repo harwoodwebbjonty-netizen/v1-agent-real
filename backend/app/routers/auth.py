@@ -29,10 +29,11 @@ def _issue_session(user_id: str) -> str:
 @router.post("/identify", response_model=LoginResponse)
 @limiter.limit(get_settings().auth_rate_limit)
 def identify(request: Request, body: IdentifyRequest) -> LoginResponse:
-    """Name + password sign-in. A new name creates a member profile. The very
-    first account on a fresh deployment becomes admin ONLY if it presents the
-    BOOTSTRAP_ADMIN_TOKEN. Legacy accounts (no password yet) are NOT self-claimed
-    — an admin must set their password (see POST /users/{id}/set-password).
+    """Name + password sign-in. Self-registration is closed: only the very
+    first account on a fresh deployment can be created this way, and only if
+    it presents the BOOTSTRAP_ADMIN_TOKEN (it becomes admin). Every other
+    account must already exist — an admin creates it (POST /users) and sets
+    its password (POST /users/{id}/set-password) before the user can sign in.
     Rate-limited, with per-account lockout after repeated failures."""
     settings = get_settings()
     name = body.name.strip()
@@ -47,25 +48,20 @@ def identify(request: Request, body: IdentifyRequest) -> LoginResponse:
 
     user = db.get_user_by_name(name)
     if user is None:
-        if db.count_users() == 0:
-            # First-ever account → admin, but only with the deployment secret.
-            if not settings.bootstrap_admin_token or body.bootstrap_token != settings.bootstrap_admin_token:
-                raise HTTPException(
-                    status_code=403,
-                    detail="Admin setup token required to create the first account.",
-                )
-            role = "admin"
-        else:
-            role = "member"
+        if db.count_users() != 0:
+            raise HTTPException(
+                status_code=404,
+                detail="No account with that name. Ask an admin to add you as a team member.",
+            )
+        # First-ever account → admin, but only with the deployment secret.
+        if not settings.bootstrap_admin_token or body.bootstrap_token != settings.bootstrap_admin_token:
+            raise HTTPException(
+                status_code=403,
+                detail="Admin setup token required to create the first account.",
+            )
         user_id = new_id()
-        db.create_user(user_id, name, role, now_iso(), password_hash=hash_password(password))
-        # Assign a role: the first admin gets the built-in Admin role; everyone
-        # else lands in the configured default role (admin can reassign later).
-        if role == "admin":
-            db.set_user_role(user_id, "role-admin")
-        else:
-            default_role = db.get_default_role()
-            db.set_user_role(user_id, default_role["id"] if default_role else "role-member")
+        db.create_user(user_id, name, "admin", now_iso(), password_hash=hash_password(password))
+        db.set_user_role(user_id, "role-admin")
         user = db.get_user_by_id(user_id)
     else:
         locked_until = user["locked_until"] if "locked_until" in user.keys() else None

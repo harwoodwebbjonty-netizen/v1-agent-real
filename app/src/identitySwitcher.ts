@@ -3,6 +3,7 @@ import { getUserNames, readImageAsDataUrl, setUserAvatar, type UserName } from "
 import { getCurrentUser, identify, subscribeAuth, updateLocalUser } from "./auth";
 import { renderAvatarHtml, resizeImageDataUrl } from "./avatar";
 import { refreshTeamMembers } from "./team";
+import { showToast } from "./toast";
 import { escapeHtml } from "./utils";
 
 const AVATAR_SIZE_PX = 128;
@@ -145,10 +146,16 @@ export function initIdentitySwitcher(): void {
   async function join(): Promise<void> {
     const name = newNameInput.value.trim();
     if (name.length === 0) return;
-    closePanel();
-    // Existing name → sign-in prompt; new name → create-profile prompt.
+    // Existing name → sign-in prompt. New name → only allowed to bootstrap the
+    // very first account on a fresh deployment; self-registration is closed,
+    // so any other unknown name needs an admin to add them as a team member.
     const isNew = !pickerNames.some((m) => m.name === name);
     const isFirstAccount = pickerNames.length === 0;
+    if (isNew && !isFirstAccount) {
+      showToast(`No account named "${name}" — ask an admin to add you as a team member.`);
+      return;
+    }
+    closePanel();
     const ok = await promptPasswordAndSignIn(name, isNew, isFirstAccount);
     if (ok) newNameInput.value = "";
   }
