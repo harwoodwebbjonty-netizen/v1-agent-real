@@ -459,6 +459,9 @@ async def create_campaign_from_csv(
     stage_by_lead: dict = {}
     seen_lead_ids: set[str] = set()
     pre_generated_count = 0
+    # (lead_id, subject, body) for rows reusing a cached preview — written to
+    # win_back_emails only after win_back_campaigns has the parent row (FK).
+    pre_generated_rows: list[tuple[str, str, str]] = []
     ts = now_iso()
     campaign_id = new_id()
     for row in body.rows:
@@ -501,9 +504,7 @@ async def create_campaign_from_csv(
         # reuse that result as-is instead of paying for research + email
         # generation again for the same company.
         if row.preview_subject.strip() and row.preview_body.strip():
-            db.upsert_win_back_email(
-                campaign_id, lead_id, new_id(), row.preview_subject, row.preview_body, ts,
-            )
+            pre_generated_rows.append((lead_id, row.preview_subject, row.preview_body))
             pre_generated_count += 1
         else:
             to_generate_lead_ids.append(lead_id)
@@ -531,6 +532,8 @@ async def create_campaign_from_csv(
         signature=body.signature.strip(),
         source_rows_json=source_rows_json,
     )
+    for lead_id, subject, body_text in pre_generated_rows:
+        db.upsert_win_back_email(campaign_id, lead_id, new_id(), subject, body_text, ts)
     if pre_generated_count:
         db.update_win_back_campaign_progress(
             campaign_id, pre_generated_count, "ready" if not to_generate_lead_ids else "generating",
