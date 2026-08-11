@@ -9,6 +9,7 @@ across restarts.
 import asyncio
 import json
 import logging
+import time
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -21,6 +22,25 @@ logger = logging.getLogger("app.ch_stream")
 
 STREAM_BASE = "https://stream.companieshouse.gov.uk"
 CH_BASE = "https://api.company-information.service.gov.uk"
+
+# The filing stream can process several events a second, each wanting up to
+# two REST lookups (name + charge detail) — enough on its own to exhaust CH's
+# whole account-wide REST rate limit (~600/5min) and 429 every other feature
+# sharing the same key (AI Prospecting, Lead Activity refresh, phone lookup).
+# This caps the stream's own REST usage well below that, leaving the rest of
+# the budget for everything else. Deliberately conservative over precise.
+_REST_CALL_MIN_INTERVAL_SECONDS = 2.0
+_last_rest_call_at = 0.0
+_rest_call_lock = asyncio.Lock()
+
+
+async def _throttle_rest_call() -> None:
+    global _last_rest_call_at
+    async with _rest_call_lock:
+        wait = _last_rest_call_at + _REST_CALL_MIN_INTERVAL_SECONDS - time.monotonic()
+        if wait > 0:
+            await asyncio.sleep(wait)
+        _last_rest_call_at = time.monotonic()
 
 _FILING_TYPE_LABEL: dict[str, str] = {
     # Accounts
@@ -83,6 +103,7 @@ async def _get_company_name(api_key: str, company_number: str) -> str:
     if cached:
         return cached
     try:
+        await _throttle_rest_call()
         async with httpx.AsyncClient(auth=(api_key, ""), base_url=CH_BASE, timeout=8.0) as c:
             r = await c.get(f"/company/{company_number}")
             if r.status_code == 200:
@@ -101,6 +122,7 @@ async def _charge_detail_desc(api_key: str, company_number: str, desc_vals: dict
     makes the feed useful; the filing event itself only says 'a charge was
     registered'."""
     try:
+        await _throttle_rest_call()
         async with httpx.AsyncClient(auth=(api_key, ""), base_url=CH_BASE, timeout=8.0) as c:
             r = await c.get(f"/company/{company_number}/charges", params={"items_per_page": 25})
             if r.status_code != 200:
