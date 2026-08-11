@@ -143,7 +143,7 @@ async def _charge_detail_desc(api_key: str, company_number: str, desc_vals: dict
     return " ".join(parts) if parts else None
 
 
-async def _process_event(event: dict, api_key: str) -> None:
+async def _process_event(event: dict, rest_api_key: str) -> None:
     """Store all filing events in DB — no category filter."""
     data = event.get("data") or {}
     filing_type = str(data.get("type") or "")
@@ -158,7 +158,7 @@ async def _process_event(event: dict, api_key: str) -> None:
     if not company_number:
         return
 
-    company_name = await _get_company_name(api_key, company_number)
+    company_name = await _get_company_name(rest_api_key, company_number)
 
     # Use our label map if we recognise the type, otherwise fall back to the
     # human-readable description CH provides in the event itself.
@@ -172,7 +172,7 @@ async def _process_event(event: dict, api_key: str) -> None:
     # Charge filings get the real detail (debenture/lender/fixed-floating)
     # from the charges API — the headline signal this feed exists for.
     if filing_type in _CHARGE_FILING_TYPES:
-        detail = await _charge_detail_desc(api_key, company_number, desc_vals)
+        detail = await _charge_detail_desc(rest_api_key, company_number, desc_vals)
         if detail:
             charge_desc = f"{_FILING_TYPE_LABEL.get(filing_type, 'Charge')}: {detail}"
 
@@ -192,7 +192,7 @@ async def _process_event(event: dict, api_key: str) -> None:
         logger.debug("CH stream: new %s for %s (%s)", filing_type, company_name, company_number)
 
 
-async def _consume_stream(api_key: str) -> None:
+async def _consume_stream(stream_key: str, rest_api_key: str) -> None:
     timepoint = db.get_stream_state("ch_filing_timepoint")
     url = "/filings"
     if timepoint:
@@ -200,7 +200,7 @@ async def _consume_stream(api_key: str) -> None:
     logger.info("CH stream: connecting (timepoint=%s)", timepoint or "start")
 
     async with httpx.AsyncClient(
-        auth=(api_key, ""),
+        auth=(stream_key, ""),
         base_url=STREAM_BASE,
         timeout=httpx.Timeout(connect=15.0, read=None, write=None, pool=None),
     ) as client:
@@ -228,7 +228,7 @@ async def _consume_stream(api_key: str) -> None:
                 if tp is not None:
                     db.set_stream_state("ch_filing_timepoint", str(tp))
 
-                await _process_event(event, api_key)
+                await _process_event(event, rest_api_key)
 
 
 FEED_RETENTION_DAYS = 30
@@ -248,13 +248,20 @@ async def _prune_loop() -> None:
         await asyncio.sleep(_PRUNE_INTERVAL_SECONDS)
 
 
-async def run_filing_stream(api_key: str) -> None:
-    """Outer loop: reconnect with backoff whenever the stream drops."""
+async def run_filing_stream(stream_key: str, rest_api_key: str) -> None:
+    """Outer loop: reconnect with backoff whenever the stream drops.
+
+    Two separate keys: `stream_key` authenticates the long-lived streaming
+    connection itself (CH's Streaming API); `rest_api_key` is used for the
+    follow-up REST lookups per event (company name, charge detail) — CH's
+    REST and Streaming keys are different credentials and are not
+    interchangeable, so passing one key for both silently 401s the REST
+    calls while the stream itself keeps working fine."""
     asyncio.create_task(_prune_loop())
     backoff = 10
     while True:
         try:
-            await _consume_stream(api_key)
+            await _consume_stream(stream_key, rest_api_key)
             logger.info("CH stream: connection closed cleanly, reconnecting in %ds", backoff)
         except Exception:
             logger.exception("CH stream: connection error, reconnecting in %ds", backoff)

@@ -126,7 +126,7 @@ def on_startup() -> None:
     settings = get_settings()
     stream_key = settings.companies_house_stream_key or settings.companies_house_api_key
     if stream_key:
-        asyncio.create_task(run_filing_stream(stream_key))
+        asyncio.create_task(run_filing_stream(stream_key, settings.companies_house_api_key))
 
 
 def _backfill_industry_unclassified() -> None:
