@@ -4638,6 +4638,29 @@ button.p-filter-chip.active {
 .calls .co b { font-weight: 550; font-size: 0.82rem; }
 .calls .co span { display: block; color: var(--text-muted); font-size: 0.72rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .calls .phone { font-family: var(--font-mono); font-size: 0.72rem; color: #8a8f9e; flex: 0 0 auto; }
+.calls li.upcoming-row { cursor: pointer; }
+.calls li.upcoming-row:hover { background: var(--surface-alt); }
+
+/* "Carry on calling" strip — jumps back into the rep's in-progress cold-call list */
+#today-carry-on:empty { display: none; }
+.carry-on-btn {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: calc(100% - 32px);
+  margin: 10px 16px 0;
+  padding: 9px 12px;
+  border: 1px solid var(--brand-crimson-border);
+  border-radius: var(--radius-sm);
+  background: var(--brand-crimson-soft);
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+.carry-on-btn:hover { border-color: var(--accent-core); }
+.carry-on-name { font-weight: 550; font-size: 0.82rem; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.carry-on-prog { font-size: 0.72rem; color: var(--text-muted); flex: 0 0 auto; }
+.carry-on-cta { font-size: 0.78rem; font-weight: 600; color: var(--accent-core); flex: 0 0 auto; }
 
 /* 04 pipeline funnel */
 .funnel { padding: 14px 16px 16px; }

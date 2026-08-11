@@ -1,8 +1,10 @@
 import {
   type Lead,
+  type LeadList,
   addLeadEmail,
   addLeadPhone,
   assignLead,
+  deleteEmailDraft,
   deleteLeadEmail,
   deleteLeadPhone,
   exportDraftsToMailchimp,
@@ -14,7 +16,8 @@ import {
   updateLeadPhone,
   type PendingEmailDraft,
 } from "../api";
-import { getEvents, refreshCalendarEvents, subscribeCalendarEvents, type CalendarEvent } from "../calendarEvents";
+import { getCurrentUser } from "../auth";
+import { deleteEvent, getEvents, refreshCalendarEvents, subscribeCalendarEvents, type CalendarEvent } from "../calendarEvents";
 import {
   openSidePanel,
   refreshIfOpen,
@@ -22,7 +25,9 @@ import {
   setTeamMembers,
   type SidePanelCallbacks,
 } from "../components/sidePanel";
+import { setPendingColdCallList } from "../coldCallListHandoff";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
+import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { getLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
 import { openTab } from "../tabs";
@@ -42,16 +47,54 @@ function callsDueToday(): { event: CalendarEvent; lead: Lead }[] {
     .filter((x): x is { event: CalendarEvent; lead: Lead } => !!x.lead);
 }
 
-function followUpsDue(): Lead[] {
+// Pairs each due follow-up with its backing calendar event when one exists
+// (some follow-ups are purely next_best_action-driven, with no event to mark
+// done) — the Worklist row uses `event` to decide whether it can offer Done.
+function followUpsDue(): { lead: Lead; event: CalendarEvent | null }[] {
   const today = todayIso();
-  const overdueFollowUpLeadIds = new Set(
-    getEvents()
-      .filter((e) => e.type === "followup" && e.date <= today && e.lead_id)
-      .map((e) => e.lead_id!)
-  );
-  return getLeads().filter(
-    (l) => l.next_best_action.action === "Send follow-up email" || overdueFollowUpLeadIds.has(l.id)
-  );
+  const events = getEvents().filter((e) => e.type === "followup" && e.date <= today && e.lead_id);
+  const eventByLead = new Map(events.map((e) => [e.lead_id!, e]));
+  const leads = getLeads();
+  const ids = new Set(eventByLead.keys());
+  for (const l of leads) {
+    if (l.next_best_action.action === "Send follow-up email") ids.add(l.id);
+  }
+  const result: { lead: Lead; event: CalendarEvent | null }[] = [];
+  for (const id of ids) {
+    const lead = leads.find((l) => l.id === id);
+    if (lead) result.push({ lead, event: eventByLead.get(id) ?? null });
+  }
+  return result;
+}
+
+// Upcoming calendar items beyond today — so the rep can see what's coming
+// without switching to the full Calendar view.
+function upcomingEvents(limit = 6): CalendarEvent[] {
+  const today = todayIso();
+  return getEvents()
+    .filter((e) => e.date > today)
+    .sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time))
+    .slice(0, limit);
+}
+
+// Calling progress for a lead list, mirroring coldCallLists.ts's listStats —
+// duplicated locally to avoid coupling the two views' internals together.
+function listCallStats(listId: string): { called: number; total: number } {
+  const leads = getLeads().filter((l) => l.list_id === listId);
+  return { called: leads.filter((l) => l.called_at).length, total: leads.length };
+}
+
+// The rep's own most-recently-created list that isn't fully called through —
+// what "Carry on calling" resumes.
+function myActiveCallList(): LeadList | null {
+  const me = getCurrentUser();
+  if (!me) return null;
+  const candidates = getLeadLists()
+    .filter((l) => l.owner_user_id === me.id)
+    .map((l) => ({ list: l, stats: listCallStats(l.id) }))
+    .filter(({ stats }) => stats.total > 0 && stats.called < stats.total)
+    .sort((a, b) => b.list.created_at.localeCompare(a.list.created_at));
+  return candidates[0]?.list ?? null;
 }
 
 function companiesNeedingResearch(): Lead[] {
@@ -118,7 +161,10 @@ export function initActionCentre(): void {
       <div class="cols today-cols">
         <div class="panel">
           <div class="subhead"><h3>Next calls</h3><span class="eyebrow">03 · Calling block</span></div>
+          <div id="today-carry-on"></div>
           <ul class="calls" id="today-next-calls"></ul>
+          <div class="p-section-label">Upcoming</div>
+          <ul class="calls" id="today-upcoming"></ul>
         </div>
         <div class="panel">
           <div class="subhead"><h3>Pipeline</h3><span class="eyebrow">04 · This month</span></div>
@@ -162,10 +208,15 @@ export function initActionCentre(): void {
     replied: container.querySelector<HTMLDivElement>('[data-section="replied"] .action-section-body')!,
   };
 
-  // Page-head "Start calling" opens the calling workspace (existing view).
+  // Page-head "Start calling" opens the calling workspace — jumps straight
+  // into the rep's in-progress list ("carry on") when one exists.
   container
     .querySelector<HTMLButtonElement>("#today-start-calling")
-    ?.addEventListener("click", () => openTab("cold-call-lists", "Cold Call Lists"));
+    ?.addEventListener("click", () => {
+      const active = myActiveCallList();
+      if (active) setPendingColdCallList(active.id);
+      openTab("cold-call-lists", "Cold Call Lists");
+    });
 
   const actionCentreSidePanelCallbacks: SidePanelCallbacks = {
     onSaveNotes: async (id, notes) => {
@@ -248,6 +299,12 @@ export function initActionCentre(): void {
   }
   const btnDetails = `<button type="button" class="btn btn-ghost btn-sm action-row-details-btn">View</button>`;
   const btnEmail = (label: string) => `<button type="button" class="btn btn-ghost btn-sm action-row-email-btn">${escapeHtml(label)}</button>`;
+  // "Done" clears the calendar reminder (call/follow-up event) — it does not
+  // log a call outcome; that still happens via Call Queue / Cold Call Lists.
+  const btnDone = (kind: "call" | "followup", eventId: string) =>
+    `<button type="button" class="btn btn-ghost btn-sm action-row-done-btn" data-done-kind="${kind}" data-done-id="${escapeHtml(eventId)}">Done</button>`;
+  const btnDeleteDraft = (draftId: string) =>
+    `<button type="button" class="btn btn-danger-ghost btn-sm action-row-done-btn" data-done-kind="draft" data-done-id="${escapeHtml(draftId)}">Delete</button>`;
 
   let pendingDrafts: PendingEmailDraft[] = [];
   // Worklist compaction: show the top rows, collapse the rest behind a toggle.
@@ -274,23 +331,24 @@ export function initActionCentre(): void {
       getEvents().filter((e) => e.type === "followup" && e.date < today && !!e.lead_id).map((e) => e.lead_id!)
     );
     const worklistRows: string[] = [
-      ...followUps.map((lead) => {
+      ...followUps.map(({ lead, event }) => {
         const reason = lead.next_best_action.reason;
         return wlRow(lead.id, "follow", "—", overdueFollowIds.has(lead.id) ? "OVERDUE" : "",
           reason ? `Follow up — ${reason}` : "Follow up",
           companyB(lead.company),
-          wlChip("Follow-up", "wl-info"), btnEmail("Send Follow-up") + btnDetails);
+          wlChip("Follow-up", "wl-info"),
+          btnEmail("Send Follow-up") + btnDetails + (event ? btnDone("followup", event.id) : ""));
       }),
       ...calls.map(({ event, lead }) =>
         wlRow(lead.id, "call", event.time || "—", "",
           "Call",
           companyB(lead.company) + (lead.phone_number ? ` · <span class="mono">${escapeHtml(lead.phone_number)}</span>` : ""),
-          wlChip("Call", "wl-hi"), btnDetails)),
+          wlChip("Call", "wl-hi"), btnDetails + btnDone("call", event.id))),
       ...pendingDrafts.map((draft) =>
         wlRow(draft.lead_id, "email", "—", "",
           draft.subject ? `Send email — ${draft.subject}` : "Send follow-up email",
           companyB(draft.lead_company),
-          wlChip("Draft", "wl-purple"), btnEmail("Continue Draft"))),
+          wlChip("Draft", "wl-purple"), btnEmail("Continue Draft") + btnDeleteDraft(draft.id))),
       ...research.map((lead) => {
         const reason = lead.next_best_action.reason;
         return wlRow(lead.id, "research", "—", "",
@@ -361,6 +419,54 @@ export function initActionCentre(): void {
         : `<li class="calls-empty">No calls scheduled today.</li>`;
     }
 
+    // "Carry on calling" — the rep's own in-progress cold-call list, not a
+    // flat list of every lead needing a call. Jumps straight into it via the
+    // same handoff "Start calling" uses.
+    const carryOnEl = container.querySelector<HTMLDivElement>("#today-carry-on");
+    if (carryOnEl) {
+      const active = myActiveCallList();
+      if (active) {
+        const s = listCallStats(active.id);
+        carryOnEl.innerHTML = `
+          <button type="button" class="carry-on-btn" id="today-carry-on-btn">
+            <span class="carry-on-name">${escapeHtml(active.name)}</span>
+            <span class="carry-on-prog mono">${s.called}/${s.total} called</span>
+            <span class="carry-on-cta">Carry on →</span>
+          </button>`;
+        carryOnEl.querySelector<HTMLButtonElement>("#today-carry-on-btn")?.addEventListener("click", () => {
+          setPendingColdCallList(active.id);
+          openTab("cold-call-lists", "Cold Call Lists");
+        });
+      } else {
+        carryOnEl.innerHTML = "";
+      }
+    }
+
+    // Upcoming — calendar items beyond today, so the rep can see what's
+    // coming without switching to the full Calendar view.
+    const upcomingEl = container.querySelector<HTMLUListElement>("#today-upcoming");
+    if (upcomingEl) {
+      const upcoming = upcomingEvents();
+      const leads = getLeads();
+      const typeLabel: Record<CalendarEvent["type"], string> = { call: "Call", followup: "Follow-up", task: "Task" };
+      upcomingEl.innerHTML = upcoming.length
+        ? upcoming
+            .map((e) => {
+              const lead = e.lead_id ? leads.find((l) => l.id === e.lead_id) : undefined;
+              const dateLabel = new Date(`${e.date}T00:00:00`).toLocaleDateString(undefined, { weekday: "short", day: "numeric" });
+              const sub = `${typeLabel[e.type]}${e.time ? ` · ${e.time}` : ""}`;
+              return `<li${lead ? ` class="upcoming-row" data-lead-id="${escapeHtml(lead.id)}"` : ""}>
+                <span class="tm">${escapeHtml(dateLabel)}</span>
+                <span class="co"><b>${escapeHtml(lead ? lead.company : e.title)}</b><span>${escapeHtml(sub)}</span></span>
+              </li>`;
+            })
+            .join("")
+        : `<li class="calls-empty">Nothing else on the calendar yet.</li>`;
+      upcomingEl.querySelectorAll<HTMLLIElement>(".upcoming-row").forEach((li) => {
+        li.addEventListener("click", () => openLead(li.dataset.leadId!));
+      });
+    }
+
     // 04 Pipeline — live funnel derived from the real lead pool (no invented data).
     const funnelEl = container.querySelector<HTMLDivElement>("#today-funnel");
     if (funnelEl) {
@@ -420,6 +526,33 @@ export function initActionCentre(): void {
         openTab("outreach", "Outreach");
       });
     });
+    container.querySelectorAll<HTMLButtonElement>(".action-row-done-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const kind = btn.dataset.doneKind!;
+        const id = btn.dataset.doneId!;
+        if (kind === "draft") {
+          if (!confirm("Delete this draft? This can't be undone.")) return;
+          btn.disabled = true;
+          try {
+            await deleteEmailDraft(id);
+            pendingDrafts = pendingDrafts.filter((d) => d.id !== id);
+            render();
+          } catch (err) {
+            showToast(`Could not delete draft: ${err}`);
+            btn.disabled = false;
+          }
+          return;
+        }
+        if (!confirm("Mark as done? This removes the reminder from your calendar (it won't log a call outcome).")) return;
+        btn.disabled = true;
+        try {
+          await deleteEvent(id);
+        } catch (err) {
+          showToast(`Could not update the calendar: ${err}`);
+          btn.disabled = false;
+        }
+      });
+    });
   }
 
   async function refreshAll(): Promise<void> {
@@ -472,7 +605,8 @@ export function initActionCentre(): void {
   subscribe(render);
   subscribeCalendarEvents(render);
   subscribeTeam(() => setTeamMembers(getTeamMembers()));
-  void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers()])
+  subscribeLeadLists(render);
+  void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers(), refreshLeadLists()])
     .then(refreshAll)
     .catch((err) => showToast(`Could not load Today data: ${err}`));
 }

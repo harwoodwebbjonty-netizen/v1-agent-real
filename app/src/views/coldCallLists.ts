@@ -51,10 +51,11 @@ import {
   type SidePanelCallbacks,
 } from "../components/sidePanel";
 import { CONTACT_STATUS_ORDER } from "../constants";
+import { consumePendingColdCallList } from "../coldCallListHandoff";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { getLeads, refreshLeads, subscribe } from "../state";
-import { openTab } from "../tabs";
+import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
 import { showToast } from "../toast";
 import { escapeHtml } from "../utils";
 
@@ -1295,6 +1296,13 @@ export function initColdCallLists(): void {
   subscribeLeadLists(renderOverview);
   subscribe(renderOverview); // keep per-list calling progress live as leads change
   subscribeAuth(() => { if (!getCurrentUser()) return; void refreshLeadLists(); });
+
+  // Today's "Carry on calling" hands off which list to jump straight into.
+  subscribeTabs(() => {
+    if (getActiveTabId() !== "cold-call-lists") return;
+    const pendingListId = consumePendingColdCallList();
+    if (pendingListId) void openListDetail(pendingListId);
+  });
 
   container.querySelector("#new-list-btn")!.addEventListener("click", showNameScreen);
 
