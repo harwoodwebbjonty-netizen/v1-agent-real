@@ -1429,6 +1429,7 @@ a:hover {
 .identity-panel-new .search-input {
   flex: 1;
   width: auto;
+  min-width: 0;
 }
 
 #identity-change-photo-btn {
