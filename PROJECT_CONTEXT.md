@@ -43,23 +43,29 @@ App is at **v0.6.4**. A multi-release frontend redesign (v0.5.0 → v0.6.4, ~10 
 
 # Current Work
 
-Diagnosing a user-reported regression: after updating to ~v0.6.3/v0.6.4, the app shows **no leads and no worklist** (both empty). Not yet root-caused. Suspect a startup JS error from the recent sidebar changes (identity-switcher moved to the footer, brand `<img>` replaced with inline SVG) or the worklist-collapse refactor in `actionCentre.ts` — needs verification against the actual running app, not just `tsc`/build (both pass clean, so this is a runtime-only failure).
+A full 18-section production-readiness audit was completed (2026-08-11, read-only, not saved to a file — exists only in that chat session). Its "Immediately" tier: (1) close open self-registration, (2) fix unguarded `Promise.all` calls, (3) confirm/fix identity-panel clipping regression. Item 2 is done (see Decisions). Self-registration and identity-panel clipping are still open — not yet investigated.
+
+Also open: `activityFeed.ts` rows show company name or number, never both — `renderChRow` (~line 146, falls back via `??`) and `renderDgRow` (~line 203, name only, no fallback). Documented, not fixed.
 
 # Known Issues
 
-- **Empty leads/worklist regression** (see Current Work) — unresolved.
 - No Apple notarization (Gatekeeper "damaged app" on new Macs) — needs Apple Developer Program.
 - No HTTPS (backend is plain HTTP to an IP) — needs a domain first.
 - No automated DB backups on the VPS.
 - Win-back emails have no unsubscribe link (blocked on domain/HTTPS).
+- Self-registration reportedly still open (from the 2026-08-11 audit) — not yet independently verified in this session.
+- Identity-panel clipping regression (from the 2026-08-11 audit) — not yet investigated.
 
 # Decisions
 
 - Redesign is presentation-only by explicit instruction: keep every existing feature/button/action; only the visual layer changes.
 - `output/` and `outputs/` both stay as separate, gitignored, uncommitted local dirs (not merged/renamed) — their real client data must never enter git history.
 - `AGENTS.md` stays a thin pointer, not a duplicate manual — re-collapsed 2026-08-10 after silently reverting once already (see `audits/os-audit-2026-08-10.md`).
+- Root-caused and fixed the "no leads/no worklist" regression (2026-08-11): three call sites (`dashboard.ts`, `actionCentre.ts`, `callQueue.ts`) ran `Promise.all([refreshLeads(), ...])` with no `.catch`; a single rejection (e.g. session expiry / non-2xx from the backend) silently left `dashboard.ts`'s `isInitialLoad` flag stuck `true` forever, so the Leads table showed permanent loading skeletons with no error surfaced. Fixed by catching and calling `showToast`, and in `dashboard.ts` still flipping `isInitialLoad = false` on failure so it falls through to the proper empty state. Verified with a Playwright script against the real frontend (mocked `window.__TAURI_INTERNALS__.invoke` to reject `get_log_entries`) showing before/after: before = stuck on 4 skeleton rows, no toast; after = empty state renders, toast shows the error. Not yet released (no version bump/tag/deploy done this session).
 
 # Next Steps
 
-1. Diagnose and fix the empty-leads/worklist regression.
-2. Keep this file updated after each meaningful change (see CLAUDE.md's Context Management Rules) — it was created 2026-08-10 and has no history before that.
+1. Bump version + tag + release the `Promise.all` fix (not yet shipped — see Decisions).
+2. Investigate and fix the two remaining items from the 2026-08-11 audit's "Immediately" tier: open self-registration, and the identity-panel clipping regression.
+3. Fix the Activity Feed name/number finding (see Current Work).
+4. Keep this file updated after each meaningful change (see CLAUDE.md's Context Management Rules) — it was created 2026-08-10 and has no history before that.

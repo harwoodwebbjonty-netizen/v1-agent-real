@@ -291,5 +291,7 @@ export function initCallQueue(): void {
   subscribe(render);
   subscribeCalendarEvents(render);
   subscribeTeam(() => setTeamMembers(getTeamMembers()));
-  void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers()]).then(render);
+  void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers()])
+    .then(render)
+    .catch((err) => showToast(`Could not load call queue: ${err}`));
 }

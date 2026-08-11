@@ -472,5 +472,7 @@ export function initActionCentre(): void {
   subscribe(render);
   subscribeCalendarEvents(render);
   subscribeTeam(() => setTeamMembers(getTeamMembers()));
-  void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers()]).then(refreshAll);
+  void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers()])
+    .then(refreshAll)
+    .catch((err) => showToast(`Could not load Today data: ${err}`));
 }

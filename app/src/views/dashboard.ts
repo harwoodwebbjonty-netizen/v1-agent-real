@@ -479,7 +479,11 @@ export function initDashboard(): void {
   subscribeAuth(() => {
     if (!getCurrentUser()) return;
     void (async () => {
-      await Promise.all([refreshLeads(), refreshTeamMembers()]);
+      try {
+        await Promise.all([refreshLeads(), refreshTeamMembers()]);
+      } catch (err) {
+        showToast(`Could not load leads: ${err}`);
+      }
       isInitialLoad = false;
       renderTable();
     })();
