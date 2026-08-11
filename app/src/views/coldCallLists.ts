@@ -33,6 +33,7 @@ import {
   updateLeadPhone,
 } from "../api";
 import { CHARGE_TYPES, bindMultiSelect, buildMultiSelectHtml } from "../components/multiSelect";
+import { renderAvatarHtml } from "../avatar";
 import { getCurrentUser, isAdmin, subscribeAuth } from "../auth";
 import {
   type SortColumn,
@@ -56,6 +57,7 @@ import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { getLeads, refreshLeads, subscribe } from "../state";
 import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
+import { getTeamMembers, subscribeTeam } from "../team";
 import { showToast } from "../toast";
 import { escapeHtml } from "../utils";
 
@@ -464,11 +466,12 @@ export function initColdCallLists(): void {
     return { called, replies, pct: total ? Math.round((called / total) * 100) : 0 };
   }
 
-  function ownerInitials(name: string | null): string {
-    if (!name) return "—";
-    const parts = name.trim().split(/\s+/).filter(Boolean);
-    const s = (parts[0]?.[0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "");
-    return s.toUpperCase() || "—";
+  // Resolves the owner's real chosen photo (if any) from the live team roster,
+  // so this stays in sync with Settings/topbar instead of showing bare initials.
+  function ownerAvatarHtml(list: LeadList): string {
+    const owner = list.owner_name || "—";
+    const member = getTeamMembers().find((m) => m.id === list.owner_user_id);
+    return renderAvatarHtml({ name: owner, avatar: member?.avatar ?? null }, "avatar-sm");
   }
 
   // Editorial "list table" row — owner avatar, lead count, live calling-progress
@@ -479,7 +482,7 @@ export function initColdCallLists(): void {
     return `
       <li class="history-list-row list-row ccl-list-row${showOwner ? " ccl-list-row-team" : ""}" data-list-id="${escapeHtml(list.id)}">
         <div class="clr-main"><div class="clr-name">${escapeHtml(list.name)}</div></div>
-        <span class="clr-own"><span class="clr-ava">${escapeHtml(ownerInitials(list.owner_name))}</span>${escapeHtml(owner)}</span>
+        <span class="clr-own">${ownerAvatarHtml(list)}${escapeHtml(owner)}</span>
         <span class="clr-leads mono">${list.lead_count.toLocaleString()} lead${list.lead_count === 1 ? "" : "s"}</span>
         <div class="clr-prog"><span class="ptrack"><i style="width:${s.pct}%"></i></span><span class="pv mono">${s.pct}%</span></div>
         <span class="clr-replies mono">${s.replies} ${s.replies === 1 ? "reply" : "replies"}</span>
@@ -1295,6 +1298,7 @@ export function initColdCallLists(): void {
 
   subscribeLeadLists(renderOverview);
   subscribe(renderOverview); // keep per-list calling progress live as leads change
+  subscribeTeam(renderOverview); // keep owner avatars live when a teammate changes their photo
   subscribeAuth(() => { if (!getCurrentUser()) return; void refreshLeadLists(); });
 
   // Today's "Carry on calling" hands off which list to jump straight into.
