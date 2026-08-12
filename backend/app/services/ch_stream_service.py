@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 import httpx
+import sentry_sdk
 
 from app import db
 from app.services.auth_service import new_id
@@ -267,6 +268,7 @@ async def _prune_loop() -> None:
                 logger.info("CH feed: pruned %d event(s) older than %d days", deleted, FEED_RETENTION_DAYS)
         except Exception:
             logger.exception("CH feed prune failed")
+            sentry_sdk.capture_exception()
         await asyncio.sleep(_PRUNE_INTERVAL_SECONDS)
 
 
@@ -287,5 +289,6 @@ async def run_filing_stream(stream_key: str, rest_api_key: str) -> None:
             logger.info("CH stream: connection closed cleanly, reconnecting in %ds", backoff)
         except Exception:
             logger.exception("CH stream: connection error, reconnecting in %ds", backoff)
+            sentry_sdk.capture_exception()
         await asyncio.sleep(backoff)
         backoff = min(backoff * 2, 300)  # cap at 5 min

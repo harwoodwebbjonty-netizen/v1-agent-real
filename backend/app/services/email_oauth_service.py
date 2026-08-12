@@ -11,6 +11,7 @@ from app import db
 from app.core.config import get_settings
 from app.services.auth_service import new_id, now_iso
 from app.services.email_format import html_to_plain_text, markdown_bold_to_html
+from app.services.token_crypto import TokenDecryptionError, decrypt_token, encrypt_token
 
 # Win-back bodies are plain text by default; apply_campaign_link() (in
 # win_back_email_service.py) may deterministically insert a single <a href>
@@ -161,17 +162,21 @@ async def handle_oauth_callback(provider: str, code: str, state: str) -> None:
         user_id,
         provider,
         email_address,
-        tokens["access_token"],
-        tokens.get("refresh_token", ""),
+        encrypt_token(tokens["access_token"]),
+        encrypt_token(tokens.get("refresh_token", "")),
         expires_at,
         now_iso(),
     )
 
 
 async def refresh_token_if_needed(account_row) -> str:
-    expires_at = datetime.fromisoformat(account_row["token_expires_at"])
-    if datetime.now(timezone.utc) < expires_at:
-        return account_row["access_token"]
+    try:
+        stored_refresh_token = decrypt_token(account_row["refresh_token"])
+        expires_at = datetime.fromisoformat(account_row["token_expires_at"])
+        if datetime.now(timezone.utc) < expires_at:
+            return decrypt_token(account_row["access_token"])
+    except TokenDecryptionError as exc:
+        raise OAuthError(str(exc)) from exc
 
     settings = get_settings()
     provider = account_row["provider"]
@@ -180,7 +185,7 @@ async def refresh_token_if_needed(account_row) -> str:
             response = await client.post(
                 GOOGLE_TOKEN_URL,
                 data={
-                    "refresh_token": account_row["refresh_token"],
+                    "refresh_token": stored_refresh_token,
                     "client_id": settings.google_oauth_client_id,
                     "client_secret": settings.google_oauth_client_secret,
                     "grant_type": "refresh_token",
@@ -190,7 +195,7 @@ async def refresh_token_if_needed(account_row) -> str:
             response = await client.post(
                 MICROSOFT_TOKEN_URL,
                 data={
-                    "refresh_token": account_row["refresh_token"],
+                    "refresh_token": stored_refresh_token,
                     "client_id": settings.microsoft_oauth_client_id,
                     "client_secret": settings.microsoft_oauth_client_secret,
                     "grant_type": "refresh_token",
@@ -204,7 +209,9 @@ async def refresh_token_if_needed(account_row) -> str:
         raise OAuthError(f"Failed to refresh {provider} token: {response.text}")
     tokens = response.json()
     new_expires_at = (datetime.now(timezone.utc) + timedelta(seconds=tokens.get("expires_in", 3600))).isoformat()
-    db.update_email_oauth_tokens(account_row["user_id"], provider, tokens["access_token"], new_expires_at, now_iso())
+    db.update_email_oauth_tokens(
+        account_row["user_id"], provider, encrypt_token(tokens["access_token"]), new_expires_at, now_iso()
+    )
     return tokens["access_token"]
 
 

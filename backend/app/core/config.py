@@ -86,6 +86,20 @@ class Settings(BaseSettings):
     apify_api_token: str = ""
     apify_linkedin_actor_id: str = ""
 
+    # Symmetric key (Fernet, urlsafe-base64, 32 raw bytes) encrypting OAuth
+    # access/refresh tokens at rest in email_oauth_accounts. Generate with:
+    #   python3 -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    # Required — no default — matching anthropic_api_key: the app must not
+    # start with tokens unprotected. Rotating this key requires re-encrypting
+    # every existing row first (see migration 032); losing it makes every
+    # connected email account's stored token permanently unrecoverable (each
+    # user simply reconnects — it is not a data-loss event for anything else).
+    token_encryption_key: str
+
+    # Sentry DSN for error tracking. Empty = disabled (sentry_sdk.init is
+    # simply not called). Get a DSN by creating a free Sentry project.
+    sentry_dsn: str = ""
+
 
 @lru_cache
 def get_settings() -> Settings:

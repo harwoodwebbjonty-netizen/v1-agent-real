@@ -616,6 +616,27 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_032_encrypt_oauth_tokens(conn: sqlite3.Connection) -> None:
+    """Re-encrypts any plaintext access_token/refresh_token left over from
+    before Fernet encryption was added (audit F-04 / Stage 0). Idempotent —
+    the enc:v1: prefix marks already-encrypted values, so re-running this is
+    a safe no-op on rows already migrated (never happens in practice since a
+    migration only runs once, but cheap insurance)."""
+    from app.services.token_crypto import encrypt_token
+
+    rows = conn.execute("SELECT id, access_token, refresh_token FROM email_oauth_accounts").fetchall()
+    for row in rows:
+        already_done = row["access_token"].startswith("enc:v1:") and (
+            not row["refresh_token"] or row["refresh_token"].startswith("enc:v1:")
+        )
+        if already_done:
+            continue
+        conn.execute(
+            "UPDATE email_oauth_accounts SET access_token = ?, refresh_token = ? WHERE id = ?",
+            (encrypt_token(row["access_token"]), encrypt_token(row["refresh_token"]), row["id"]),
+        )
+
+
 def _migration_031_roles(conn: sqlite3.Connection) -> None:
     """RBAC: custom roles with per-permission toggles + lead scope. Seeds two
     built-in roles (Admin = all permissions; Member = today's member access) and
@@ -780,8 +801,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (29, _migration_029_company_norm_and_flags),
     (30, _migration_030_audit_log),
     (31, _migration_031_roles),
+    (32, _migration_032_encrypt_oauth_tokens),
 ]
-CURRENT_SCHEMA_VERSION = 31
+CURRENT_SCHEMA_VERSION = 32
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:

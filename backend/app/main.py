@@ -1,6 +1,7 @@
 import asyncio
 import logging
 
+import sentry_sdk
 from fastapi import Depends, FastAPI, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from slowapi.errors import RateLimitExceeded
@@ -46,6 +47,13 @@ from app.services.sequences_service import process_due_enrollments
 logger = logging.getLogger("app.main")
 SEQUENCE_POLL_INTERVAL_SECONDS = 15 * 60
 ACTIVITY_REFRESH_POLL_SECONDS = 30 * 60
+
+# Error tracking — disabled (sentry_sdk.init never called) unless SENTRY_DSN is
+# set. traces_sample_rate=0.0: error visibility only, not performance tracing.
+# send_default_pii=False: this backend handles real lead/contact personal
+# data, so request bodies/user data are never sent to Sentry by default.
+if get_settings().sentry_dsn:
+    sentry_sdk.init(dsn=get_settings().sentry_dsn, traces_sample_rate=0.0, send_default_pii=False)
 
 app = FastAPI(title="Company Phone Lookup Backend")
 app.state.limiter = limiter
@@ -93,6 +101,7 @@ async def _sequence_scheduler_loop() -> None:
                 logger.info("Sequence scheduler processed %d enrollment(s)", processed)
         except Exception:  # noqa: BLE001 — the loop must never die from one bad cycle
             logger.exception("Sequence scheduler cycle failed")
+            sentry_sdk.capture_exception()
         await asyncio.sleep(SEQUENCE_POLL_INTERVAL_SECONDS)
 
 
@@ -107,6 +116,7 @@ async def _activity_refresh_loop() -> None:
                 logger.info("Activity refresh detected %d new event(s)", detected)
         except Exception:  # noqa: BLE001
             logger.exception("Activity refresh cycle failed")
+            sentry_sdk.capture_exception()
         await asyncio.sleep(ACTIVITY_REFRESH_POLL_SECONDS)
 
 
@@ -164,6 +174,11 @@ async def unhandled_exception_handler(request: Request, exc: Exception) -> JSONR
     if isinstance(exc, HTTPException):
         raise exc
     logger.exception("Unhandled error on %s %s", request.method, request.url.path)
+    # This handler fully handles the exception (returns a JSONResponse rather
+    # than re-raising), so Sentry's automatic ASGI-level capture never sees
+    # it — from the ASGI middleware's perspective, nothing went unhandled.
+    # Explicit capture here is the only reliable way these reach Sentry.
+    sentry_sdk.capture_exception(exc)
     return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
 
