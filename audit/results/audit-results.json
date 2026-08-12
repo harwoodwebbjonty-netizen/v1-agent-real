@@ -1,0 +1,310 @@
+{
+  "metadata": {
+    "repository": "/Users/jontyhw/v1 agent",
+    "commit": "8c923ac5e703928e3f94721e6c11593a5c397f7d",
+    "evaluated_at": "2026-08-12T09:41:23Z",
+    "stack": [
+      "Backend: FastAPI (Python), SQLite (WAL mode), single uvicorn worker, systemd on one VPS",
+      "Frontend: Tauri (Rust shell) + vanilla TypeScript + Vite, no framework",
+      "AI: Anthropic (Claude) via 8 backend service files",
+      "Integrations: Google/Microsoft OAuth (email send), Companies House REST+Streaming, Apify, Mailchimp"
+    ],
+    "limitations": [
+      "No live browser/UI automation performed — this is a native Tauri desktop app, not a website; Phase 6's workflow evaluation was done via static code-path tracing, not timed live interaction",
+      "Direct production-database row-level queries were blocked twice by this environment's own permission classifier; the confirmed 29x DB-growth finding is based on file-size/filesystem observation (ls, df, crontab -l), not a table-level breakdown — the exact cause is Inferred, not Confirmed",
+      "No frontend lint/static-analysis tool is configured in this repo (no eslint/biome config exists), so 'existing lint results' could not be reported because none exist",
+      "Competitor research relied on live WebSearch/WebFetch; a few official pricing pages (Salesforce, Apollo, HubSpot) returned errors or JS-only shells to the fetch tool and were cross-corroborated via third-party pricing trackers instead, flagged inline in 02-competitor-benchmark.md"
+    ]
+  },
+  "overall_score": 40,
+  "category_scores": {
+    "core_crm_completeness": {
+      "weight": 15,
+      "score": 7.5,
+      "percentage": 50,
+      "evidence": "Leads/ownership are strong (90%); Deals/Pipeline data model exists but its only UI is on an orphaned screen with no kanban; Files, custom fields, tags, archiving are all confirmed absent (0%); duplicate detection/merge backend logic is genuinely solid.",
+      "strongest_aspect": "Leads as the core object — real skeleton loading, dual empty states, solid ownership/assignment model",
+      "weakest_aspect": "Deals/Pipeline: real data model, effectively no usable UI (see visual audit orphaned-screen finding)",
+      "confidence_level": "high",
+      "path_to_60": "Reconnect Opportunity Workspace so the existing pipeline data model has a working UI at all",
+      "path_to_75": "Add kanban visualisation, custom fields, tags, and file attachments",
+      "path_to_90": "Add archiving, followers/watchers, full field-level record history, and configurable duplicate rules on top of the existing merge logic"
+    },
+    "sales_workflow_quality": {
+      "weight": 10,
+      "score": 4.5,
+      "percentage": 45,
+      "evidence": "Today/Action Centre and Sequences are strong; Call Queue is fully built but orphaned; pipeline drag-and-drop, forecasting, saved views, and a command palette are all confirmed absent.",
+      "strongest_aspect": "Today/Action Centre worklist — the best-executed workflow screen in the app",
+      "weakest_aspect": "No pipeline drag-and-drop or saved/shared filter views anywhere",
+      "confidence_level": "high",
+      "path_to_60": "Reconnect Call Queue; add saved views",
+      "path_to_75": "Add kanban pipeline and a real command palette",
+      "path_to_90": "Add forecasting, stalled-deal detection, and automated/round-robin assignment"
+    },
+    "visual_system_and_polish": {
+      "weight": 15,
+      "score": 6,
+      "percentage": 40,
+      "evidence": "Token system is well-designed (72 custom properties, documented scales) but inconsistently used: 58% of font-size, 39% of border-radius, 31%+ of padding declarations bypass the scale; 4+ duplicate modal implementations; only 2 of ~15 reachable screens have real skeleton loading.",
+      "strongest_aspect": "The token system's underlying design and the documented legacy-alias backward-compatibility shim",
+      "weakest_aspect": "Type-scale bypass rate (58% of all font-size declarations are raw, one-off values)",
+      "confidence_level": "high",
+      "path_to_60": "Consolidate the font-size/padding/border-radius bypass and build one shared modal component",
+      "path_to_75": "Standardise loading/error-state coverage across all screens to match Dashboard's reference pattern",
+      "path_to_90": "Full accessibility pass (aria-labels, focus-visible rings) and reduced-motion support"
+    },
+    "usability_and_information_architecture": {
+      "weight": 10,
+      "score": 4,
+      "percentage": 40,
+      "evidence": "10 of 15 declared screens are reachable; 3 fully-built screens are structurally orphaned from navigation; dead data-admin-only markup; a redundant device-local Settings PIN gate layered on top of the real permission system; sparse accessibility (5 aria-labels vs 334 interactive controls).",
+      "strongest_aspect": "The 10 reachable top-level sections map cleanly to real daily jobs, no evidence of nav-bloat/clutter",
+      "weakest_aspect": "3 finished screens (Call Queue, Opportunity Workspace, AI Sales Intelligence) unreachable through any navigation path",
+      "confidence_level": "high",
+      "path_to_60": "Reconnect or deliberately retire the orphaned screens; remove the dead admin-only markup and redundant PIN gate",
+      "path_to_75": "Add a command palette; add sub-view-level permission granularity for the Outreach sub-tools",
+      "path_to_90": "Full accessibility remediation; saved/shared views"
+    },
+    "integration_readiness": {
+      "weight": 10,
+      "score": 4,
+      "percentage": 40,
+      "evidence": "3 integrations exist and are individually well-engineered (email OAuth with correct CSRF handling, Companies House with retry/backoff/idempotency, Anthropic with real cost controls); no connector framework, no calendar/telephony provider, no public API/webhooks, no marketplace.",
+      "strongest_aspect": "The Companies House streaming integration's retry/backoff/idempotency/self-pruning design",
+      "weakest_aspect": "No provider-neutral connector abstraction — each integration hand-built from scratch; no calling-provider or calendar-sync integration at all",
+      "confidence_level": "high",
+      "path_to_60": "Extract the CH stream's pattern into a reusable SyncJob/SyncCursor abstraction; add Google/Outlook Calendar sync",
+      "path_to_75": "Add a provider-neutral calling adapter plus one named calling provider (Aircall)",
+      "path_to_90": "Build a real 'Connected Apps' settings surface with health/reconnect UX; add a public API + webhooks"
+    },
+    "multi_tenant_saas_readiness": {
+      "weight": 15,
+      "score": 1,
+      "percentage": 7,
+      "evidence": "Confirmed by repo-wide grep: zero references to workspace/tenant/organisation_id anywhere in the backend. Single shared users table, no org boundary on any of 33 tables. No self-serve signup, no billing/subscription/plan-gating, no email-based invites, no trial lifecycle.",
+      "strongest_aspect": "The existing custom RBAC/permission-string model is a genuine foundation to layer org-scoping onto — it is not a rebuild, just an extension",
+      "weakest_aspect": "No tenant/organisation concept exists anywhere in the schema or codebase",
+      "confidence_level": "high",
+      "path_to_60": "Not achievable without the full tenant-isolation migration (Roadmap Stage 1) — this is the single largest, most foundational engineering effort identified in the entire audit",
+      "path_to_75": "Tenant isolation plus self-serve signup, org creation, and email-based invites",
+      "path_to_90": "Add billing/subscription/plan-entitlement layer, trial lifecycle, and per-tenant integration credentials"
+    },
+    "security_and_privacy": {
+      "weight": 10,
+      "score": 6,
+      "percentage": 60,
+      "evidence": "Zero accidental unauthenticated endpoints across 124 routes; parameterized SQL with an allowlist guard; correct OAuth CSRF (single-use random state nonce); zero hardcoded secrets in repo or git history; real, enforced AI cost controls. Confirmed gaps: OAuth tokens stored in plaintext, uneven audit-log coverage, no encryption at rest, no GDPR retention/export/erasure tooling.",
+      "strongest_aspect": "Authentication/authorisation fundamentals — verified zero accidental gaps across every route in the backend",
+      "weakest_aspect": "OAuth access/refresh tokens stored in plaintext with no encryption-at-rest layer anywhere in the codebase",
+      "confidence_level": "high",
+      "path_to_60": "Already at this level on fundamentals; encrypt OAuth tokens at rest to solidify it",
+      "path_to_75": "Close audit-log coverage gaps (user lifecycle, outbound email actions); add GDPR retention/export/erasure tooling",
+      "path_to_90": "Encryption at rest for the database itself; admin-impersonation/secure-support-access model; formal data-processing register"
+    },
+    "scalability_and_reliability": {
+      "weight": 10,
+      "score": 4,
+      "percentage": 40,
+      "evidence": "Solid migration strategy (31 sequential, append-only migrations); strong background-loop exception handling (two-layer, never dies from one bad cycle); confirmed zero observability/error-tracking anywhere; confirmed production DB grew ~29x in one month with no working automated backup; 22 unbounded list endpoints; 19 real missing indexes on FK-shaped columns.",
+      "strongest_aspect": "Migration discipline and the background-job exception-handling pattern (two-layer, never permanently dies)",
+      "weakest_aspect": "Confirmed active operational risk: no working automated database backup, combined with rapid, unexplained data growth",
+      "confidence_level": "high on what was measured; the exact cause of DB growth is Inferred not Confirmed, blocked by this environment's own controls from a direct query",
+      "path_to_60": "Install automated backups; diagnose and address the DB growth cause; add basic observability",
+      "path_to_75": "Add pagination to unbounded endpoints; add the missing indexes",
+      "path_to_90": "Multi-worker-safe rate limiting and background-job coordination if the deployment ever scales beyond one process"
+    },
+    "testing_and_maintainability": {
+      "weight": 5,
+      "score": 2.5,
+      "percentage": 50,
+      "evidence": "40 backend tests pass, confirmed safely isolated (tmp-path DB per test file); zero frontend tests exist (no test runner configured in app/package.json); no lint/static-analysis tool configured for the frontend; tsc --noEmit is clean; zero TODO/FIXME/console.log leftovers found anywhere (genuinely clean hygiene); db.py is a single 2,760-line file holding the entire schema and every query function.",
+      "strongest_aspect": "Backend test suite is real, safe, and passing (40/40); zero debug-leftover hygiene issues found anywhere in the codebase",
+      "weakest_aspect": "Zero frontend tests and zero frontend lint/static-analysis tooling of any kind",
+      "confidence_level": "high",
+      "path_to_60": "Add a frontend test runner (even minimal smoke tests) and a lint config",
+      "path_to_75": "Meaningful frontend test coverage on the core Leads/Pipeline/Outreach flows; backend coverage measurement",
+      "path_to_90": "Split db.py's monolithic query functions into per-domain modules; CI-enforced coverage thresholds"
+    }
+  },
+  "confirmed_findings": [
+    {
+      "id": "F-01",
+      "category": "usability-ia",
+      "severity": "high",
+      "summary": "Three fully-built screens (Call Queue, Opportunity Workspace, AI Sales Intelligence) are structurally unreachable — declared in tabs.ts, initialised in main.ts, but absent from router.ts's ALL_VIEWS and untargeted by any nav link.",
+      "evidence": "app/src/tabs.ts:1-16 vs app/src/router.ts:3-14 vs app/src/main.ts:35-51"
+    },
+    {
+      "id": "F-02",
+      "category": "saas-readiness",
+      "severity": "critical",
+      "summary": "No multi-tenant/organisation concept exists anywhere in the schema or backend code.",
+      "evidence": "Repo-wide grep for workspace|tenant|organi[sz]ation_id across backend/app: zero hits; 33 tables in db.py, none with an org-scoping column"
+    },
+    {
+      "id": "F-03",
+      "category": "operations",
+      "severity": "critical",
+      "summary": "Production database (team.db) grew from 58MB to 1.68GB (~29x) in one month and is not covered by any working automated backup.",
+      "evidence": "Direct VPS inspection: ls -la on team.db and backups dir, df -h, crontab -l for root and appuser (both empty) — 2026-08-12"
+    },
+    {
+      "id": "F-04",
+      "category": "security",
+      "severity": "high",
+      "summary": "OAuth access_token/refresh_token for connected Gmail/Microsoft accounts are stored as plaintext TEXT columns with no encryption-at-rest layer anywhere in the codebase.",
+      "evidence": "backend/app/db.py email_oauth_accounts table definition; repo-wide grep for encrypt|fernet|kms|vault returns zero hits"
+    },
+    {
+      "id": "F-05",
+      "category": "security",
+      "severity": "none-found",
+      "summary": "Zero accidental unauthenticated endpoints across all 124 routes in 20 routers; the 3 routes with no session-bearer auth are all deliberately and correctly public.",
+      "evidence": "audit/scripts/backend_route_inventory.py output, audit/results/backend_routes.json, manually cross-verified"
+    },
+    {
+      "id": "F-06",
+      "category": "visual-design-system",
+      "severity": "medium",
+      "summary": "58% of font-size declarations (123 of 213) in style.css bypass the documented 6-step type scale, fragmenting into 20+ undocumented one-off sizes.",
+      "evidence": "Frontend design-system research pass, direct grep counts against style.css"
+    },
+    {
+      "id": "F-07",
+      "category": "crm-capability",
+      "severity": "medium",
+      "summary": "No pipeline kanban/drag-and-drop UI exists anywhere; opportunity_stage changes only via a <select> dropdown on the orphaned Opportunity Workspace screen.",
+      "evidence": "Zero kanban/draggable hits in app/src; opportunityWorkspace.ts:137-139"
+    },
+    {
+      "id": "F-08",
+      "category": "integrations",
+      "severity": "none-found-positive",
+      "summary": "Manual tel: click-to-call is genuinely implemented and working, contrary to an initial assumption that calling was entirely absent.",
+      "evidence": "app/src/views/callQueue.ts:44-45,150; app/src/views/opportunityWorkspace.ts:44-45,132"
+    },
+    {
+      "id": "F-09",
+      "category": "operations",
+      "severity": "high",
+      "summary": "Zero observability/error-tracking tooling of any kind is integrated in the backend or app; the only production signal is stdout/systemd journal logging.",
+      "evidence": "Grep for sentry|datadog|rollbar|bugsnag|opentelemetry across backend and app source: zero hits"
+    },
+    {
+      "id": "F-10",
+      "category": "testing",
+      "severity": "medium",
+      "summary": "Zero frontend tests and zero frontend lint/static-analysis configuration exist; backend has 40 passing, safely-isolated tests.",
+      "evidence": "app/package.json devDependencies (no test runner); no .eslintrc*/eslint.config.*/biome.json in app/; backend/tests/ 40 passed via pytest"
+    }
+  ],
+  "inferred_findings": [
+    {
+      "id": "I-01",
+      "category": "operations",
+      "summary": "The most plausible driver of the confirmed 29x database growth is the Companies House charge feed, which this repo's own project history documents as having recently started ingesting significantly more volume after a key-configuration bug was fixed.",
+      "confidence": "medium — plausible and consistent with existing project history, but not verified by a direct table-size query"
+    },
+    {
+      "id": "I-02",
+      "category": "reliability",
+      "summary": "Sequence-scheduler and activity-refresh background loops may be vulnerable to a duplicate-send on process crash between performing a side effect (e.g. sending a sequence email) and persisting updated state, unlike the CH stream which has confirmed strong idempotency.",
+      "confidence": "low-medium — plausible from the code structure, not exhaustively traced against exact ordering"
+    }
+  ],
+  "unverified_items": [
+    "Whether disconnecting an OAuth email account server-side actually revokes the token with the provider, or only deletes the local DB row",
+    "CSV export functionality's exact scope (import was confirmed present; export was not directly inspected this pass)",
+    "Whether email_scraper_service.py's workflow-prompt read is cached (lru_cache) or re-read per call, unlike the confirmed-cached anthropic_service.py path",
+    "Exact row-level breakdown of which table(s) are driving the confirmed database growth (blocked by this environment's permission controls from a direct query)"
+  ],
+  "launch_blockers": [
+    "No multi-tenant data isolation exists at all (F-02)",
+    "Production database has no working automated backup and unexplained rapid growth (F-03)",
+    "OAuth tokens stored in plaintext (F-04)",
+    "No self-serve account/billing lifecycle exists",
+    "Zero observability/error-tracking (F-09)",
+    "No GDPR data retention/export/erasure tooling"
+  ],
+  "recommendations": [
+    "Stage 0: diagnose DB growth cause and install working automated backups — independent of every other decision",
+    "Stage 0: encrypt OAuth tokens at rest",
+    "Stage 0: add minimal error-tracking/observability",
+    "Stage 2: reconnect or deliberately retire the 3 orphaned screens — cheapest, highest-leverage fix in the audit",
+    "Stage 2: consolidate design-token bypass (font-size/padding/border-radius) and build one shared modal component",
+    "Stage 3: build a kanban pipeline view on the existing opportunity_stage data, inside the reconnected Opportunity Workspace",
+    "Stage 1 (conditional on pursuing SaaS): tenant-isolation migration is the single largest, most foundational new-engineering effort identified in this audit — sequence before any self-serve signup or billing work",
+    "Full detail and effort/priority scoring for every item: audit/08-prioritised-roadmap.md"
+  ],
+  "test_results": [
+    {
+      "suite": "backend pytest",
+      "command": "backend/.venv/bin/python -m pytest tests/ -q",
+      "result": "40 passed, 0 failed",
+      "duration_seconds": 2.23,
+      "safety_note": "Confirmed isolated via per-file tmp-path DB fixtures — does not touch backend/data/team.db"
+    },
+    {
+      "suite": "frontend type-check",
+      "command": "npx tsc --noEmit",
+      "result": "exit 0, no errors",
+      "duration_seconds": null
+    },
+    {
+      "suite": "frontend production build",
+      "command": "npx vite build",
+      "result": "exit 0, succeeded",
+      "notes": "Single 527KB JS bundle (151.87KB gzip), single 90.6KB CSS bundle, no code-splitting; one informational INEFFECTIVE_DYNAMIC_IMPORT warning, pre-existing"
+    },
+    {
+      "suite": "backend route/auth scan",
+      "command": "python3 audit/scripts/backend_route_inventory.py",
+      "result": "124 routes scanned, 121/124 auth-covered on first pass, 3/3 remaining manually confirmed as intentionally public, 0 real gaps"
+    },
+    {
+      "suite": "schema/index scan",
+      "command": "python3 audit/scripts/schema_index_scan.py",
+      "result": "33 tables, 28 indexes, 19 real (non-PK) FK-shaped columns without an explicit index, most notably lead_phones.lead_id and lead_emails.lead_id"
+    },
+    {
+      "suite": "secrets/style/misc scan",
+      "command": "python3 audit/scripts/misc_scans.py",
+      "result": "0 hardcoded secrets found; .gitignore hygiene correct at root and backend/ level; 26 hardcoded hex colors and 104 inline style attributes in app/src/**/*.ts; 0 TODO/FIXME/console.log leftovers anywhere"
+    }
+  ],
+  "routes": {
+    "summary": "124 routes across 20 router files in backend/app/routers/. Full per-route detail (method, path, auth dependency, pagination hint) in audit/results/backend_routes.json.",
+    "auth_gap_count_confirmed_real": 0,
+    "intentionally_public_routes": [
+      "POST /auth/identify",
+      "GET /users/names",
+      "GET /email-oauth/{provider}/callback"
+    ],
+    "unbounded_collection_endpoints_flagged": 22
+  },
+  "integrations": [
+    {"name": "Google Gmail", "category": "email", "direction": "outbound-only", "status": "working, well-secured (correct OAuth CSRF), token storage plaintext"},
+    {"name": "Microsoft 365", "category": "email", "direction": "outbound-only", "status": "working, well-secured, token storage plaintext"},
+    {"name": "Companies House REST", "category": "data-enrichment", "direction": "inbound", "status": "working, rate-limit-aware, correctly key-separated from Streaming"},
+    {"name": "Companies House Streaming", "category": "data-enrichment", "direction": "inbound", "status": "working, self-throttled, self-pruned, idempotent, resumable — strongest-engineered integration in the codebase"},
+    {"name": "Anthropic (Claude)", "category": "AI", "direction": "outbound", "status": "working, cost-capped, no system-prompt-injection vector found, one documented instance of the team removing rather than capping a risky tool-use capability after a real cost incident"},
+    {"name": "Apify", "category": "data-enrichment (LinkedIn)", "direction": "outbound", "status": "configured, not deep-audited this pass"},
+    {"name": "Mailchimp", "category": "email/campaign export", "direction": "outbound-only", "status": "working, no inbound bounce/complaint webhook ingestion"},
+    {"name": "Datagardener", "category": "data-enrichment", "direction": "n/a", "status": "confirmed dead — key configured but unwired to any code path"},
+    {"name": "Calendar (Google/Outlook)", "category": "calendar", "direction": "n/a", "status": "does not exist — CRM-native calendar only, no external sync"},
+    {"name": "Telephony provider (Aircall/RingCentral/Twilio/Dialpad/CloudTalk)", "category": "calling", "direction": "n/a", "status": "does not exist as a provider integration — manual tel: click-to-call is real and working, no automated call-outcome capture"},
+    {"name": "Public API / Zapier / Make / n8n / Slack / Teams / webhooks", "category": "productivity", "direction": "n/a", "status": "does not exist in any form"}
+  ],
+  "competitor_comparisons": [
+    {"product": "HubSpot Sales Hub", "org_model": "self-serve signup, Teams grouping", "integration_count": "1,000-2,000+", "pipeline_ux": "kanban + list, AI deal insights", "automation": "visual Workflows builder", "lesson": "ecosystem breadth is a decade-long moat, not a template to copy; avoid tier-gating core automation behind a forced onboarding fee", "source": "hubspot.com/company-news, knowledge.hubspot.com, accessed 2026-08-12"},
+    {"product": "Salesforce Sales Cloud", "org_model": "sales-assisted, multi-tenant org architecture", "integration_count": "10,000+ post-merger", "pipeline_ux": "kanban, Flow-Builder kanban components", "automation": "Salesforce Flow", "lesson": "cautionary tale — configurability-for-everyone is a cognitive-load tax a small team doesn't want, 1,830 cited complaints about learning curve", "source": "techzine.eu, g2.com, accessed 2026-08-12"},
+    {"product": "Pipedrive", "org_model": "14-day trial, self-serve", "integration_count": "500+ plus open API", "pipeline_ux": "kanban is the literal organising principle", "automation": "Workflow Automation, gated to higher tiers", "lesson": "closest philosophical peer to this product; avoid stacking essential features as separate paid add-ons", "source": "lindy.ai, meetergo.com, accessed 2026-08-12"},
+    {"product": "Attio", "org_model": "self-serve, 2-role model", "integration_count": "API+webhooks+MCP on every paid tier", "pipeline_ux": "Objects/Records/Attributes, staged list views", "automation": "no-code Workflows + AI agents", "lesson": "API/webhooks as an AI-era default worth adopting; schema flexibility is double-edged for non-technical small teams", "source": "attio.com/pricing, supademo.com, accessed 2026-08-12"},
+    {"product": "Close", "org_model": "org container, trusted-domain self-join, 3 roles", "integration_count": "minimal native, 9,000 via Zapier", "pipeline_ux": "genuine kanban Opportunities board, inline edit", "automation": "Workflows, gated to top 2 tiers", "lesson": "the single most directly relevant comp — calling-first design is exactly this product's target use case", "source": "close.com/calling, help.close.com, accessed 2026-08-12"},
+    {"product": "Apollo.io", "org_model": "free signup + credits", "integration_count": "bi-directional CRM sync from $49/mo tier", "pipeline_ux": "table+kanban, secondary to prospecting database", "automation": "multi-step Sequences", "lesson": "not really a CRM competitor — validates this product's own CH-enrichment engine as a legitimate standalone value axis", "source": "thesaassource.co, knowledge.apollo.io, accessed 2026-08-12"},
+    {"product": "Zoho CRM", "org_model": "admin creates org, invites by email", "integration_count": "2,500+ extensions", "pipeline_ux": "kanban under Blueprint process-enforcement", "automation": "Workflow Rules, Canvas, Deluge scripting", "lesson": "ecosystem-sprawl cautionary tale #2; Zoho's own Bigin spin-off validates a focused smaller CRM as a legitimate distinct category", "source": "zoho.com/marketplace, lowcode.agency, accessed 2026-08-12"},
+    {"product": "Monday Sales CRM", "org_model": "auto workspace, no free tier", "integration_count": "~827", "pipeline_ux": "generic customizable boards, not a fixed CRM object model", "automation": "'Recipes' natural-language if/then", "lesson": "a skin over a general-purpose primitive with zero sales-specific defaults — this product should ship with sane defaults built in, the opposite approach", "source": "support.monday.com, appmarketplace.com, accessed 2026-08-12"},
+    {"product": "Folk", "org_model": "magic-link signup, 2 roles", "integration_count": "5,000+ claimed via Zapier/Make", "pipeline_ux": "kanban+table, custom-field-driven columns", "automation": "lightweight single trigger + AI assistants", "lesson": "proof a small team doesn't need Salesforce-grade rigor, but has no calling story at all — would be fatal for this product's cold-calling-driven use case specifically", "source": "help.folk.app, lightfield.app, accessed 2026-08-12"}
+  ]
+}

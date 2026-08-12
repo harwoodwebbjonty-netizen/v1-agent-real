@@ -1,0 +1,1785 @@
+{
+  "metadata": {
+    "script": "backend_route_inventory.py",
+    "commit": "8c923ac5e703928e3f94721e6c11593a5c397f7d",
+    "generated_at": "2026-08-12T10:04:48.795278+00:00",
+    "method": "regex-based static scan of decorator + function-signature text; heuristic, not a full Python AST/type analysis"
+  },
+  "summary": {
+    "router_files_scanned": 20,
+    "total_routes": 124,
+    "routes_without_recognized_auth_dependency": 3,
+    "routes_with_pagination_hint": 12,
+    "collection_endpoints_without_pagination_hint": 22
+  },
+  "routes_without_recognized_auth_dependency": [
+    {
+      "file": "backend/app/routers/auth.py",
+      "method": "POST",
+      "path": "/auth/identify",
+      "auth_dependencies_found": [],
+      "has_any_auth_dependency": false,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": false
+    },
+    {
+      "file": "backend/app/routers/email_oauth.py",
+      "method": "GET",
+      "path": "/email-oauth/{provider}/callback",
+      "auth_dependencies_found": [],
+      "has_any_auth_dependency": false,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": false
+    },
+    {
+      "file": "backend/app/routers/users.py",
+      "method": "GET",
+      "path": "/users/names",
+      "auth_dependencies_found": [],
+      "has_any_auth_dependency": false,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    }
+  ],
+  "collection_endpoints_without_pagination_hint": [
+    {
+      "file": "backend/app/routers/activity.py",
+      "method": "GET",
+      "path": "/activity/status",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/activity.py",
+      "method": "GET",
+      "path": "/activity/batch-summary",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/ai_prospecting.py",
+      "method": "GET",
+      "path": "/ai-prospecting/status",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/ai_prospecting.py",
+      "method": "GET",
+      "path": "/ai-prospecting/runs",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/auth.py",
+      "method": "GET",
+      "path": "/auth/me",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/brand_voice.py",
+      "method": "GET",
+      "path": "/brand-voice",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/calendar.py",
+      "method": "GET",
+      "path": "/calendar-events",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/ch_feed.py",
+      "method": "GET",
+      "path": "/ch-feed/status",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/credit_settings.py",
+      "method": "GET",
+      "path": "/credit-settings/limits",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/credit_settings.py",
+      "method": "GET",
+      "path": "/credit-settings/usage",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/email_oauth.py",
+      "method": "GET",
+      "path": "/email-oauth/accounts",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/email_templates.py",
+      "method": "GET",
+      "path": "/email-templates",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/lead_lists.py",
+      "method": "GET",
+      "path": "/lead-lists",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/leads.py",
+      "method": "GET",
+      "path": "/leads",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/leads.py",
+      "method": "GET",
+      "path": "/leads/ch-enrich-status",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/list_campaigns.py",
+      "method": "GET",
+      "path": "/list-campaigns",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/roles.py",
+      "method": "GET",
+      "path": "/roles/catalogue",
+      "auth_dependencies_found": [
+        "require_permission_via_module_alias"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/roles.py",
+      "method": "GET",
+      "path": "/roles",
+      "auth_dependencies_found": [
+        "require_permission_via_module_alias"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/sequences.py",
+      "method": "GET",
+      "path": "/sequences",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/users.py",
+      "method": "GET",
+      "path": "/users/names",
+      "auth_dependencies_found": [],
+      "has_any_auth_dependency": false,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/users.py",
+      "method": "GET",
+      "path": "/users",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    },
+    {
+      "file": "backend/app/routers/win_back.py",
+      "method": "GET",
+      "path": "/win-back/campaigns",
+      "auth_dependencies_found": [
+        "get_current_user"
+      ],
+      "has_any_auth_dependency": true,
+      "pagination_hint_found": false,
+      "looks_like_collection_endpoint": true
+    }
+  ],
+  "files": [
+    {
+      "file": "backend/app/routers/__init__.py",
+      "router_prefix": "",
+      "route_count": 0,
+      "routes": []
+    },
+    {
+      "file": "backend/app/routers/activity.py",
+      "router_prefix": "/activity",
+      "route_count": 6,
+      "routes": [
+        {
+          "file": "backend/app/routers/activity.py",
+          "method": "GET",
+          "path": "/activity/status",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/activity.py",
+          "method": "GET",
+          "path": "/activity/lead/{lead_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/activity.py",
+          "method": "GET",
+          "path": "/activity/lead/{lead_id}/summary",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/activity.py",
+          "method": "POST",
+          "path": "/activity/lead/{lead_id}/refresh",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/activity.py",
+          "method": "GET",
+          "path": "/activity/batch-summary",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/activity.py",
+          "method": "GET",
+          "path": "/activity/feed",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": true
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/ai_prospecting.py",
+      "router_prefix": "/ai-prospecting",
+      "route_count": 4,
+      "routes": [
+        {
+          "file": "backend/app/routers/ai_prospecting.py",
+          "method": "GET",
+          "path": "/ai-prospecting/status",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/ai_prospecting.py",
+          "method": "GET",
+          "path": "/ai-prospecting/runs",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/ai_prospecting.py",
+          "method": "GET",
+          "path": "/ai-prospecting/runs/{run_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/ai_prospecting.py",
+          "method": "POST",
+          "path": "/ai-prospecting/run",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/audit.py",
+      "router_prefix": "/audit-log",
+      "route_count": 1,
+      "routes": [
+        {
+          "file": "backend/app/routers/audit.py",
+          "method": "GET",
+          "path": "/audit-log",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": true
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/auth.py",
+      "router_prefix": "/auth",
+      "route_count": 4,
+      "routes": [
+        {
+          "file": "backend/app/routers/auth.py",
+          "method": "POST",
+          "path": "/auth/identify",
+          "auth_dependencies_found": [],
+          "has_any_auth_dependency": false,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/auth.py",
+          "method": "POST",
+          "path": "/auth/logout",
+          "auth_dependencies_found": [
+            "bearer_scheme_only"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/auth.py",
+          "method": "GET",
+          "path": "/auth/me",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/auth.py",
+          "method": "POST",
+          "path": "/auth/heartbeat",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/brand_voice.py",
+      "router_prefix": "/brand-voice",
+      "route_count": 2,
+      "routes": [
+        {
+          "file": "backend/app/routers/brand_voice.py",
+          "method": "GET",
+          "path": "/brand-voice",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/brand_voice.py",
+          "method": "PUT",
+          "path": "/brand-voice",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/calendar.py",
+      "router_prefix": "/calendar-events",
+      "route_count": 4,
+      "routes": [
+        {
+          "file": "backend/app/routers/calendar.py",
+          "method": "GET",
+          "path": "/calendar-events",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/calendar.py",
+          "method": "POST",
+          "path": "/calendar-events",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/calendar.py",
+          "method": "PATCH",
+          "path": "/calendar-events/{event_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/calendar.py",
+          "method": "DELETE",
+          "path": "/calendar-events/{event_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/call_logs.py",
+      "router_prefix": "/call-logs",
+      "route_count": 2,
+      "routes": [
+        {
+          "file": "backend/app/routers/call_logs.py",
+          "method": "GET",
+          "path": "/call-logs/lead/{lead_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/call_logs.py",
+          "method": "POST",
+          "path": "/call-logs",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/ch_feed.py",
+      "router_prefix": "/ch-feed",
+      "route_count": 3,
+      "routes": [
+        {
+          "file": "backend/app/routers/ch_feed.py",
+          "method": "GET",
+          "path": "/ch-feed/status",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/ch_feed.py",
+          "method": "GET",
+          "path": "/ch-feed/charges",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/ch_feed.py",
+          "method": "POST",
+          "path": "/ch-feed/charges/{charge_id}/add-lead",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/credit_settings.py",
+      "router_prefix": "/credit-settings",
+      "route_count": 3,
+      "routes": [
+        {
+          "file": "backend/app/routers/credit_settings.py",
+          "method": "GET",
+          "path": "/credit-settings/limits",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/credit_settings.py",
+          "method": "POST",
+          "path": "/credit-settings/limits",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/credit_settings.py",
+          "method": "GET",
+          "path": "/credit-settings/usage",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/email_oauth.py",
+      "router_prefix": "/email-oauth",
+      "route_count": 4,
+      "routes": [
+        {
+          "file": "backend/app/routers/email_oauth.py",
+          "method": "GET",
+          "path": "/email-oauth/{provider}/connect",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_oauth.py",
+          "method": "GET",
+          "path": "/email-oauth/{provider}/callback",
+          "auth_dependencies_found": [],
+          "has_any_auth_dependency": false,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_oauth.py",
+          "method": "GET",
+          "path": "/email-oauth/accounts",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/email_oauth.py",
+          "method": "DELETE",
+          "path": "/email-oauth/{provider}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/email_templates.py",
+      "router_prefix": "/email-templates",
+      "route_count": 5,
+      "routes": [
+        {
+          "file": "backend/app/routers/email_templates.py",
+          "method": "POST",
+          "path": "/email-templates",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_templates.py",
+          "method": "GET",
+          "path": "/email-templates",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/email_templates.py",
+          "method": "PATCH",
+          "path": "/email-templates/{template_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_templates.py",
+          "method": "DELETE",
+          "path": "/email-templates/{template_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_templates.py",
+          "method": "POST",
+          "path": "/email-templates/{template_id}/apply",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/email_writer.py",
+      "router_prefix": "",
+      "route_count": 12,
+      "routes": [
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/email-drafts/generate",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/follow-up-draft",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/email-drafts/{draft_id}/refine",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "PATCH",
+          "path": "/email-drafts/{draft_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "GET",
+          "path": "/leads/{lead_id}/email-drafts",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "GET",
+          "path": "/email-drafts/pending",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "DELETE",
+          "path": "/email-drafts/{draft_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/email-drafts/personalisation",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/email-drafts/cta-suggestions",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "GET",
+          "path": "/leads/{lead_id}/timeline",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/email-drafts/{draft_id}/send",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/email_writer.py",
+          "method": "POST",
+          "path": "/email-drafts/export-mailchimp",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/lead_lists.py",
+      "router_prefix": "/lead-lists",
+      "route_count": 8,
+      "routes": [
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "POST",
+          "path": "/lead-lists",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "GET",
+          "path": "/lead-lists",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "GET",
+          "path": "/lead-lists/{list_id}/leads",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "POST",
+          "path": "/lead-lists/{list_id}/import-csv",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "DELETE",
+          "path": "/lead-lists/{list_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "POST",
+          "path": "/lead-lists/{list_id}/score",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "PATCH",
+          "path": "/lead-lists/{list_id}/leads/{lead_id}/toggle-called",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/lead_lists.py",
+          "method": "POST",
+          "path": "/lead-lists/{list_id}/add-leads",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/leads.py",
+      "router_prefix": "/leads",
+      "route_count": 26,
+      "routes": [
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "GET",
+          "path": "/leads",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "GET",
+          "path": "/leads/ch-enrich-status",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "GET",
+          "path": "/leads/{lead_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "PATCH",
+          "path": "/leads/{lead_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/assign",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/share",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "PATCH",
+          "path": "/leads/{lead_id}/follow-up",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/phones",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "PATCH",
+          "path": "/leads/{lead_id}/phones/{phone_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "DELETE",
+          "path": "/leads/{lead_id}/phones/{phone_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/emails",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "PATCH",
+          "path": "/leads/{lead_id}/emails/{email_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "DELETE",
+          "path": "/leads/{lead_id}/emails/{email_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/scrape-email",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/verify-emails",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/{lead_id}/generate-intelligence",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "GET",
+          "path": "/leads/{lead_id}/intelligence-history",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "GET",
+          "path": "/leads/{lead_id}/linkedin-posts",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/import-csv",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/ch-enrich-all",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/ch-enrich-auto",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/ch-enrich-stop",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/backfill-industry",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/dedup",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/leads.py",
+          "method": "POST",
+          "path": "/leads/migrate",
+          "auth_dependencies_found": [
+            "require_admin"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/list_campaigns.py",
+      "router_prefix": "/list-campaigns",
+      "route_count": 6,
+      "routes": [
+        {
+          "file": "backend/app/routers/list_campaigns.py",
+          "method": "POST",
+          "path": "/list-campaigns",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/list_campaigns.py",
+          "method": "GET",
+          "path": "/list-campaigns",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/list_campaigns.py",
+          "method": "GET",
+          "path": "/list-campaigns/{campaign_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/list_campaigns.py",
+          "method": "GET",
+          "path": "/list-campaigns/{campaign_id}/drafts",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/list_campaigns.py",
+          "method": "POST",
+          "path": "/list-campaigns/{campaign_id}/resume",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/list_campaigns.py",
+          "method": "POST",
+          "path": "/list-campaigns/{campaign_id}/send-all",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/roles.py",
+      "router_prefix": "/roles",
+      "route_count": 6,
+      "routes": [
+        {
+          "file": "backend/app/routers/roles.py",
+          "method": "GET",
+          "path": "/roles/catalogue",
+          "auth_dependencies_found": [
+            "require_permission_via_module_alias"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/roles.py",
+          "method": "GET",
+          "path": "/roles",
+          "auth_dependencies_found": [
+            "require_permission_via_module_alias"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/roles.py",
+          "method": "POST",
+          "path": "/roles",
+          "auth_dependencies_found": [
+            "require_permission_via_module_alias"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/roles.py",
+          "method": "PATCH",
+          "path": "/roles/{role_id}",
+          "auth_dependencies_found": [
+            "require_permission_via_module_alias"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/roles.py",
+          "method": "DELETE",
+          "path": "/roles/{role_id}",
+          "auth_dependencies_found": [
+            "require_permission_via_module_alias"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/roles.py",
+          "method": "POST",
+          "path": "/roles/{role_id}/default",
+          "auth_dependencies_found": [
+            "require_permission_via_module_alias"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/sequences.py",
+      "router_prefix": "/sequences",
+      "route_count": 10,
+      "routes": [
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "GET",
+          "path": "/sequences",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "POST",
+          "path": "/sequences",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "PATCH",
+          "path": "/sequences/{sequence_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "DELETE",
+          "path": "/sequences/{sequence_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "GET",
+          "path": "/sequences/{sequence_id}/steps",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "POST",
+          "path": "/sequences/{sequence_id}/steps",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "DELETE",
+          "path": "/sequences/{sequence_id}/steps/{step_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "GET",
+          "path": "/sequences/{sequence_id}/enrollments",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "POST",
+          "path": "/sequences/{sequence_id}/enrollments",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/sequences.py",
+          "method": "POST",
+          "path": "/sequences/{sequence_id}/enrollments/{enrollment_id}/stop",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/users.py",
+      "router_prefix": "/users",
+      "route_count": 8,
+      "routes": [
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "GET",
+          "path": "/users/names",
+          "auth_dependencies_found": [],
+          "has_any_auth_dependency": false,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "GET",
+          "path": "/users",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "POST",
+          "path": "/users/{user_id}/role",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "POST",
+          "path": "/users/{user_id}/set-password",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "POST",
+          "path": "/users",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "PATCH",
+          "path": "/users/{user_id}",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "PATCH",
+          "path": "/users/{user_id}/avatar",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/users.py",
+          "method": "DELETE",
+          "path": "/users/{user_id}",
+          "auth_dependencies_found": [
+            "require_permission"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    },
+    {
+      "file": "backend/app/routers/win_back.py",
+      "router_prefix": "/win-back",
+      "route_count": 10,
+      "routes": [
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "GET",
+          "path": "/win-back/campaigns",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": true
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns/from-csv",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns/preview",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns/{campaign_id}/resume",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": true,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "GET",
+          "path": "/win-back/campaigns/{campaign_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "GET",
+          "path": "/win-back/campaigns/{campaign_id}/rows",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns/{campaign_id}/send/{email_id}",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns/{campaign_id}/send-all",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        },
+        {
+          "file": "backend/app/routers/win_back.py",
+          "method": "POST",
+          "path": "/win-back/campaigns/{campaign_id}/export-mailchimp",
+          "auth_dependencies_found": [
+            "get_current_user"
+          ],
+          "has_any_auth_dependency": true,
+          "pagination_hint_found": false,
+          "looks_like_collection_endpoint": false
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,2366 @@
+{
+  "metadata": {
+    "script": "schema_index_scan.py",
+    "commit": "8c923ac5e703928e3f94721e6c11593a5c397f7d",
+    "generated_at": "2026-08-12T10:04:48.843094+00:00",
+    "method": "regex-based text scan of backend/app/db.py \u2014 not a live PRAGMA index_list query against the actual database file"
+  },
+  "summary": {
+    "tables_found": 33,
+    "indexes_found": 28,
+    "fk_shaped_columns_without_explicit_index": 21,
+    "of_which_primary_key_false_positives": 2,
+    "of_which_real_non_pk_gaps": 19
+  },
+  "real_non_pk_index_gaps_sorted_by_where_usage": [
+    {
+      "table": "lead_phones",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "lead_emails",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "calendar_events",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "ch_charge_feed",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "win_back_emails",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "sessions",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "email_oauth_accounts",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "user_settings",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "oauth_states",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "lead_lists",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "email_templates",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "email_drafts",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "sequences",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "prospecting_runs",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "email_drafts",
+      "column": "sequence_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 4,
+      "note": null
+    },
+    {
+      "table": "list_email_campaigns",
+      "column": "list_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 4,
+      "note": null
+    },
+    {
+      "table": "call_logs",
+      "column": "calendar_event_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 0,
+      "note": null
+    },
+    {
+      "table": "ch_charge_feed",
+      "column": "transaction_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 0,
+      "note": null
+    },
+    {
+      "table": "audit_log",
+      "column": "entity_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 0,
+      "note": null
+    }
+  ],
+  "all_flagged_including_pk_false_positives": [
+    {
+      "table": "sessions",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "lead_phones",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "lead_emails",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "lead_lists",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "lead_intelligence_locks",
+      "column": "lead_id",
+      "is_primary_key": true,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": "PRIMARY KEY columns are implicitly indexed by SQLite even without an explicit CREATE INDEX \u2014 not a real gap."
+    },
+    {
+      "table": "calendar_events",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "brand_voice_profiles",
+      "column": "user_id",
+      "is_primary_key": true,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": "PRIMARY KEY columns are implicitly indexed by SQLite even without an explicit CREATE INDEX \u2014 not a real gap."
+    },
+    {
+      "table": "email_templates",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "email_drafts",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "email_drafts",
+      "column": "sequence_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 4,
+      "note": null
+    },
+    {
+      "table": "email_oauth_accounts",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "call_logs",
+      "column": "calendar_event_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 0,
+      "note": null
+    },
+    {
+      "table": "sequences",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "prospecting_runs",
+      "column": "owner_user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 9,
+      "note": null
+    },
+    {
+      "table": "ch_charge_feed",
+      "column": "transaction_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 0,
+      "note": null
+    },
+    {
+      "table": "ch_charge_feed",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "win_back_emails",
+      "column": "lead_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 26,
+      "note": null
+    },
+    {
+      "table": "user_settings",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    },
+    {
+      "table": "list_email_campaigns",
+      "column": "list_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 4,
+      "note": null
+    },
+    {
+      "table": "audit_log",
+      "column": "entity_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 0,
+      "note": null
+    },
+    {
+      "table": "oauth_states",
+      "column": "user_id",
+      "is_primary_key": false,
+      "where_clause_occurrences_in_db_py": 11,
+      "note": null
+    }
+  ],
+  "indexes": [
+    {
+      "index_name": "idx_lead_intelligence_versions_lead_id",
+      "table": "lead_intelligence_versions",
+      "columns": [
+        "lead_id"
+      ]
+    },
+    {
+      "index_name": "idx_calendar_events_owner",
+      "table": "calendar_events",
+      "columns": [
+        "owner_user_id"
+      ]
+    },
+    {
+      "index_name": "idx_email_drafts_lead_id",
+      "table": "email_drafts",
+      "columns": [
+        "lead_id"
+      ]
+    },
+    {
+      "index_name": "idx_call_logs_lead_id",
+      "table": "call_logs",
+      "columns": [
+        "lead_id"
+      ]
+    },
+    {
+      "index_name": "idx_sequence_steps_sequence_id",
+      "table": "sequence_steps",
+      "columns": [
+        "sequence_id"
+      ]
+    },
+    {
+      "index_name": "idx_sequence_enrollments_sequence_id",
+      "table": "sequence_enrollments",
+      "columns": [
+        "sequence_id"
+      ]
+    },
+    {
+      "index_name": "idx_sequence_enrollments_lead_id",
+      "table": "sequence_enrollments",
+      "columns": [
+        "lead_id"
+      ]
+    },
+    {
+      "index_name": "idx_snapshots_company",
+      "table": "company_snapshots",
+      "columns": [
+        "company_number"
+      ]
+    },
+    {
+      "index_name": "idx_activity_company",
+      "table": "activity_events",
+      "columns": [
+        "company_number"
+      ]
+    },
+    {
+      "index_name": "idx_activity_lead",
+      "table": "activity_events",
+      "columns": [
+        "lead_id"
+      ]
+    },
+    {
+      "index_name": "idx_activity_detected",
+      "table": "activity_events",
+      "columns": [
+        "detected_at"
+      ]
+    },
+    {
+      "index_name": "idx_ch_charge_detected",
+      "table": "ch_charge_feed",
+      "columns": [
+        "detected_at"
+      ]
+    },
+    {
+      "index_name": "idx_ch_charge_company",
+      "table": "ch_charge_feed",
+      "columns": [
+        "company_number"
+      ]
+    },
+    {
+      "index_name": "idx_win_back_emails_campaign",
+      "table": "win_back_emails",
+      "columns": [
+        "campaign_id"
+      ]
+    },
+    {
+      "index_name": "idx_credit_usage_user",
+      "table": "credit_usage",
+      "columns": [
+        "user_id",
+        "created_at"
+      ]
+    },
+    {
+      "index_name": "idx_ch_charge_detected",
+      "table": "ch_charge_feed",
+      "columns": [
+        "detected_at"
+      ]
+    },
+    {
+      "index_name": "idx_ch_charge_company",
+      "table": "ch_charge_feed",
+      "columns": [
+        "company_number"
+      ]
+    },
+    {
+      "index_name": "idx_lead_linkedin_posts_lead_id",
+      "table": "lead_linkedin_posts",
+      "columns": [
+        "lead_id"
+      ]
+    },
+    {
+      "index_name": "idx_list_email_campaigns_owner",
+      "table": "list_email_campaigns",
+      "columns": [
+        "owner_user_id"
+      ]
+    },
+    {
+      "index_name": "idx_email_drafts_campaign",
+      "table": "email_drafts",
+      "columns": [
+        "campaign_id"
+      ]
+    },
+    {
+      "index_name": "idx_audit_created",
+      "table": "audit_log",
+      "columns": [
+        "created_at"
+      ]
+    },
+    {
+      "index_name": "idx_audit_actor",
+      "table": "audit_log",
+      "columns": [
+        "actor_id"
+      ]
+    },
+    {
+      "index_name": "idx_leads_company_norm",
+      "table": "leads",
+      "columns": [
+        "company_norm"
+      ]
+    },
+    {
+      "index_name": "idx_leads_list_id",
+      "table": "leads",
+      "columns": [
+        "list_id"
+      ]
+    },
+    {
+      "index_name": "idx_leads_owner",
+      "table": "leads",
+      "columns": [
+        "owner_user_id"
+      ]
+    },
+    {
+      "index_name": "idx_leads_assigned",
+      "table": "leads",
+      "columns": [
+        "assigned_user_id"
+      ]
+    },
+    {
+      "index_name": "idx_leads_company_number",
+      "table": "leads",
+      "columns": [
+        "company_number"
+      ]
+    },
+    {
+      "index_name": "idx_leads_next_dg_refresh",
+      "table": "leads",
+      "columns": [
+        "next_dg_refresh_at"
+      ]
+    }
+  ],
+  "tables": {
+    "users": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "role",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "sessions": [
+      {
+        "name": "token",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "expires_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "leads": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "timestamp",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "company",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "phone_number",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "source_url",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "notes",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "industry",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "contact_status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_notes",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "assigned_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "lead_phones": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "phone_number",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "source",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "lead_emails": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "email",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "source",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "lead_lists": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "lead_intelligence_versions": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "executive_summary",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "sales_summary",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "pain_points",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "buying_signals",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "conversation_starters",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "discovery_questions",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "objection_handling",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "pitch_angle",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "call_brief",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "score_breakdown",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_score",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_temperature",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "confidence_note",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "lead_intelligence_locks": [
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "locked_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "calendar_events": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "title",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "date",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "time",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "type",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "description",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "brand_voice_profiles": [
+      {
+        "name": "user_id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "company_name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "company_description",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "industry",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "target_audience",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "core_services",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "preferred_writing_style",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "preferred_cta_style",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "preferred_email_length",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "website",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "booking_link",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "signature",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "email_templates": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "subject",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "body",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "tone",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "length",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "email_drafts": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "subject",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "body",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "tone",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "length",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "sent_via",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "sent_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "estimated_open_rate",
+        "type": "REAL",
+        "is_primary_key": false
+      },
+      {
+        "name": "estimated_reply_rate",
+        "type": "REAL",
+        "is_primary_key": false
+      },
+      {
+        "name": "estimated_readability_score",
+        "type": "REAL",
+        "is_primary_key": false
+      },
+      {
+        "name": "campaign_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "sequence_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "sequence_step",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "ab_test_group",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "email_oauth_accounts": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "provider",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "email_address",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "access_token",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "refresh_token",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "token_expires_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "call_logs": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "calendar_event_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "outcome",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "notes",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "duration_seconds",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_by",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "sequences": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "sequence_steps": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "sequence_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "step_order",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "delay_days",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "step_type",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "subject_template",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "body_template",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "sequence_enrollments": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "sequence_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "current_step",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "last_error",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "enrolled_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "next_run_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_by",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "prospecting_runs": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "criteria",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "found",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "created",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "skipped",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "error",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "started_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "completed_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "company_snapshots": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "company_number",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "snapshot_json",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "fetched_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "activity_events": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "company_number",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "company_name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "event_type",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "description",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "event_data",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "occurred_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "detected_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "ch_charge_feed": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "company_number",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "company_name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "filing_type",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "charge_description",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "filing_date",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "transaction_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "event_data",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "detected_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "ch_stream_state": [
+      {
+        "name": "key",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "value",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "win_back_campaigns": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_by",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "total",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "generated",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "win_back_emails": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "campaign_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "subject",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "body",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "send_status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "sent_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "send_method",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "credit_usage": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "feature",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "amount_gbp",
+        "type": "REAL",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "user_settings": [
+      {
+        "name": "user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "key",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "value",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "lead_linkedin_posts": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "lead_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "linkedin_url",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "posts_json",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "list_email_campaigns": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "list_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "owner_user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "idea",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "offers",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "link_url",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "link_text",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "signature",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "status",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "total_target",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "updated_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "roles": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "permissions",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "lead_scope",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "is_system",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "is_default",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "audit_log": [
+      {
+        "name": "id",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "actor_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "actor_name",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "action",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "entity_type",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "entity_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "detail",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "app_flags": [
+      {
+        "name": "key",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "def",
+        "type": "_migration_028_leads_hot_indexes",
+        "is_primary_key": false
+      },
+      {
+        "name": "CREATE",
+        "type": "INDEX",
+        "is_primary_key": false
+      }
+    ],
+    "oauth_states": [
+      {
+        "name": "state",
+        "type": "TEXT",
+        "is_primary_key": true
+      },
+      {
+        "name": "user_id",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "provider",
+        "type": "TEXT",
+        "is_primary_key": false
+      },
+      {
+        "name": "created_at",
+        "type": "TEXT",
+        "is_primary_key": false
+      }
+    ],
+    "schema_version": [
+      {
+        "name": "version",
+        "type": "INTEGER",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "run_pending_migrations",
+        "is_primary_key": false
+      },
+      {
+        "name": "for",
+        "type": "version",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "version",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "_check_integrity",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "result",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "backup_database",
+        "is_primary_key": false
+      },
+      {
+        "name": "on",
+        "type": "a",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "not",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "None",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "backup_path",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "_validate_backup",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "not",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "False",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "result",
+        "is_primary_key": false
+      },
+      {
+        "name": "except",
+        "type": "sqlite3",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "False",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "_prune_old_backups",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "not",
+        "is_primary_key": false
+      },
+      {
+        "name": "for",
+        "type": "old_backup",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "restore_database",
+        "is_primary_key": false
+      },
+      {
+        "name": "whatever",
+        "type": "is",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "not",
+        "is_primary_key": false
+      },
+      {
+        "name": "raise",
+        "type": "ValueError",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "DB_PATH",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "init_db",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "db_existed",
+        "is_primary_key": false
+      },
+      {
+        "name": "raise",
+        "type": "RuntimeError",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "current",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "backup_path",
+        "is_primary_key": false
+      },
+      {
+        "name": "raise",
+        "type": "RuntimeError",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "backup_path",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "not",
+        "is_primary_key": false
+      },
+      {
+        "name": "raise",
+        "type": "RuntimeError",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "yield",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "record_audit",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "except",
+        "type": "Exception",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "list_audit_log",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_app_flag",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "row",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "set_app_flag",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "list_roles",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_role_by_name",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "create_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "update_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "delete_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "set_user_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_default_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "set_default_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "count_users_with_role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "count_users",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "count_admins",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "create_user",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "set_user_password",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "record_login_failure",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "reset_login_failures",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "list_user_display_names",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_user_by_name",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_user_by_id",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "list_users",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "update_user",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "name",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "if",
+        "type": "role",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "delete_user",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "update_user_avatar",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "update_user_last_seen",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "get_lead_by_company_number",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      },
+      {
+        "name": "return",
+        "type": "conn",
+        "is_primary_key": false
+      },
+      {
+        "name": "def",
+        "type": "create_prospecting_run",
+        "is_primary_key": false
+      },
+      {
+        "name": "with",
+        "type": "get_connection",
+        "is_primary_key": false
+      }
+    ]
+  }
+}

@@ -1,0 +1,223 @@
+{
+  "metadata": {
+    "script": "misc_scans.py",
+    "commit": "8c923ac5e703928e3f94721e6c11593a5c397f7d",
+    "generated_at": "2026-08-12T10:04:48.892213+00:00"
+  },
+  "secrets_scan": {
+    "hits": [],
+    "note": "Regex heuristic for common provider key shapes only \u2014 not a full entropy-based secret scanner."
+  },
+  "env_hygiene": {
+    "root_gitignore_has_env_rule": true,
+    "backend_gitignore_has_env_rule": true,
+    "risky_tracked_files": []
+  },
+  "style_hardcoding": {
+    "total_hardcoded_hex_in_ts": 26,
+    "total_inline_style_attrs": 104,
+    "per_file": [
+      {
+        "file": "app/src/views/aiProspecting.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 21
+      },
+      {
+        "file": "app/src/views/analytics.ts",
+        "hardcoded_hex_count": 8,
+        "inline_style_attr_count": 12
+      },
+      {
+        "file": "app/src/views/settings.ts",
+        "hardcoded_hex_count": 2,
+        "inline_style_attr_count": 17
+      },
+      {
+        "file": "app/src/views/winBackCampaign.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 17
+      },
+      {
+        "file": "app/src/views/listCampaign.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 8
+      },
+      {
+        "file": "app/src/avatar.ts",
+        "hardcoded_hex_count": 6,
+        "inline_style_attr_count": 1
+      },
+      {
+        "file": "app/src/components/sidePanel.ts",
+        "hardcoded_hex_count": 6,
+        "inline_style_attr_count": 0
+      },
+      {
+        "file": "app/src/views/sequences.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 6
+      },
+      {
+        "file": "app/src/identitySwitcher.ts",
+        "hardcoded_hex_count": 1,
+        "inline_style_attr_count": 4
+      },
+      {
+        "file": "app/src/components/tabBar.ts",
+        "hardcoded_hex_count": 1,
+        "inline_style_attr_count": 4
+      },
+      {
+        "file": "app/src/views/coldCallLists.ts",
+        "hardcoded_hex_count": 1,
+        "inline_style_attr_count": 3
+      },
+      {
+        "file": "app/src/views/actionCentre.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 4
+      },
+      {
+        "file": "app/src/components/industryFilter.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 2
+      },
+      {
+        "file": "app/src/views/opportunityWorkspace.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 2
+      },
+      {
+        "file": "app/src/views/activityFeed.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 2
+      },
+      {
+        "file": "app/src/utils.ts",
+        "hardcoded_hex_count": 1,
+        "inline_style_attr_count": 0
+      },
+      {
+        "file": "app/src/components/multiSelect.ts",
+        "hardcoded_hex_count": 0,
+        "inline_style_attr_count": 1
+      }
+    ]
+  },
+  "largest_files": [
+    {
+      "file": "backend/app/db.py",
+      "lines": 2760
+    },
+    {
+      "file": "app/src/views/coldCallLists.ts",
+      "lines": 1352
+    },
+    {
+      "file": "app/src/api.ts",
+      "lines": 1274
+    },
+    {
+      "file": "app/src/views/winBackCampaign.ts",
+      "lines": 1028
+    },
+    {
+      "file": "app/src/views/aiProspecting.ts",
+      "lines": 961
+    },
+    {
+      "file": "backend/app/routers/leads.py",
+      "lines": 938
+    },
+    {
+      "file": "app/src/views/emailWriter.ts",
+      "lines": 859
+    },
+    {
+      "file": "backend/app/routers/win_back.py",
+      "lines": 837
+    },
+    {
+      "file": "app/src/components/sidePanel.ts",
+      "lines": 695
+    },
+    {
+      "file": "app/src/views/settings.ts",
+      "lines": 690
+    },
+    {
+      "file": "app/src/views/actionCentre.ts",
+      "lines": 612
+    },
+    {
+      "file": "app/src/views/analytics.ts",
+      "lines": 595
+    },
+    {
+      "file": "app/src/views/dashboard.ts",
+      "lines": 491
+    },
+    {
+      "file": "backend/app/services/win_back_email_service.py",
+      "lines": 491
+    },
+    {
+      "file": "app/src/views/activityFeed.ts",
+      "lines": 471
+    },
+    {
+      "file": "backend/app/services/ai_prospecting_service.py",
+      "lines": 409
+    },
+    {
+      "file": "backend/app/routers/email_writer.py",
+      "lines": 401
+    },
+    {
+      "file": "app/src/views/listCampaign.ts",
+      "lines": 396
+    },
+    {
+      "file": "app/src/views/salesIntelligence.ts",
+      "lines": 386
+    },
+    {
+      "file": "app/src/views/calendar.ts",
+      "lines": 380
+    }
+  ],
+  "todo_and_debug_statements": {
+    "todo_fixme_hack_xxx_comments": 0,
+    "frontend_console_log_debug_calls": 0,
+    "backend_bare_print_statements": 0
+  },
+  "test_results": {
+    "backend_pytest": {
+      "exit_code": 0,
+      "summary_line": "40 passed in 2.11s",
+      "stderr_tail": ""
+    },
+    "frontend_tsc_noemit": {
+      "exit_code": 0,
+      "output_tail": ""
+    },
+    "frontend_build": {
+      "exit_code": 0,
+      "asset_sizes": [
+        {
+          "file": "index-BV9ii4p3.js",
+          "bytes": 527103
+        },
+        {
+          "file": "index-o1Xq5q_l.css",
+          "bytes": 90634
+        },
+        {
+          "file": "app-D2QwlKrl.js",
+          "bytes": 227
+        }
+      ],
+      "build_output_tail": "pp-D2QwlKrl.js       0.22 kB \u2502 gzip:   0.19 kB\ndist/assets/index-BV9ii4p3.js   527.10 kB \u2502 gzip: 151.87 kB\n\n\u2713 built in 179ms\n\u001b[33m[INEFFECTIVE_DYNAMIC_IMPORT] \u001b[0msrc/api.ts is dynamically imported by src/components/sidePanel.ts but also statically imported by src/auth.ts, src/calendarEvents.ts, src/components/activityModal.ts, src/components/sidePanel.ts, src/connection.ts, ..., dynamic import will not move module into another chunk.\n\n[plugin builtin:vite-reporter] \n(!) Some chunks are larger than 500 kB after minification. Consider:\n- Using dynamic import() to code-split the application\n- Use build.rolldownOptions.output.codeSplitting to improve chunking: https://rolldown.rs/reference/OutputOptions.codeSplitting\n- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.\n"
+    }
+  }
+}
