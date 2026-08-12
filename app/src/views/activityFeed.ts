@@ -64,6 +64,7 @@ interface State {
   chCharges: ChCharge[];
   chLoading: boolean;
   chConfigured: boolean;
+  chLoadFailed: boolean;
   chTimepoint: string | null;
   chSearch: string;
   chGroups: Set<string>;   // selected group labels
@@ -75,6 +76,7 @@ interface State {
   dgEvents: ActivityEvent[];
   dgLoading: boolean;
   dgConfigured: boolean;
+  dgLoadFailed: boolean;
   dgSearch: string;
   dgTypes: Set<string>;
   dgHours: number | null;
@@ -84,12 +86,12 @@ interface State {
 
 const s: State = {
   tab: "ch",
-  chCharges: [], chLoading: false, chConfigured: false,
+  chCharges: [], chLoading: false, chConfigured: false, chLoadFailed: false,
   // Default to Charges — debentures and new borrowing are the signal this
   // feed exists for; director changes etc. are opt-in via the chips.
   chTimepoint: null, chSearch: "", chGroups: new Set(["Charges"]),
   chNotAdded: false, chOffset: 0, chHasMore: false, chAddingIds: new Set(),
-  dgEvents: [], dgLoading: false, dgConfigured: false,
+  dgEvents: [], dgLoading: false, dgConfigured: false, dgLoadFailed: false,
   dgSearch: "", dgTypes: new Set(), dgHours: 7 * 24,
   poll: null,
 };
@@ -176,6 +178,12 @@ function renderChFilters(): string {
 }
 
 function renderChBody(): string {
+  if (s.chLoadFailed) {
+    return `<div class="activity-empty-state">
+      <strong>Couldn't load the charge feed</strong>
+      <p class="text-muted">The backend may be unreachable — check your connection and try again.</p>
+    </div>`;
+  }
   if (!s.chConfigured) {
     return `<div class="activity-empty-state">
       <strong>Charge feed not configured</strong>
@@ -238,6 +246,12 @@ function renderDgFilters(): string {
 }
 
 function renderDgBody(): string {
+  if (s.dgLoadFailed) {
+    return `<div class="activity-empty-state">
+      <strong>Couldn't load the activity feed</strong>
+      <p class="text-muted">The backend may be unreachable — check your connection and try again.</p>
+    </div>`;
+  }
   if (!s.dgConfigured) {
     return `<div class="activity-empty-state">
       <strong>Activity feed not configured</strong>
@@ -415,41 +429,51 @@ async function handleAddToLeads(chargeId: string): Promise<void> {
 
 async function loadCh(reset = false): Promise<void> {
   const types = chSelectedTypes();
+  s.chLoadFailed = false;
   try {
+    // No per-call .catch() here on purpose — letting either request's
+    // rejection reach this outer catch is what lets us tell "backend
+    // unreachable" (chLoadFailed) apart from "reachable, but genuinely not
+    // configured" (chConfigured: false, a real, successful response).
     const [status, charges] = await Promise.all([
-      getChargeFeedStatus().catch(() => ({ configured: false, timepoint: null })),
+      getChargeFeedStatus(),
       getChargeFeed({
         companyName: s.chSearch || undefined,
         filingTypes: types.length > 0 ? types.join(",") : undefined,
         notAdded: s.chNotAdded,
         limit: PAGE_SIZE,
         offset: s.chOffset,
-      }).catch(() => []),
+      }),
     ]);
     s.chConfigured = status.configured;
     s.chTimepoint = status.timepoint ?? null;
     if (reset || s.chOffset === 0) s.chCharges = charges;
     else s.chCharges = [...s.chCharges, ...charges];
     s.chHasMore = charges.length >= PAGE_SIZE;
-  } catch {
+  } catch (err) {
+    console.error("Activity Feed: failed to load charge feed", err);
+    s.chLoadFailed = true;
     if (reset) s.chCharges = [];
   }
   if (s.tab === "ch") rebuildBody();
 }
 
 async function loadDg(): Promise<void> {
+  s.dgLoadFailed = false;
   try {
     const [status, events] = await Promise.all([
-      getActivityStatus().catch(() => ({ configured: false })),
+      getActivityStatus(),
       getGlobalActivityFeed({
         eventTypes: s.dgTypes.size > 0 ? Array.from(s.dgTypes).join(",") : undefined,
         since: sinceFromHours(s.dgHours),
         companyName: s.dgSearch || undefined,
-      }).catch(() => []),
+      }),
     ]);
     s.dgConfigured = status.configured;
     s.dgEvents = events as ActivityEvent[];
-  } catch {
+  } catch (err) {
+    console.error("Activity Feed: failed to load activity feed", err);
+    s.dgLoadFailed = true;
     s.dgEvents = [];
   }
   if (s.tab === "dg") rebuildBody();

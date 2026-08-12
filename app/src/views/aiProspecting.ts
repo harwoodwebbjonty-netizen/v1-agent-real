@@ -445,11 +445,19 @@ export function initAiProspecting(): void {
   async function render(): Promise<void> {
     let configured = false;
     let runs: ProspectingRun[] = [];
+    let loadFailed = false;
     try {
       const [status, runList] = await Promise.all([getProspectingStatus(), listProspectingRuns()]);
       configured = status.configured;
       runs = runList;
-    } catch { /* backend offline */ }
+    } catch (err) {
+      // Distinct from "genuinely not configured" (a real, successful
+      // response with configured: false) — this is "couldn't even ask,"
+      // which used to render the exact same "not set up yet" message,
+      // hiding a real backend-offline problem behind a config instruction.
+      console.error("AI Prospecting: failed to load status/runs", err);
+      loadFailed = true;
+    }
 
     const sicOptions = SIC_CODES.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}`, group: s.group }));
     const locationOptions = UK_COUNTIES.map((c) => ({ value: c, label: c }));
@@ -466,7 +474,12 @@ export function initAiProspecting(): void {
           </div>
         </header>
 
-        ${!configured
+        ${loadFailed
+          ? `<section class="card">
+              <h3 class="card-title">Couldn't load AI Prospecting</h3>
+              <p style="margin:var(--space-2) 0 var(--space-3)">The backend may be unreachable — check your connection and try again.</p>
+            </section>`
+          : !configured
           ? `<section class="card">
               <h3 class="card-title">Not set up yet</h3>
               <p style="margin:var(--space-2) 0 var(--space-3)">AI Prospecting isn't available because the server doesn't have a Companies House API key configured. Ask your administrator to set one up — it's free and takes a couple of minutes (register at developer.company-information.service.gov.uk, then add the key to the server settings).</p>
