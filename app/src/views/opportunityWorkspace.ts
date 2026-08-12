@@ -33,6 +33,10 @@ const STAGE_LABELS: Record<OpportunityStage, string> = {
   lost: "Lost",
 };
 
+// Column order for the kanban board — deliberately excludes "none" (not yet
+// an opportunity; those leads live on the Leads screen, not here).
+const KANBAN_STAGES: OpportunityStage[] = ["engaged", "opportunity", "proposal", "won", "lost"];
+
 const OUTCOME_LABELS: Record<CallOutcome, string> = {
   connected: "Connected",
   voicemail: "Voicemail",
@@ -59,34 +63,98 @@ export function initOpportunityWorkspace(): void {
   let intelHistory: LeadIntelligenceVersion[] = [];
   let timeline: TimelineEntry[] = [];
 
+  async function moveLeadToStage(leadId: string, stage: OpportunityStage): Promise<void> {
+    const lead = getLeads().find((l) => l.id === leadId);
+    if (!lead || lead.opportunity_stage === stage) return;
+    await updateLead(leadId, { opportunityStage: stage });
+    await refreshLeads();
+    showToast(`${lead.company} moved to ${STAGE_LABELS[stage]}`);
+  }
+
   function renderList(): void {
     const opportunities = activeOpportunities();
+
+    if (!opportunities.length) {
+      container.innerHTML = `
+        <main class="container">
+          <section class="card-title-row">
+            <h2 class="card-title">Opportunities</h2>
+          </section>
+          <p class="card-subtitle">Active deals — click into one for its full working environment.</p>
+          <p class="empty-hint">No active opportunities yet. Move a lead to Opportunity from its Next Best Action.</p>
+        </main>
+      `;
+      return;
+    }
+
+    const columnsHtml = KANBAN_STAGES.map((stage) => {
+      const cardsInStage = opportunities.filter((l) => l.opportunity_stage === stage);
+      return `
+        <div class="kanban-column" data-stage="${stage}">
+          <div class="kanban-column-head">
+            <span class="kanban-column-title">${escapeHtml(STAGE_LABELS[stage])}</span>
+            <span class="kanban-column-count">${cardsInStage.length}</span>
+          </div>
+          <div class="kanban-column-body" data-stage="${stage}">
+            ${
+              cardsInStage.length
+                ? cardsInStage
+                    .map(
+                      (lead) => `
+              <div class="kanban-card" draggable="true" data-lead-id="${escapeHtml(lead.id)}">
+                <span class="kanban-card-company">${escapeHtml(lead.company)}</span>
+                ${lead.industry ? `<span class="kanban-card-meta">${escapeHtml(lead.industry)}</span>` : ""}
+                <button type="button" class="btn btn-ghost btn-sm kanban-card-open-btn">Open &rarr;</button>
+              </div>`
+                    )
+                    .join("")
+                : `<p class="kanban-column-empty">Drop a card here</p>`
+            }
+          </div>
+        </div>`;
+    }).join("");
+
     container.innerHTML = `
       <main class="container">
         <section class="card-title-row">
           <h2 class="card-title">Opportunities</h2>
         </section>
-        <p class="card-subtitle">Active deals — click into one for its full working environment.</p>
-        <div class="action-section-body">
-          ${
-            opportunities.length
-              ? opportunities
-                  .map(
-                    (lead) => `
-              <div class="action-row opportunity-list-row" data-lead-id="${escapeHtml(lead.id)}">
-                <span class="action-row-title">${escapeHtml(lead.company)}</span>
-                <span class="status-badge cal-type-task">${escapeHtml(STAGE_LABELS[lead.opportunity_stage])}</span>
-                <button type="button" class="btn btn-secondary btn-sm">Open Workspace</button>
-              </div>`
-                  )
-                  .join("")
-              : `<p class="empty-hint">No active opportunities yet. Move a lead to Opportunity from its Next Best Action.</p>`
-          }
-        </div>
+        <p class="card-subtitle">Active deals — drag a card to change its stage, or open one for its full working environment.</p>
+        <div class="kanban-board">${columnsHtml}</div>
       </main>
     `;
-    container.querySelectorAll<HTMLElement>(".opportunity-list-row").forEach((row) => {
-      row.addEventListener("click", () => openWorkspace(row.dataset.leadId!));
+
+    container.querySelectorAll<HTMLButtonElement>(".kanban-card-open-btn").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const card = btn.closest<HTMLElement>(".kanban-card")!;
+        openWorkspace(card.dataset.leadId!);
+      });
+    });
+
+    container.querySelectorAll<HTMLElement>(".kanban-card").forEach((card) => {
+      card.addEventListener("dragstart", (ev) => {
+        ev.dataTransfer?.setData("text/plain", card.dataset.leadId!);
+        ev.dataTransfer!.effectAllowed = "move";
+        card.classList.add("kanban-card-dragging");
+      });
+      card.addEventListener("dragend", () => card.classList.remove("kanban-card-dragging"));
+    });
+
+    container.querySelectorAll<HTMLElement>(".kanban-column-body").forEach((columnBody) => {
+      columnBody.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        ev.dataTransfer!.dropEffect = "move";
+        columnBody.classList.add("kanban-column-drop-target");
+      });
+      columnBody.addEventListener("dragleave", () => columnBody.classList.remove("kanban-column-drop-target"));
+      columnBody.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        columnBody.classList.remove("kanban-column-drop-target");
+        const leadId = ev.dataTransfer?.getData("text/plain");
+        const stage = columnBody.dataset.stage as OpportunityStage;
+        if (leadId) void moveLeadToStage(leadId, stage);
+      });
     });
   }
 
