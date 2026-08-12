@@ -187,4 +187,8 @@ async def send_all(
             failed += 1
         await asyncio.sleep(1)
 
+    db.record_audit(
+        current_user.id, current_user.name, "send_all", "list_campaign", campaign_id,
+        detail=f"sent={sent} failed={failed} skipped={skipped} via={body.provider}",
+    )
     return {"sent": sent, "failed": failed, "skipped": skipped}

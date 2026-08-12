@@ -332,6 +332,7 @@ async def send_draft(
         raise HTTPException(status_code=502, detail=str(exc))
 
     db.mark_email_draft_sent(draft_id, body.provider, now_iso())
+    db.record_audit(current_user.id, current_user.name, "send", "email_draft", draft_id, detail=f"to={to} via={body.provider}")
     return _to_draft_out(db.get_email_draft(draft_id))
 
 

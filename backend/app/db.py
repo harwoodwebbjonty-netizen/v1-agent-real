@@ -616,6 +616,23 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
+    """Five FK-shaped lead_id columns had no explicit index (audit
+    schema_index_scan.py) despite being queried on every lead-record render
+    (lead_phones/lead_emails — every card) or regularly elsewhere. Not an
+    active incident at today's data volume, but cheap to fix now rather than
+    retrofit under load later."""
+    conn.executescript(
+        """
+        CREATE INDEX IF NOT EXISTS idx_lead_phones_lead_id ON lead_phones(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_lead_emails_lead_id ON lead_emails(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_calendar_events_lead_id ON calendar_events(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_ch_charge_feed_lead_id ON ch_charge_feed(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_win_back_emails_lead_id ON win_back_emails(lead_id);
+        """
+    )
+
+
 def _migration_032_encrypt_oauth_tokens(conn: sqlite3.Connection) -> None:
     """Re-encrypts any plaintext access_token/refresh_token left over from
     before Fernet encryption was added (audit F-04 / Stage 0). Idempotent —
@@ -802,8 +819,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (30, _migration_030_audit_log),
     (31, _migration_031_roles),
     (32, _migration_032_encrypt_oauth_tokens),
+    (33, _migration_033_lead_id_indexes),
 ]
-CURRENT_SCHEMA_VERSION = 32
+CURRENT_SCHEMA_VERSION = 33
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:

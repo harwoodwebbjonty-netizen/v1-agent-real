@@ -752,6 +752,7 @@ async def send_one_email(
         raise HTTPException(status_code=502, detail=str(exc))
 
     db.mark_win_back_email_sent(email_id, body.provider, now_iso())
+    db.record_audit(current_user.id, current_user.name, "send", "win_back_email", email_id, detail=f"to={to} via={body.provider}")
     return {"status": "sent"}
 
 
@@ -791,6 +792,10 @@ async def send_all_emails(
             failed += 1
         await asyncio.sleep(1)
 
+    db.record_audit(
+        current_user.id, current_user.name, "send_all", "win_back_campaign", campaign_id,
+        detail=f"sent={sent} failed={failed} via={body.provider}",
+    )
     return {"sent": sent, "failed": failed}
 
 

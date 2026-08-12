@@ -75,6 +75,7 @@ def set_user_password(
     db.set_user_password(user_id, hash_password(body.password))
     db.reset_login_failures(user_id)
     db.delete_other_sessions_for_user(user_id)
+    db.record_audit(admin.id, admin.name, "set_password", "user", user_id)
     return user_out_from_row(db.get_user_by_id(user_id))
 
 
@@ -85,6 +86,7 @@ def create_user(body: CreateUserRequest, admin: CurrentUser = Depends(require_pe
 
     user_id = new_id()
     db.create_user(user_id, body.name.strip(), body.role, now_iso())
+    db.record_audit(admin.id, admin.name, "create", "user", user_id, detail=body.name.strip())
     return user_out_from_row(db.get_user_by_id(user_id))
 
 
@@ -132,4 +134,5 @@ def delete_user(user_id: str, admin: CurrentUser = Depends(require_permission("m
         raise HTTPException(status_code=400, detail="Can't remove the last admin — promote someone else first")
 
     db.delete_user(user_id)
+    db.record_audit(admin.id, admin.name, "delete", "user", user_id, detail=user["name"])
     return {"status": "ok"}
