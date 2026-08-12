@@ -315,6 +315,22 @@ async fn delete_lead_email(app_handle: tauri::AppHandle, lead_id: String, email_
     backend_client::delete_email(&base_url, &session.token, &lead_id, &email_id).await
 }
 
+// --- Tags (freeform, additive) ---
+
+#[tauri::command]
+async fn add_lead_tag(app_handle: tauri::AppHandle, lead_id: String, tag: String) -> Result<LeadRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::add_tag(&base_url, &session.token, &lead_id, &tag).await
+}
+
+#[tauri::command]
+async fn delete_lead_tag(app_handle: tauri::AppHandle, lead_id: String, tag: String) -> Result<LeadRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_tag(&base_url, &session.token, &lead_id, &tag).await
+}
+
 /// Independent AI email scraper — manual trigger only, never runs as a side
 /// effect of the phone-lookup flow above.
 #[tauri::command]
@@ -1341,6 +1357,8 @@ pub fn run() {
       add_lead_email,
       update_lead_email,
       delete_lead_email,
+      add_lead_tag,
+      delete_lead_tag,
       scrape_lead_email,
       verify_lead_emails,
       generate_lead_intelligence,

@@ -22,6 +22,8 @@ let onDeletePhone: ((id: string, phoneId: string) => Promise<void>) | null = nul
 let onAddEmail: ((id: string, email: string) => Promise<void>) | null = null;
 let onUpdateEmail: ((id: string, emailId: string, email: string) => Promise<void>) | null = null;
 let onDeleteEmail: ((id: string, emailId: string) => Promise<void>) | null = null;
+let onAddTag: ((id: string, tag: string) => Promise<void>) | null = null;
+let onDeleteTag: ((id: string, tag: string) => Promise<void>) | null = null;
 let onSaveNotes: ((id: string, notes: string) => Promise<void>) | null = null;
 let onSaveDetails:
   | ((id: string, contactName: string, contactTitle: string, website: string, linkedin: string) => Promise<void>)
@@ -103,6 +105,7 @@ function render(): void {
   (document.querySelector("#detail-linkedin") as HTMLInputElement).value = lead.linkedin;
 
   renderAssignment(lead);
+  renderTags(lead);
   renderPhones(lead);
   renderEmails(lead);
   renderFollowUp(lead);
@@ -350,6 +353,29 @@ function renderAssignment(lead: Lead): void {
   });
 }
 
+function renderTags(lead: Lead): void {
+  const el = document.querySelector("#tags-section")!;
+  if (lead.tags.length === 0) {
+    el.innerHTML = '<p class="empty-hint">No tags yet</p>';
+    return;
+  }
+  el.innerHTML = lead.tags
+    .map(
+      (tag) => `
+      <span class="tag-chip">
+        ${escapeHtml(tag)}
+        <button class="tag-chip-remove" type="button" data-tag="${escapeHtml(tag)}" title="Remove tag">✕</button>
+      </span>`
+    )
+    .join("");
+  el.querySelectorAll<HTMLButtonElement>(".tag-chip-remove").forEach((btn) => {
+    btn.addEventListener("click", async () => {
+      if (!currentLead || !onDeleteTag) return;
+      await onDeleteTag(currentLead.id, btn.dataset.tag!);
+    });
+  });
+}
+
 function renderPhones(lead: Lead): void {
   const el = document.querySelector("#phones-section")!;
   if (lead.phones.length === 0) {
@@ -566,6 +592,8 @@ export interface SidePanelCallbacks {
   onAddEmail: (id: string, email: string) => Promise<void>;
   onUpdateEmail: (id: string, emailId: string, email: string) => Promise<void>;
   onDeleteEmail: (id: string, emailId: string) => Promise<void>;
+  onAddTag: (id: string, tag: string) => Promise<void>;
+  onDeleteTag: (id: string, tag: string) => Promise<void>;
   /** Independent AI scraper — separate action from phone lookup, never automatic. */
   onScrapeEmail: (id: string) => Promise<void>;
   /** Manual trigger only — also used for "Refresh" (same backend action). Never automatic. */
@@ -585,6 +613,8 @@ export function setSidePanelCallbacks(callbacks: SidePanelCallbacks): void {
   onAddEmail = callbacks.onAddEmail;
   onUpdateEmail = callbacks.onUpdateEmail;
   onDeleteEmail = callbacks.onDeleteEmail;
+  onAddTag = callbacks.onAddTag;
+  onDeleteTag = callbacks.onDeleteTag;
   onSaveNotes = callbacks.onSaveNotes;
   onSaveDetails = callbacks.onSaveDetails;
   onScrapeEmail = callbacks.onScrapeEmail;
@@ -617,6 +647,22 @@ export function initSidePanel(callbacks: SidePanelCallbacks): void {
     const linkedin = (document.querySelector("#detail-linkedin") as HTMLInputElement).value.trim();
     await onSaveDetails!(currentLead.id, contactName, contactTitle, website, linkedin);
   });
+
+  const tagInput = document.querySelector<HTMLInputElement>("#add-tag-input")!;
+  const tagError = document.querySelector<HTMLSpanElement>("#add-tag-error")!;
+  const submitTag = async () => {
+    const value = tagInput.value.trim();
+    if (!currentLead || !value) return;
+    tagError.textContent = "";
+    try {
+      await onAddTag!(currentLead.id, value);
+      tagInput.value = "";
+    } catch (err) {
+      tagError.textContent = String(err);
+    }
+  };
+  document.querySelector("#add-tag-btn")!.addEventListener("click", () => void submitTag());
+  tagInput.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); void submitTag(); } });
 
   const phoneInput = document.querySelector<HTMLInputElement>("#add-phone-input")!;
   const phoneError = document.querySelector<HTMLSpanElement>("#add-phone-error")!;

@@ -51,3 +51,17 @@ class EmailOut(BaseModel):
     verify_status: str = "unchecked"
     person_match: str = "unknown"
     verify_detail: str = ""
+
+
+class AddTagRequest(BaseModel):
+    tag: str
+
+    @field_validator("tag")
+    @classmethod
+    def validate_tag(cls, value: str) -> str:
+        value = value.strip()
+        if not value:
+            raise ValueError("Tag can't be empty")
+        if len(value) > 40:
+            raise ValueError("Tag is too long (max 40 characters)")
+        return value

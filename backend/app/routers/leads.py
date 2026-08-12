@@ -16,6 +16,7 @@ from app.dependencies import CurrentUser, get_current_user, require_admin, requi
 from app.schemas_contacts import (
     AddEmailRequest,
     AddPhoneRequest,
+    AddTagRequest,
     EmailOut,
     PhoneOut,
     UpdateEmailRequest,
@@ -98,6 +99,7 @@ class LeadBatch:
         ids = [r["id"] for r in rows]
         self.phones = db.get_phones_for_leads(ids)
         self.emails = db.get_emails_for_leads(ids)
+        self.tags = db.get_tags_for_leads(ids)
         self.intel_latest = db.get_latest_intelligence_for_leads(ids)
         self.intel_meta = db.get_intelligence_meta_for_leads(ids)
 
@@ -157,10 +159,12 @@ def _to_lead_out(
         intelligence = _to_intelligence_out(lead_id, intel_row, batch) if intel_row is not None else None
         phone_rows = batch.phones.get(lead_id, [])
         email_rows = batch.emails.get(lead_id, [])
+        tags = batch.tags.get(lead_id, [])
     else:
         intelligence = _to_intelligence_out(lead_id, db.get_latest_lead_intelligence(lead_id))
         phone_rows = db.list_phones(lead_id)
         email_rows = db.list_emails(lead_id)
+        tags = db.list_tags(lead_id)
     next_best_action = compute_next_best_action(
         status=row["status"],
         contact_status=row["contact_status"],
@@ -211,6 +215,7 @@ def _to_lead_out(
             )
             for e in email_rows
         ],
+        tags=list(tags),
         intelligence=intelligence,
     )
 
@@ -491,6 +496,31 @@ def delete_email(lead_id: str, email_id: str, current_user: CurrentUser = Depend
     if email is None or email["lead_id"] != lead_id:
         raise HTTPException(status_code=404, detail="Email address not found on this lead")
     db.delete_email(email_id)
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
+
+
+# --- Tags (freeform, additive — INSERT OR IGNORE means re-adding an existing tag is a harmless no-op) ---
+
+@router.post("/{lead_id}/tags", response_model=LeadOut)
+def add_tag(
+    lead_id: str, body: AddTagRequest, current_user: CurrentUser = Depends(get_current_user),
+    activity: ActivityContext = Depends(get_activity_context),
+) -> LeadOut:
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+    db.add_tag(id=new_id(), lead_id=lead_id, tag=body.tag, created_at=now_iso())
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
+
+
+@router.delete("/{lead_id}/tags/{tag}", response_model=LeadOut)
+def delete_tag(lead_id: str, tag: str, current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context)) -> LeadOut:
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+    db.delete_tag(lead_id, tag)
     return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 

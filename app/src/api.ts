@@ -80,6 +80,7 @@ export interface Lead {
   last_dg_refreshed_at: string | null;
   phones: PhoneEntry[];
   emails: EmailEntry[];
+  tags: string[];
   intelligence: LeadIntelligence | null;
 }
 
@@ -378,6 +379,14 @@ export async function updateLeadEmail(leadId: string, emailId: string, email: st
 
 export async function deleteLeadEmail(leadId: string, emailId: string): Promise<Lead> {
   return invoke<Lead>("delete_lead_email", { leadId, emailId });
+}
+
+export async function addLeadTag(leadId: string, tag: string): Promise<Lead> {
+  return invoke<Lead>("add_lead_tag", { leadId, tag });
+}
+
+export async function deleteLeadTag(leadId: string, tag: string): Promise<Lead> {
+  return invoke<Lead>("delete_lead_tag", { leadId, tag });
 }
 
 /** Independent AI email scraper — manual trigger only, never runs automatically. */

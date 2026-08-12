@@ -137,6 +137,8 @@ pub struct LeadRecord {
     pub list_name: Option<String>,
     pub phones: Vec<PhoneRecord>,
     pub emails: Vec<EmailRecord>,
+    #[serde(default)]
+    pub tags: Vec<String>,
     pub intelligence: Option<LeadIntelligence>,
 }
 
@@ -323,6 +325,52 @@ pub async fn delete_phone(base_url: &str, token: &str, lead_id: &str, phone_id: 
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
+}
+
+// --- Tags (freeform, additive) ---
+
+#[derive(Serialize)]
+struct TagRequest<'a> {
+    tag: &'a str,
+}
+
+pub async fn add_tag(base_url: &str, token: &str, lead_id: &str, tag: &str) -> Result<LeadRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/tags", base_url, lead_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&TagRequest { tag })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn delete_tag(base_url: &str, token: &str, lead_id: &str, tag: &str) -> Result<LeadRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/tags/{}", base_url, lead_id, urlencoding_encode(tag));
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+/// Minimal percent-encoding for a path segment — a tag can contain spaces or
+/// other characters that aren't safe to splice directly into a URL path.
+/// Avoids pulling in a dependency just for this one call site.
+fn urlencoding_encode(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    for byte in s.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => out.push(byte as char),
+            _ => out.push_str(&format!("%{:02X}", byte)),
+        }
+    }
+    out
 }
 
 // --- Email addresses (manual CRUD, fully independent of phones) ---

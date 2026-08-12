@@ -2,11 +2,13 @@ import {
   type Lead,
   addLeadEmail,
   addLeadPhone,
+  addLeadTag,
   assignLead,
   createCallLog,
   createCalendarEvent,
   deleteLeadEmail,
   deleteLeadPhone,
+  deleteLeadTag,
   generateLeadIntelligence,
   scrapeLeadEmail,
   updateLead,
@@ -107,6 +109,14 @@ export function initCallQueue(): void {
     },
     onDeleteEmail: async (id, emailId) => {
       await deleteLeadEmail(id, emailId);
+      await refreshLeads();
+    },
+    onAddTag: async (id, tag) => {
+      await addLeadTag(id, tag);
+      await refreshLeads();
+    },
+    onDeleteTag: async (id, tag) => {
+      await deleteLeadTag(id, tag);
       await refreshLeads();
     },
     onScrapeEmail: async (id) => {

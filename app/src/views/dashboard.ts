@@ -3,6 +3,7 @@ import {
   type Lead,
   addLeadEmail,
   addLeadPhone,
+  addLeadTag,
   assignLead,
   chEnrichAll,
   chEnrichAuto,
@@ -11,6 +12,7 @@ import {
   dedupLeads,
   deleteLeadEmail,
   deleteLeadPhone,
+  deleteLeadTag,
   exportLogCsv,
   generateLeadIntelligence,
   getBatchActivitySummaries,
@@ -238,6 +240,14 @@ export function initDashboard(): void {
     },
     onDeleteEmail: async (id, emailId) => {
       await deleteLeadEmail(id, emailId);
+      await refreshLeads();
+    },
+    onAddTag: async (id, tag) => {
+      await addLeadTag(id, tag);
+      await refreshLeads();
+    },
+    onDeleteTag: async (id, tag) => {
+      await deleteLeadTag(id, tag);
       await refreshLeads();
     },
     onScrapeEmail: async (id) => {

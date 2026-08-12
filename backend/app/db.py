@@ -616,6 +616,25 @@ def _migration_025_list_email_campaigns(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_034_lead_tags(conn: sqlite3.Connection) -> None:
+    """Freeform tags on leads (audit Stage 3 roadmap item) — a separate
+    table, matching lead_phones/lead_emails's shape, not a comma-separated
+    column, so tag lookups/uniqueness stay index-backed and consistent with
+    how every other one-to-many lead attribute is already modelled."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS lead_tags (
+            id TEXT PRIMARY KEY,
+            lead_id TEXT NOT NULL,
+            tag TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            UNIQUE(lead_id, tag)
+        );
+        CREATE INDEX IF NOT EXISTS idx_lead_tags_lead_id ON lead_tags(lead_id);
+        """
+    )
+
+
 def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
     """Five FK-shaped lead_id columns had no explicit index (audit
     schema_index_scan.py) despite being queried on every lead-record render
@@ -820,8 +839,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (31, _migration_031_roles),
     (32, _migration_032_encrypt_oauth_tokens),
     (33, _migration_033_lead_id_indexes),
+    (34, _migration_034_lead_tags),
 ]
-CURRENT_SCHEMA_VERSION = 33
+CURRENT_SCHEMA_VERSION = 34
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1533,6 +1553,29 @@ def delete_email(email_id: str) -> None:
         conn.execute("DELETE FROM lead_emails WHERE id = ?", (email_id,))
 
 
+# --- lead tags (freeform, additive) ---
+
+def list_tags(lead_id: str) -> list[str]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT tag FROM lead_tags WHERE lead_id = ? ORDER BY created_at", (lead_id,)
+        ).fetchall()
+        return [r["tag"] for r in rows]
+
+
+def add_tag(id: str, lead_id: str, tag: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO lead_tags (id, lead_id, tag, created_at) VALUES (?, ?, ?, ?)",
+            (id, lead_id, tag, created_at),
+        )
+
+
+def delete_tag(lead_id: str, tag: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM lead_tags WHERE lead_id = ? AND tag = ?", (lead_id, tag))
+
+
 # --- lead lists (private cold call lists — leads with list_id stay out of the shared feed) ---
 
 def create_lead_list(id: str, name: str, owner_user_id: str, created_at: str) -> None:
@@ -1726,6 +1769,20 @@ def get_phones_for_leads(lead_ids: list[str]) -> dict[str, list[sqlite3.Row]]:
                 f"SELECT * FROM lead_phones WHERE lead_id IN ({ph}) ORDER BY created_at", chunk
             ):
                 result[r["lead_id"]].append(r)
+    return result
+
+
+def get_tags_for_leads(lead_ids: list[str]) -> dict[str, list[str]]:
+    result: dict[str, list[str]] = {lid: [] for lid in lead_ids}
+    if not lead_ids:
+        return result
+    with get_connection() as conn:
+        for chunk in _id_chunks(lead_ids):
+            ph = ", ".join("?" for _ in chunk)
+            for r in conn.execute(
+                f"SELECT lead_id, tag FROM lead_tags WHERE lead_id IN ({ph}) ORDER BY created_at", chunk
+            ):
+                result[r["lead_id"]].append(r["tag"])
     return result
 
 

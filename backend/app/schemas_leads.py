@@ -70,6 +70,7 @@ class LeadOut(BaseModel):
     list_name: Optional[str] = None
     phones: list[PhoneOut]
     emails: list[EmailOut]
+    tags: list[str] = []
     intelligence: Optional[LeadIntelligenceOut]
 
 
