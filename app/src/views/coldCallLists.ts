@@ -33,6 +33,7 @@ import {
   updateLeadPhone,
 } from "../api";
 import { CHARGE_TYPES, bindMultiSelect, buildMultiSelectHtml } from "../components/multiSelect";
+import { confirmDialog } from "../components/modal";
 import { renderAvatarHtml } from "../avatar";
 import { getCurrentUser, isAdmin, subscribeAuth } from "../auth";
 import {
@@ -745,44 +746,30 @@ export function initColdCallLists(): void {
 
   selectorCreateBtn.addEventListener("click", () => void confirmCreateList());
 
-  function showConflictDialog(conflicted: Lead[]): Promise<"move" | "skip" | "cancel"> {
-    return new Promise((resolve) => {
-      const byList: Record<string, number> = {};
-      for (const l of conflicted) {
-        const name = l.list_name || "Unknown list";
-        byList[name] = (byList[name] || 0) + 1;
-      }
-      const listLines = Object.entries(byList)
-        .map(([name, count]) => `<li>"${escapeHtml(name)}" — ${count} lead${count === 1 ? "" : "s"}</li>`)
-        .join("");
-      const overlay = document.createElement("div");
-      overlay.className = "conflict-modal-overlay";
-      overlay.innerHTML = `
-        <div class="conflict-modal">
-          <h3 class="conflict-modal-title">Some leads are already in a list</h3>
-          <p class="conflict-modal-desc">${conflicted.length} selected lead${conflicted.length === 1 ? " is" : "s are"} already assigned to:</p>
-          <ul class="conflict-modal-list">${listLines}</ul>
-          <p class="conflict-modal-question">What would you like to do?</p>
-          <div class="conflict-modal-actions">
-            <button id="conflict-move-btn" class="btn btn-primary btn-sm">Move to new list</button>
-            <button id="conflict-skip-btn" class="btn btn-secondary btn-sm">Skip these leads</button>
-            <button id="conflict-cancel-btn" class="btn btn-ghost btn-sm">Cancel</button>
-          </div>
-          <p class="conflict-modal-hint">
-            <strong>Move</strong> — reassign them to this new list.
-            <strong>Skip</strong> — only add the ${selectorSelected.size - conflicted.length} unassigned leads.
-          </p>
-        </div>
-      `;
-      document.body.appendChild(overlay);
-      const cleanup = (result: "move" | "skip" | "cancel") => {
-        document.body.removeChild(overlay);
-        resolve(result);
-      };
-      overlay.querySelector("#conflict-move-btn")!.addEventListener("click", () => cleanup("move"));
-      overlay.querySelector("#conflict-skip-btn")!.addEventListener("click", () => cleanup("skip"));
-      overlay.querySelector("#conflict-cancel-btn")!.addEventListener("click", () => cleanup("cancel"));
+  async function showConflictDialog(conflicted: Lead[]): Promise<"move" | "skip" | "cancel"> {
+    const byList: Record<string, number> = {};
+    for (const l of conflicted) {
+      const name = l.list_name || "Unknown list";
+      byList[name] = (byList[name] || 0) + 1;
+    }
+    const listItemsHtml = Object.entries(byList)
+      .map(([name, count]) => `<li>"${escapeHtml(name)}" — ${count} lead${count === 1 ? "" : "s"}</li>`)
+      .join("");
+
+    const result = await confirmDialog({
+      title: "Some leads are already in a list",
+      descriptionHtml: `${conflicted.length} selected lead${conflicted.length === 1 ? " is" : "s are"} already assigned to:`,
+      listItemsHtml,
+      questionHtml: "What would you like to do?",
+      hintHtml: `<strong>Move</strong> — reassign them to this new list.
+        <strong>Skip</strong> — only add the ${selectorSelected.size - conflicted.length} unassigned leads.`,
+      actions: [
+        { id: "move", label: "Move to new list", variant: "primary" },
+        { id: "skip", label: "Skip these leads", variant: "secondary" },
+        { id: "cancel", label: "Cancel", variant: "ghost" },
+      ],
     });
+    return result as "move" | "skip" | "cancel";
   }
 
   async function confirmCreateList(): Promise<void> {
