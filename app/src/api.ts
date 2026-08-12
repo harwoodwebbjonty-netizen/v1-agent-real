@@ -1,4 +1,34 @@
-import { invoke } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke } from "@tauri-apps/api/core";
+
+// Must match SESSION_EXPIRED_SENTINEL in app/src-tauri/src/backend_client.rs —
+// returned in place of the normal error message whenever a request fails
+// because the stored session token was rejected server-side (expired,
+// revoked, or its user deleted), as opposed to any other command error.
+const SESSION_EXPIRED_SENTINEL = "SESSION_EXPIRED";
+
+let sessionExpiredHandler: (() => void) | null = null;
+
+/** Registered once by auth.ts at startup. Kept as a callback registration
+ * (rather than importing auth.ts here) because auth.ts imports this module
+ * — a direct import back would be circular. */
+export function registerSessionExpiredHandler(fn: () => void): void {
+  sessionExpiredHandler = fn;
+}
+
+/** Thin wrapper around Tauri's invoke: every backend-calling command in this
+ * file goes through here, so this is the single place that can detect "the
+ * session died" and react globally instead of each of the ~150 call sites
+ * (and every view that uses them) failing silently on its own. */
+async function invoke<T>(cmd: string, args?: Record<string, unknown>): Promise<T> {
+  try {
+    return await tauriInvoke<T>(cmd, args);
+  } catch (err) {
+    if (err === SESSION_EXPIRED_SENTINEL) {
+      sessionExpiredHandler?.();
+    }
+    throw err;
+  }
+}
 
 export interface PhoneEntry {
   id: string;

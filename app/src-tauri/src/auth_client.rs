@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 
+use crate::backend_client::{is_session_invalid_detail, SESSION_EXPIRED_SENTINEL};
+
 fn default_scope() -> String {
     "all_shared".to_string()
 }
@@ -46,6 +48,9 @@ async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Resp
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        if status == reqwest::StatusCode::UNAUTHORIZED && is_session_invalid_detail(&body) {
+            return Err(SESSION_EXPIRED_SENTINEL.to_string());
+        }
         // Surface FastAPI's {"detail": "..."} as a plain human message when
         // present — the UI shows these errors verbatim.
         if let Ok(parsed) = serde_json::from_str::<serde_json::Value>(&body) {

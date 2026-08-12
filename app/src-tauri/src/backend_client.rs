@@ -12,6 +12,28 @@ pub fn default_base_url() -> &'static str {
     }
 }
 
+/// Returned in place of the normal error message whenever a request fails
+/// because the stored session token was rejected by `get_current_user`
+/// (expired, revoked, or its user deleted) — as opposed to a 401 from
+/// `/auth/identify` itself (wrong password), which is a normal part of the
+/// sign-in flow and must not trigger this. The frontend matches on this
+/// exact string to force the app back to signed-out state; see api.ts.
+pub const SESSION_EXPIRED_SENTINEL: &str = "SESSION_EXPIRED";
+
+/// The three `detail` messages `get_current_user` (backend/app/dependencies.py)
+/// can raise — all mean "this token no longer identifies a signed-in user".
+pub fn is_session_invalid_detail(body: &str) -> bool {
+    serde_json::from_str::<serde_json::Value>(body)
+        .ok()
+        .and_then(|v| v.get("detail").and_then(|d| d.as_str()).map(str::to_string))
+        .is_some_and(|detail| {
+            matches!(
+                detail.as_str(),
+                "Session expired or invalid" | "Not authenticated" | "User not found"
+            )
+        })
+}
+
 async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Response) -> Result<T, String> {
     if response.status() == reqwest::StatusCode::TOO_MANY_REQUESTS {
         return Err("Rate limit exceeded. Try again shortly.".to_string());
@@ -19,6 +41,9 @@ async fn handle_response<T: serde::de::DeserializeOwned>(response: reqwest::Resp
     if !response.status().is_success() {
         let status = response.status();
         let body = response.text().await.unwrap_or_default();
+        if status == reqwest::StatusCode::UNAUTHORIZED && is_session_invalid_detail(&body) {
+            return Err(SESSION_EXPIRED_SENTINEL.to_string());
+        }
         return Err(format!("Backend returned {}: {}", status, body));
     }
     response

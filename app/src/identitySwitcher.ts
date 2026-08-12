@@ -1,6 +1,6 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { getUserNames, readImageAsDataUrl, setUserAvatar, type UserName } from "./api";
-import { getCurrentUser, identify, subscribeAuth, updateLocalUser } from "./auth";
+import { getCurrentUser, identify, subscribeAuth, subscribeSessionExpired, updateLocalUser } from "./auth";
 import { renderAvatarHtml, resizeImageDataUrl } from "./avatar";
 import { refreshTeamMembers } from "./team";
 import { showToast } from "./toast";
@@ -127,6 +127,9 @@ export function initIdentitySwitcher(): void {
   subscribeAuth(() => {
     renderTrigger();
     void refreshPicker();
+  });
+  subscribeSessionExpired(() => {
+    panel.classList.remove("hidden");
   });
   void refreshPicker();
   renderTrigger();
