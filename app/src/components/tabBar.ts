@@ -5,7 +5,7 @@ import { getActiveTabId, openTab, type ViewName } from "../tabs";
 // if the user's role grants it (admin has all). Outreach's inner sub-tabs
 // (email writer, sequences) live under one shared "view_outreach" permission
 // and aren't gated separately.
-const NAV_PERMISSIONS: Partial<Record<ViewName, string>> = {
+export const NAV_PERMISSIONS: Partial<Record<ViewName, string>> = {
   "action-centre": "view_today",
   "activity-feed": "view_activity_feed",
   "ai-prospecting": "view_prospecting",
@@ -21,7 +21,7 @@ const NAV_PERMISSIONS: Partial<Record<ViewName, string>> = {
   settings: "view_settings",
 };
 
-const NAV_TITLES: Record<ViewName, string> = {
+export const NAV_TITLES: Record<ViewName, string> = {
   "action-centre": "Today",
   "activity-feed": "Activity Feed",
   "ai-prospecting": "AI Prospecting",

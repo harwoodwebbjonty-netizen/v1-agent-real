@@ -14,6 +14,7 @@ import { initActivityFeed } from "./views/activityFeed";
 import { initChargeFeed } from "./views/chargeFeed";
 import { initAiProspecting } from "./views/aiProspecting";
 import { initActivityModalOverlay } from "./components/activityModal";
+import { initCommandPalette } from "./components/commandPalette";
 import { initActionCentre } from "./views/actionCentre";
 import { initAnalytics } from "./views/analytics";
 import { initCalendar } from "./views/calendar";
@@ -54,6 +55,7 @@ initTopBar();
 initTabRouter();
 initSidebarToggle();
 initPresence();
+initCommandPalette();
 
 void initAuth();
 void initUpdater();

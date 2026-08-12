@@ -3544,6 +3544,74 @@ button.p-filter-chip.active {
   margin-top: var(--space-1);
 }
 
+/* Command palette (Cmd/Ctrl+K) */
+.command-palette-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding-top: 14vh;
+  z-index: 9999;
+}
+.command-palette {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-modal);
+  width: 92%;
+  max-width: 560px;
+  overflow: hidden;
+}
+.command-palette-input {
+  width: 100%;
+  border: none;
+  border-bottom: 1px solid var(--border);
+  padding: var(--space-4) var(--space-4);
+  font-size: var(--text-lg);
+  font-family: inherit;
+  color: var(--text);
+  background: transparent;
+}
+.command-palette-input:focus {
+  outline: none;
+}
+.command-palette-list {
+  list-style: none;
+  margin: 0;
+  padding: var(--space-2);
+  max-height: 320px;
+  overflow-y: auto;
+}
+.command-palette-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+.command-palette-row.active {
+  background: var(--accent-glow);
+}
+.command-palette-row-label {
+  font-size: var(--text-sm);
+  color: var(--text);
+  font-weight: 500;
+}
+.command-palette-row-hint {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+.command-palette-empty {
+  padding: var(--space-4);
+  text-align: center;
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+}
+
 /* Status filter group */
 .ccl-status-filter { display: flex; gap: var(--space-1); }
 

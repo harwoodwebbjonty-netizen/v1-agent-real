@@ -41,10 +41,10 @@ export function initTopBar(): void {
       dashSearch.dispatchEvent(new Event("input", { bubbles: true }));
     }
   }
+  // Cmd/Ctrl+K now opens the real command palette (components/commandPalette.ts)
+  // instead of just focusing this box — Enter here still works as a direct
+  // shortcut straight into the Leads table for anyone already typing here.
   searchEl?.addEventListener("keydown", (e) => { if (e.key === "Enter") { e.preventDefault(); runSearch(); } });
-  document.addEventListener("keydown", (e) => {
-    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") { e.preventDefault(); searchEl?.focus(); }
-  });
 
   // bell → today's worklist; profile → identity switcher (both existing)
   notifEl?.addEventListener("click", () => openTab("action-centre", "Today"));
