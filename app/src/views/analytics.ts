@@ -1,5 +1,5 @@
 import { Chart, registerables } from "chart.js";
-import type { Lead, LeadList } from "../api";
+import type { Lead, LeadList, OpportunityStage } from "../api";
 import { setIndustryFilter } from "../components/industryFilter";
 import { CONTACT_STATUS_ORDER } from "../constants";
 import { setPendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
@@ -107,6 +107,44 @@ function computeFunnel(leads: Lead[]): number[] {
   return CONTACT_STATUS_ORDER.map(
     (_, rank) => leads.filter((l) => CONTACT_STATUS_ORDER.indexOf(l.contact_status) >= rank).length
   );
+}
+
+// Deal pipeline stage — a distinct concept from contact_status (the funnel
+// above): this tracks the Opportunities kanban board's stages, not whether a
+// lead has been reached yet. Order matches opportunityWorkspace.ts's
+// KANBAN_STAGES (kept as a small local duplicate rather than a shared import
+// between two view files, matching how this codebase already tolerates a
+// handful of near-identical small constants per-file, e.g. telHref()).
+const PIPELINE_STAGE_ORDER: OpportunityStage[] = ["engaged", "opportunity", "proposal", "won", "lost"];
+const PIPELINE_STAGE_LABELS: Record<OpportunityStage, string> = {
+  none: "Not an opportunity",
+  engaged: "Engaged",
+  opportunity: "Opportunity",
+  proposal: "Proposal",
+  won: "Won",
+  lost: "Lost",
+};
+
+interface PipelineStats {
+  stageCounts: { stage: OpportunityStage; count: number }[];
+  active: number; // engaged + opportunity + proposal — still open
+  won: number;
+  lost: number;
+  winRate: number | null; // won / (won + lost), null if no closed deals yet
+}
+
+function computePipeline(leads: Lead[]): PipelineStats {
+  const stageCounts = PIPELINE_STAGE_ORDER.map((stage) => ({
+    stage,
+    count: leads.filter((l) => l.opportunity_stage === stage).length,
+  }));
+  const won = stageCounts.find((s) => s.stage === "won")?.count ?? 0;
+  const lost = stageCounts.find((s) => s.stage === "lost")?.count ?? 0;
+  const active = stageCounts
+    .filter((s) => s.stage === "engaged" || s.stage === "opportunity" || s.stage === "proposal")
+    .reduce((sum, s) => sum + s.count, 0);
+  const closed = won + lost;
+  return { stageCounts, active, won, lost, winRate: closed > 0 ? Math.round((won / closed) * 100) : null };
 }
 
 function monthKey(dateStr: string): string {
@@ -389,6 +427,37 @@ function renderFunnel(leads: Lead[]): void {
   });
 }
 
+function renderPipeline(leads: Lead[]): void {
+  const stats = computePipeline(leads);
+  const max = Math.max(...stats.stageCounts.map((s) => s.count), 1);
+
+  const winRateEl = document.querySelector<HTMLElement>("#pipeline-kpi-win-rate")!;
+  winRateEl.textContent = stats.winRate === null ? "—" : `${stats.winRate}%`;
+  document.querySelector<HTMLElement>("#pipeline-kpi-active")!.textContent = String(stats.active);
+  document.querySelector<HTMLElement>("#pipeline-kpi-won")!.textContent = String(stats.won);
+  document.querySelector<HTMLElement>("#pipeline-kpi-lost")!.textContent = String(stats.lost);
+
+  const container = document.querySelector<HTMLDivElement>("#pipeline-stage-container")!;
+  if (stats.stageCounts.every((s) => s.count === 0)) {
+    container.innerHTML = `<p class="empty-hint">No opportunities yet — move a lead to Opportunity from its Next Best Action.</p>`;
+    return;
+  }
+  container.innerHTML = stats.stageCounts
+    .map(({ stage, count }) => {
+      const pct = Math.round((count / max) * 100);
+      return `
+      <div class="funnel-row" data-stage="${stage}" title="Open the Opportunities board">
+        <span class="funnel-label">${escapeHtml(PIPELINE_STAGE_LABELS[stage])}</span>
+        <div class="funnel-bar-track"><div class="funnel-bar-fill" style="width: ${pct}%"></div></div>
+        <span class="funnel-count">${count}</span>
+      </div>`;
+    })
+    .join("");
+  container.querySelectorAll<HTMLDivElement>(".funnel-row").forEach((row) => {
+    row.addEventListener("click", () => openTab("opportunity-workspace", "Opportunities"));
+  });
+}
+
 function renderTrendChart(leads: Lead[]): void {
   const { labels, counts } = computeMonthlyTrend(leads);
   const canvas = document.querySelector<HTMLCanvasElement>("#trend-chart")!;
@@ -474,6 +543,7 @@ function renderAnalytics(): void {
 
   renderKpis(leads);
   renderCoverageStats(leads);
+  renderPipeline(leads);
   renderIndustryChart(leads);
   renderStatusChart(leads);
   renderFunnel(leads);
@@ -516,6 +586,19 @@ export function initAnalytics(): void {
             <div class="row"><span class="cl">Companies House number <em id="cov-company-number-em"></em></span><span class="bar b2"><i id="cov-company-number-bar" style="width:0%"></i></span><span class="pc" id="cov-company-number">0%</span></div>
             <div class="row"><span class="cl">Fully enriched <em id="cov-enriched-em"></em></span><span class="bar b3"><i id="cov-enriched-bar" style="width:0%"></i></span><span class="pc" id="cov-enriched">0%</span></div>
           </div>
+        </section>
+
+        <div class="sec-head"><span class="sec-num">C</span><h3 class="action-section-title">Pipeline</h3><span class="sec-rule"></span><span class="sec-count">opportunities</span></div>
+        <section class="metrics">
+          <div class="m"><div class="l">Win rate</div><div class="v tnum" id="pipeline-kpi-win-rate">—</div></div>
+          <div class="m"><div class="l">Active opportunities</div><div class="v tnum" id="pipeline-kpi-active">0</div></div>
+          <div class="m"><div class="l">Won</div><div class="v tnum" id="pipeline-kpi-won">0</div></div>
+          <div class="m"><div class="l">Lost</div><div class="v tnum" id="pipeline-kpi-lost">0</div></div>
+        </section>
+        <section class="card">
+          <h2 class="card-title">Stage breakdown</h2>
+          <p class="card-subtitle">Click a stage to open the Opportunities board.</p>
+          <div id="pipeline-stage-container"></div>
         </section>
 
         <section class="card">
