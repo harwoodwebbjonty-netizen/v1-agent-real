@@ -20,6 +20,7 @@ import {
 } from "../api";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentUser, subscribeAuth } from "../auth";
+import { openOverlay } from "../components/modal";
 import { escapeHtml } from "../utils";
 
 // Haiku pricing (claude-haiku-4-5): $0.80/MTok input, $4/MTok output.
@@ -114,9 +115,6 @@ async function showCostConfirm(count: number, totalCost: string): Promise<boolea
   }
 
   return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "conflict-modal-overlay";
-
     const limitRowsHtml = usage
       ? runEstimates
           .map(({ feature, label, note, estimate }) => {
@@ -140,8 +138,8 @@ async function showCostConfirm(count: number, totalCost: string): Promise<boolea
           .join("")
       : "";
 
-    overlay.innerHTML = `
-      <div class="conflict-modal">
+    const { overlay, close } = openOverlay(
+      `<div class="conflict-modal">
         <div class="conflict-modal-title">Confirm email generation</div>
         <div class="conflict-modal-desc">
           You're about to generate <strong>${count} personalised email${count === 1 ? "" : "s"}</strong>
@@ -156,9 +154,9 @@ async function showCostConfirm(count: number, totalCost: string): Promise<boolea
           <button class="btn btn-primary" id="cost-confirm-yes">Generate</button>
           <button class="btn btn-secondary" id="cost-confirm-no">Cancel</button>
         </div>
-      </div>
-    `;
-    document.body.appendChild(overlay);
+      </div>`,
+      { onEscape: () => { close(); resolve(false); } }
+    );
 
     overlay.querySelectorAll<HTMLElement>(".cost-confirm-warn").forEach((row) => {
       const feature = row.dataset.feature as keyof CreditLimits;
@@ -185,11 +183,11 @@ async function showCostConfirm(count: number, totalCost: string): Promise<boolea
     });
 
     overlay.querySelector("#cost-confirm-yes")!.addEventListener("click", () => {
-      overlay.remove();
+      close();
       resolve(true);
     });
     overlay.querySelector("#cost-confirm-no")!.addEventListener("click", () => {
-      overlay.remove();
+      close();
       resolve(false);
     });
   });

@@ -2,6 +2,7 @@ import { open } from "@tauri-apps/plugin-dialog";
 import { getUserNames, readImageAsDataUrl, setUserAvatar, type UserName } from "./api";
 import { getCurrentUser, identify, subscribeAuth, subscribeSessionExpired, updateLocalUser } from "./auth";
 import { renderAvatarHtml, resizeImageDataUrl } from "./avatar";
+import { openOverlay } from "./components/modal";
 import { refreshTeamMembers } from "./team";
 import { showToast } from "./toast";
 import { escapeHtml } from "./utils";
@@ -19,10 +20,8 @@ let pickerNames: UserName[] = [];
  * error and let the user retry without reopening. */
 function promptPasswordAndSignIn(name: string, isNew: boolean, isFirstAccount: boolean): Promise<boolean> {
   return new Promise((resolve) => {
-    const overlay = document.createElement("div");
-    overlay.className = "conflict-modal-overlay";
-    overlay.innerHTML = `
-      <div class="conflict-modal">
+    const { overlay, close } = openOverlay(
+      `<div class="conflict-modal">
         <div class="conflict-modal-title">${isNew ? `Create profile — ${escapeHtml(name)}` : `Sign in as ${escapeHtml(name)}`}</div>
         <div class="conflict-modal-desc" style="margin-bottom:12px">${
           isNew
@@ -37,13 +36,14 @@ function promptPasswordAndSignIn(name: string, isNew: boolean, isFirstAccount: b
                  style="width:100%;margin-bottom:8px" />`
             : ""
         }
-        <p id="idsw-error" style="color:var(--danger,#e53);font-size:0.82rem;min-height:1.2em;margin-bottom:8px"></p>
+        <p id="idsw-error" style="color:var(--danger);font-size:0.82rem;min-height:1.2em;margin-bottom:8px"></p>
         <div class="conflict-modal-actions">
           <button id="idsw-submit" class="btn btn-primary">${isNew ? "Create & sign in" : "Sign in"}</button>
           <button id="idsw-cancel" class="btn btn-ghost">Cancel</button>
         </div>
-      </div>`;
-    document.body.appendChild(overlay);
+      </div>`,
+      { onEscape: () => cleanup(false) }
+    );
 
     const input = overlay.querySelector<HTMLInputElement>("#idsw-password")!;
     const bootstrapInput = overlay.querySelector<HTMLInputElement>("#idsw-bootstrap");
@@ -51,7 +51,7 @@ function promptPasswordAndSignIn(name: string, isNew: boolean, isFirstAccount: b
     const submitBtn = overlay.querySelector<HTMLButtonElement>("#idsw-submit")!;
     setTimeout(() => input.focus(), 40);
 
-    const cleanup = (ok: boolean) => { overlay.remove(); resolve(ok); };
+    const cleanup = (ok: boolean) => { close(); resolve(ok); };
     overlay.querySelector("#idsw-cancel")!.addEventListener("click", () => cleanup(false));
 
     const submit = async () => {

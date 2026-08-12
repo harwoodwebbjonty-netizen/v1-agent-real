@@ -33,7 +33,7 @@ import {
   updateLeadPhone,
 } from "../api";
 import { CHARGE_TYPES, bindMultiSelect, buildMultiSelectHtml } from "../components/multiSelect";
-import { confirmDialog } from "../components/modal";
+import { confirmDialog, openOverlay } from "../components/modal";
 import { renderAvatarHtml } from "../avatar";
 import { getCurrentUser, isAdmin, subscribeAuth } from "../auth";
 import {
@@ -995,10 +995,8 @@ export function initColdCallLists(): void {
   // One-click "Send follow-up": drafts from the lead's call notes + previous
   // emails (backend), then an inline review-and-send from the rep's own account.
   async function openFollowUpModal(lead: Lead): Promise<void> {
-    const overlay = document.createElement("div");
-    overlay.className = "follow-up-overlay";
-    overlay.innerHTML = `
-      <div class="follow-up-modal" role="dialog" aria-modal="true">
+    const { overlay, close } = openOverlay(
+      `<div class="follow-up-modal" role="dialog" aria-modal="true">
         <div class="follow-up-modal-head">
           <h3>Follow-up · ${escapeHtml(lead.company)}</h3>
           <button class="follow-up-close icon-btn" type="button" title="Close">✕</button>
@@ -1006,16 +1004,9 @@ export function initColdCallLists(): void {
         <div class="follow-up-body">
           <div class="follow-up-loading">Drafting a follow-up from your call notes and previous emails…</div>
         </div>
-      </div>`;
-    document.body.appendChild(overlay);
-    const previouslyFocused = document.activeElement as HTMLElement | null;
-    const close = () => {
-      document.removeEventListener("keydown", onKey);
-      overlay.remove();
-      previouslyFocused?.focus();  // restore focus to the triggering control
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") close(); };
-    document.addEventListener("keydown", onKey);
+      </div>`,
+      { overlayClassName: "follow-up-overlay", onEscape: () => close() }
+    );
     overlay.querySelector<HTMLButtonElement>(".follow-up-close")!.addEventListener("click", close);
     overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
     overlay.querySelector<HTMLButtonElement>(".follow-up-close")!.focus();
