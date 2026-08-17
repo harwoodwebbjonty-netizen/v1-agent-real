@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -11,8 +12,26 @@ from app.schemas_calendar import (
     UpdateCalendarEventRequest,
 )
 from app.services.auth_service import new_id, now_iso
+from app.services.calendar_oauth_service import OAuthError, push_event_to_calendar
+
+logger = logging.getLogger("app.calendar")
 
 router = APIRouter(prefix="/calendar-events", tags=["calendar"])
+
+
+async def _push_to_connected_calendar(current_user: CurrentUser, body: CreateCalendarEventRequest) -> None:
+    """Best-effort, one-way (CRM -> external) push — see
+    calendar_oauth_service.push_event_to_calendar's docstring for the scope
+    decision. Never raises: a failed external push must not fail the local
+    event creation the rep is actually waiting on."""
+    for provider in ("gmail", "microsoft"):
+        account = db.get_calendar_oauth_account(current_user.id, provider)
+        if account is None:
+            continue
+        try:
+            await push_event_to_calendar(account, body.title, body.description, body.date, body.time)
+        except OAuthError:
+            logger.warning("Failed to push calendar event to %s for user %s", provider, current_user.id)
 
 
 def _to_event_out(row: sqlite3.Row) -> CalendarEventOut:
@@ -42,7 +61,7 @@ def list_events(current_user: CurrentUser = Depends(get_current_user)) -> Calend
 
 
 @router.post("", response_model=CalendarEventOut)
-def create_event(
+async def create_event(
     body: CreateCalendarEventRequest, current_user: CurrentUser = Depends(get_current_user)
 ) -> CalendarEventOut:
     event_id = new_id()
@@ -58,6 +77,7 @@ def create_event(
         description=body.description,
         created_at=created_at,
     )
+    await _push_to_connected_calendar(current_user, body)
     return _to_event_out(db.get_calendar_event(event_id))
 
 

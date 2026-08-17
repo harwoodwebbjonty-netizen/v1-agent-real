@@ -19,6 +19,7 @@ from app.routers import (
     auth,
     brand_voice,
     calendar,
+    calendar_oauth,
     call_logs,
     ch_feed,
     credit_settings,
@@ -76,6 +77,7 @@ app.include_router(users.router)
 app.include_router(leads.router)
 app.include_router(lead_lists.router)
 app.include_router(calendar.router)
+app.include_router(calendar_oauth.router)
 app.include_router(call_logs.router)
 app.include_router(brand_voice.router)
 app.include_router(email_templates.router)

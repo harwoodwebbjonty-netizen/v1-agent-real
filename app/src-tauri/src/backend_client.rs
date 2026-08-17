@@ -1707,6 +1707,58 @@ pub async fn disconnect_email_oauth_account(base_url: &str, token: &str, provide
     Ok(())
 }
 
+// --- Calendar sync: OAuth calendar accounts (Google/Outlook) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CalendarOAuthAccount {
+    pub provider: String,
+    pub email_address: String,
+}
+
+pub async fn get_calendar_oauth_connect_url(base_url: &str, token: &str, provider: &str) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/calendar-oauth/{}/connect", base_url, provider);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: ConnectUrlResponse = handle_response(response).await?;
+    Ok(parsed.url)
+}
+
+#[derive(Deserialize)]
+struct CalendarOAuthAccountsResponse {
+    accounts: Vec<CalendarOAuthAccount>,
+}
+
+pub async fn list_calendar_oauth_accounts(base_url: &str, token: &str) -> Result<Vec<CalendarOAuthAccount>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/calendar-oauth/accounts", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: CalendarOAuthAccountsResponse = handle_response(response).await?;
+    Ok(parsed.accounts)
+}
+
+pub async fn disconnect_calendar_oauth_account(base_url: &str, token: &str, provider: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/calendar-oauth/{}", base_url, provider);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
 // --- Saved/shared filter views (Leads list) ---
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

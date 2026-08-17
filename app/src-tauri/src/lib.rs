@@ -896,6 +896,33 @@ async fn disconnect_email_oauth_account(app_handle: tauri::AppHandle, provider: 
     backend_client::disconnect_email_oauth_account(&base_url, &session.token, &provider).await
 }
 
+// --- Calendar sync: OAuth calendar accounts (Google/Outlook) ---
+
+#[tauri::command]
+async fn connect_calendar_account(app_handle: tauri::AppHandle, provider: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    let url = backend_client::get_calendar_oauth_connect_url(&base_url, &session.token, &provider).await?;
+    app_handle
+        .opener()
+        .open_url(&url, None::<String>)
+        .map_err(|e| format!("Failed to open browser: {}", e))
+}
+
+#[tauri::command]
+async fn list_calendar_oauth_accounts(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::CalendarOAuthAccount>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_calendar_oauth_accounts(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn disconnect_calendar_oauth_account(app_handle: tauri::AppHandle, provider: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::disconnect_calendar_oauth_account(&base_url, &session.token, &provider).await
+}
+
 #[tauri::command]
 async fn list_saved_views(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::SavedView>, String> {
     let session = require_session(&app_handle)?;
@@ -1474,6 +1501,9 @@ pub fn run() {
       connect_email_account,
       list_email_oauth_accounts,
       disconnect_email_oauth_account,
+      connect_calendar_account,
+      list_calendar_oauth_accounts,
+      disconnect_calendar_oauth_account,
       list_saved_views,
       create_saved_view,
       delete_saved_view,

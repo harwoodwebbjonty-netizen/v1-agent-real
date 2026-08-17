@@ -686,6 +686,31 @@ def _migration_036_custom_fields(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_037_calendar_oauth(conn: sqlite3.Connection) -> None:
+    """Calendar OAuth accounts (audit Stage 4 roadmap item) — identical shape
+    to email_oauth_accounts, deliberately a separate table rather than
+    reusing it: a user may connect email and calendar independently (or use
+    different providers for each), and calendar scopes are a materially
+    bigger consent grant than "send email as me", so keeping them as
+    distinct stored grants matches what the user actually consented to."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS calendar_oauth_accounts (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            provider TEXT NOT NULL,
+            email_address TEXT NOT NULL,
+            access_token TEXT NOT NULL,
+            refresh_token TEXT NOT NULL,
+            token_expires_at TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, provider)
+        );
+        """
+    )
+
+
 def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
     """Five FK-shaped lead_id columns had no explicit index (audit
     schema_index_scan.py) despite being queried on every lead-record render
@@ -893,8 +918,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (34, _migration_034_lead_tags),
     (35, _migration_035_saved_views),
     (36, _migration_036_custom_fields),
+    (37, _migration_037_calendar_oauth),
 ]
-CURRENT_SCHEMA_VERSION = 36
+CURRENT_SCHEMA_VERSION = 37
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -2441,6 +2467,64 @@ def delete_email_oauth_account(user_id: str, provider: str) -> None:
     with get_connection() as conn:
         conn.execute(
             "DELETE FROM email_oauth_accounts WHERE user_id = ? AND provider = ?", (user_id, provider)
+        )
+
+
+# --- calendar OAuth accounts (same shape/pattern as email OAuth accounts above, kept separate —
+# see migration 037's docstring for why) ---
+
+def upsert_calendar_oauth_account(
+    id: str,
+    user_id: str,
+    provider: str,
+    email_address: str,
+    access_token: str,
+    refresh_token: str,
+    token_expires_at: str,
+    created_at: str,
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO calendar_oauth_accounts
+               (id, user_id, provider, email_address, access_token, refresh_token, token_expires_at, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(user_id, provider) DO UPDATE SET
+                   email_address = excluded.email_address,
+                   access_token = excluded.access_token,
+                   refresh_token = excluded.refresh_token,
+                   token_expires_at = excluded.token_expires_at,
+                   updated_at = excluded.updated_at""",
+            (id, user_id, provider, email_address, access_token, refresh_token, token_expires_at, created_at, created_at),
+        )
+
+
+def update_calendar_oauth_tokens(user_id: str, provider: str, access_token: str, token_expires_at: str, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE calendar_oauth_accounts SET access_token = ?, token_expires_at = ?, updated_at = ? "
+            "WHERE user_id = ? AND provider = ?",
+            (access_token, token_expires_at, updated_at, user_id, provider),
+        )
+
+
+def get_calendar_oauth_account(user_id: str, provider: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM calendar_oauth_accounts WHERE user_id = ? AND provider = ?", (user_id, provider)
+        ).fetchone()
+
+
+def list_calendar_oauth_accounts(user_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM calendar_oauth_accounts WHERE user_id = ? ORDER BY provider", (user_id,)
+        ).fetchall()
+
+
+def delete_calendar_oauth_account(user_id: str, provider: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "DELETE FROM calendar_oauth_accounts WHERE user_id = ? AND provider = ?", (user_id, provider)
         )
 
 

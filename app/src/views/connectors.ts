@@ -1,6 +1,9 @@
 import {
+  connectCalendarAccount,
   connectEmailAccount,
+  disconnectCalendarOAuthAccount,
   disconnectEmailOAuthAccount,
+  listCalendarOAuthAccounts,
   listEmailOAuthAccounts,
   type EmailProvider,
 } from "../api";
@@ -34,6 +37,18 @@ export function initConnectors(): void {
           <button id="conn-check-email-btn" class="btn btn-ghost btn-sm">Check connection</button>
         </div>
         <span id="conn-email-status" class="status-message"></span>
+      </section>
+
+      <section class="card">
+        <h2 class="card-title">Calendar</h2>
+        <p class="card-subtitle">Connect your own Google or Outlook calendar so calls and follow-ups you schedule in this CRM also show up where you actually check your day. One-way for now: creating an event here pushes it out to your connected calendar; edits made on the calendar side don't sync back yet.</p>
+        <ul id="conn-calendar-accounts-list" class="history-list"></ul>
+        <div class="card-actions">
+          <button id="conn-connect-gcal-btn" class="btn btn-secondary btn-sm">Connect Google Calendar</button>
+          <button id="conn-connect-outlook-cal-btn" class="btn btn-secondary btn-sm">Connect Outlook Calendar</button>
+          <button id="conn-check-calendar-btn" class="btn btn-ghost btn-sm">Check connection</button>
+        </div>
+        <span id="conn-calendar-status" class="status-message"></span>
       </section>
 
       <section class="card">
@@ -95,5 +110,58 @@ export function initConnectors(): void {
   container.querySelector("#conn-check-email-btn")!.addEventListener("click", async () => {
     status.textContent = "";
     await renderAccounts();
+  });
+
+  const calendarList = container.querySelector<HTMLUListElement>("#conn-calendar-accounts-list")!;
+  const calendarStatus = container.querySelector<HTMLSpanElement>("#conn-calendar-status")!;
+
+  async function renderCalendarAccounts(): Promise<void> {
+    try {
+      const accounts = await listCalendarOAuthAccounts();
+      calendarList.innerHTML =
+        accounts.length === 0
+          ? '<li class="empty-hint">No calendars connected yet.</li>'
+          : accounts
+              .map(
+                (a) => `
+              <li class="history-list-row">
+                <span>${escapeHtml(a.provider)} — ${escapeHtml(a.email_address)}</span>
+                <button class="btn btn-ghost btn-sm conn-cal-disconnect-btn" data-provider="${a.provider}">Disconnect</button>
+              </li>`
+              )
+              .join("");
+      calendarList.querySelectorAll<HTMLButtonElement>(".conn-cal-disconnect-btn").forEach((btn) => {
+        btn.addEventListener("click", async () => {
+          await disconnectCalendarOAuthAccount(btn.dataset.provider as EmailProvider);
+          await renderCalendarAccounts();
+        });
+      });
+    } catch (err) {
+      calendarStatus.textContent = `Failed to load: ${err}`;
+    }
+  }
+  void renderCalendarAccounts();
+
+  container.querySelector("#conn-connect-gcal-btn")!.addEventListener("click", async () => {
+    try {
+      await connectCalendarAccount("gmail");
+      calendarStatus.textContent = 'Continue in your browser, then click "Check connection".';
+    } catch (err) {
+      calendarStatus.textContent = `Failed: ${err}`;
+    }
+  });
+
+  container.querySelector("#conn-connect-outlook-cal-btn")!.addEventListener("click", async () => {
+    try {
+      await connectCalendarAccount("microsoft");
+      calendarStatus.textContent = 'Continue in your browser, then click "Check connection".';
+    } catch (err) {
+      calendarStatus.textContent = `Failed: ${err}`;
+    }
+  });
+
+  container.querySelector("#conn-check-calendar-btn")!.addEventListener("click", async () => {
+    calendarStatus.textContent = "";
+    await renderCalendarAccounts();
   });
 }

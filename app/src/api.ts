@@ -885,6 +885,26 @@ export async function disconnectEmailOAuthAccount(provider: EmailProvider): Prom
   await invoke("disconnect_email_oauth_account", { provider });
 }
 
+// --- Calendar sync: OAuth calendar accounts (Google/Outlook, one-way CRM -> external push on create) ---
+
+export interface CalendarOAuthAccount {
+  provider: EmailProvider;
+  email_address: string;
+}
+
+/** Opens the OAuth consent flow in the system browser — never an embedded webview. */
+export async function connectCalendarAccount(provider: EmailProvider): Promise<void> {
+  await invoke("connect_calendar_account", { provider });
+}
+
+export async function listCalendarOAuthAccounts(): Promise<CalendarOAuthAccount[]> {
+  return invoke<CalendarOAuthAccount[]>("list_calendar_oauth_accounts");
+}
+
+export async function disconnectCalendarOAuthAccount(provider: EmailProvider): Promise<void> {
+  await invoke("disconnect_calendar_oauth_account", { provider });
+}
+
 /** Manual trigger only — actually sends the email via the connected account. */
 export async function sendEmailDraft(draftId: string, provider: EmailProvider): Promise<EmailDraft> {
   return invoke<EmailDraft>("send_email_draft", { draftId, provider });
