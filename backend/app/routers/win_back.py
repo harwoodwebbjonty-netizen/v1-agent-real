@@ -21,8 +21,6 @@ from app.services.companies_house_service import (
     get_company_profile,
     search_company_by_name,
 )
-from app.services.email_format import build_win_back_footer_html, build_win_back_footer_text
-from app.services.email_oauth_service import OAuthError, send_email as send_email_via_oauth
 from app.services.linkedin_activity_service import fetch_linkedin_posts_preview, format_posts_for_prompt, get_or_fetch_linkedin_posts
 from app.services.mailchimp_service import (
     MailchimpError,
@@ -115,14 +113,6 @@ class PreviewCampaignRequest(BaseModel):
     campaign_link_text: str = ""
     signature: str = ""
     depth: str = "standard"
-
-
-class SendEmailRequest(BaseModel):
-    provider: str = "gmail"
-
-
-class MailchimpExportRequest(BaseModel):
-    provider: str = "gmail"
 
 
 # --- Background generation ---
@@ -720,94 +710,9 @@ def get_campaign_rows(campaign_id: str, current_user: CurrentUser = Depends(get_
     }
 
 
-@router.post("/campaigns/{campaign_id}/send/{email_id}")
-async def send_one_email(
-    campaign_id: str,
-    email_id: str,
-    body: SendEmailRequest,
-    current_user: CurrentUser = Depends(get_current_user),
-) -> dict:
-    campaign = db.get_win_back_campaign(campaign_id)
-    if campaign is None:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    if campaign["created_by"] != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    emails = db.get_win_back_emails(campaign_id)
-    email_row = next((e for e in emails if e["id"] == email_id), None)
-    if email_row is None:
-        raise HTTPException(status_code=404, detail="Email not found")
-    if email_row["send_status"] == "sent":
-        raise HTTPException(status_code=400, detail="Already sent")
-
-    to = email_row["contact_email"] if "contact_email" in email_row.keys() else None
-    if not to:
-        raise HTTPException(status_code=400, detail="This lead has no email address on file.")
-
-    account = db.get_email_oauth_account(current_user.id, body.provider)
-    if account is None:
-        raise HTTPException(status_code=400, detail=f"Connect a {body.provider} account in Settings first.")
-
-    try:
-        await send_email_via_oauth(
-            account, to, email_row["subject"], email_row["body"],
-            footer_html=build_win_back_footer_html(), footer_text=build_win_back_footer_text(),
-        )
-    except OAuthError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
-
-    db.mark_win_back_email_sent(email_id, body.provider, now_iso())
-    db.record_audit(current_user.id, current_user.name, "send", "win_back_email", email_id, detail=f"to={to} via={body.provider}")
-    return {"status": "sent"}
-
-
-@router.post("/campaigns/{campaign_id}/send-all")
-async def send_all_emails(
-    campaign_id: str,
-    body: SendEmailRequest,
-    current_user: CurrentUser = Depends(get_current_user),
-) -> dict:
-    campaign = db.get_win_back_campaign(campaign_id)
-    if campaign is None:
-        raise HTTPException(status_code=404, detail="Campaign not found")
-    if campaign["created_by"] != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="Access denied")
-
-    account = db.get_email_oauth_account(current_user.id, body.provider)
-    if account is None:
-        raise HTTPException(status_code=400, detail=f"Connect a {body.provider} account in Settings first.")
-
-    emails = db.get_win_back_emails(campaign_id)
-    sent = 0
-    failed = 0
-    for email_row in emails:
-        if email_row["send_status"] == "sent":
-            continue
-        to = email_row["contact_email"] if "contact_email" in email_row.keys() else None
-        if not to:
-            continue
-        try:
-            await send_email_via_oauth(
-                account, to, email_row["subject"], email_row["body"],
-                footer_html=build_win_back_footer_html(), footer_text=build_win_back_footer_text(),
-            )
-            db.mark_win_back_email_sent(email_row["id"], body.provider, now_iso())
-            sent += 1
-        except OAuthError:
-            failed += 1
-        await asyncio.sleep(1)
-
-    db.record_audit(
-        current_user.id, current_user.name, "send_all", "win_back_campaign", campaign_id,
-        detail=f"sent={sent} failed={failed} via={body.provider}",
-    )
-    return {"sent": sent, "failed": failed}
-
-
 @router.post("/campaigns/{campaign_id}/export-mailchimp")
 async def export_mailchimp(
     campaign_id: str,
-    body: MailchimpExportRequest,
     current_user: CurrentUser = Depends(get_current_user),
 ) -> dict:
     campaign = db.get_win_back_campaign(campaign_id)
@@ -816,17 +721,19 @@ async def export_mailchimp(
     if campaign["created_by"] != current_user.id and current_user.role != "admin":
         raise HTTPException(status_code=403, detail="Access denied")
 
-    account = db.get_email_oauth_account(current_user.id, body.provider)
-    # Sender display name is the broker team, not whichever operator happens
-    # to click export — recipients don't know the logged-in user's name, and
-    # a consistent team identity reads as legitimate rather than as a random
-    # personal name attached to a cold win-back email.
+    # Win-back sends exclusively through Mailchimp — never through a connected
+    # Gmail/Outlook account, which is reserved for the Outreach section
+    # (email writer, list campaigns, sequences). Sender display name is the
+    # broker team, not whichever operator happens to click export —
+    # recipients don't know the logged-in user's name, and a consistent team
+    # identity reads as legitimate rather than as a random personal name
+    # attached to a cold win-back email.
     from_name = "WCF Broker Team"
-    from_email = (account["email_address"] if account else "") or get_settings().mailchimp_from_email.strip()
+    from_email = get_settings().mailchimp_from_email.strip()
     if not from_email:
         raise HTTPException(
             status_code=422,
-            detail="No sender email address available. Connect a Gmail or Outlook account, or set a verified Mailchimp 'from' address (MAILCHIMP_FROM_EMAIL) in Settings, before exporting to Mailchimp.",
+            detail="No sender email address configured. Set a verified Mailchimp 'from' address (MAILCHIMP_FROM_EMAIL) before exporting to Mailchimp.",
         )
 
     emails = db.get_win_back_emails(campaign_id)

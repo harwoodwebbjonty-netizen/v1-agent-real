@@ -1273,20 +1273,6 @@ async fn get_win_back_campaign(app_handle: tauri::AppHandle, campaign_id: String
 }
 
 #[tauri::command]
-async fn send_win_back_email(app_handle: tauri::AppHandle, campaign_id: String, email_id: String, provider: String) -> Result<(), String> {
-    let session = require_session(&app_handle)?;
-    let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::send_win_back_email(&base_url, &session.token, &campaign_id, &email_id, &provider).await
-}
-
-#[tauri::command]
-async fn send_all_win_back_emails(app_handle: tauri::AppHandle, campaign_id: String, provider: String) -> Result<serde_json::Value, String> {
-    let session = require_session(&app_handle)?;
-    let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::send_all_win_back_emails(&base_url, &session.token, &campaign_id, &provider).await
-}
-
-#[tauri::command]
 async fn resume_win_back_campaign(app_handle: tauri::AppHandle, campaign_id: String) -> Result<serde_json::Value, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
@@ -1294,10 +1280,10 @@ async fn resume_win_back_campaign(app_handle: tauri::AppHandle, campaign_id: Str
 }
 
 #[tauri::command]
-async fn export_win_back_mailchimp(app_handle: tauri::AppHandle, campaign_id: String, provider: String) -> Result<String, String> {
+async fn export_win_back_mailchimp(app_handle: tauri::AppHandle, campaign_id: String) -> Result<String, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::export_win_back_mailchimp(&base_url, &session.token, &campaign_id, &provider).await
+    backend_client::export_win_back_mailchimp(&base_url, &session.token, &campaign_id).await
 }
 
 #[tauri::command]
@@ -1538,8 +1524,6 @@ pub fn run() {
       get_win_back_campaigns,
       get_win_back_campaign,
       get_win_back_campaign_rows,
-      send_win_back_email,
-      send_all_win_back_emails,
       resume_win_back_campaign,
       export_win_back_mailchimp,
       parse_win_back_csv,

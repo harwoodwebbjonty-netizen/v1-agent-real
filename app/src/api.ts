@@ -1213,22 +1213,17 @@ export async function getWinBackCampaign(campaignId: string): Promise<WinBackCam
   return invoke<WinBackCampaignDetail>("get_win_back_campaign", { campaignId });
 }
 
-export async function sendWinBackEmail(campaignId: string, emailId: string, provider = "gmail"): Promise<void> {
-  await invoke("send_win_back_email", { campaignId, emailId, provider });
-}
-
 /** Regenerates only the leads that never got an email (credit ceiling hit,
  * crash) — progress continues from where the campaign stopped. */
 export async function resumeWinBackCampaign(campaignId: string): Promise<{ resumed: boolean; remaining: number }> {
   return invoke<{ resumed: boolean; remaining: number }>("resume_win_back_campaign", { campaignId });
 }
 
-export async function sendAllWinBackEmails(campaignId: string, provider = "gmail"): Promise<{ sent: number; failed: number }> {
-  return invoke("send_all_win_back_emails", { campaignId, provider });
-}
-
-export async function exportWinBackMailchimp(campaignId: string, provider = "gmail"): Promise<string> {
-  return invoke<string>("export_win_back_mailchimp", { campaignId, provider });
+/** Win-back sends exclusively through Mailchimp — the connected Gmail/Outlook
+ * account is reserved for the Outreach section (email writer, list
+ * campaigns, sequences), never for win-back. */
+export async function exportWinBackMailchimp(campaignId: string): Promise<string> {
+  return invoke<string>("export_win_back_mailchimp", { campaignId });
 }
 
 export interface WinBackCsvRow {

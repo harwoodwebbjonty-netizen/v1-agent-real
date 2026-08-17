@@ -15,8 +15,6 @@ import {
   previewWinBackCampaignEmail,
   resumeWinBackCampaign,
   saveCreditLimits,
-  sendAllWinBackEmails,
-  sendWinBackEmail,
 } from "../api";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentUser, subscribeAuth } from "../auth";
@@ -824,7 +822,6 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
         ${
           emails.length > 0
             ? `<div class="wb-bulk-actions-bar">
-                <button id="wb-send-all-btn" class="btn btn-secondary btn-sm">Send all via Gmail</button>
                 <button id="wb-mailchimp-btn" class="btn btn-ghost btn-sm">Export to Mailchimp</button>
                 <span id="wb-mailchimp-status" class="status-message"></span>
                </div>
@@ -843,11 +840,6 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
                       <td><span class="status-badge ${e.send_status === "sent" ? "status-verified" : ""}">${escapeHtml(e.send_status)}</span></td>
                       <td class="wb-actions-cell">
                         <button class="btn btn-ghost btn-sm wb-preview-btn" data-id="${escapeHtml(e.id)}">Preview</button>
-                        ${
-                          e.send_status !== "sent" && e.contact_email
-                            ? `<button class="btn btn-ghost btn-sm wb-send-btn" data-id="${escapeHtml(e.id)}">Send</button>`
-                            : ""
-                        }
                       </td>
                     </tr>`
                     )
@@ -946,39 +938,6 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
 
   container.querySelector<HTMLElement>(".wb-modal-backdrop")?.addEventListener("click", () => {
     container.querySelector<HTMLDivElement>("#wb-preview-modal")?.classList.add("hidden");
-  });
-
-  container.querySelectorAll<HTMLButtonElement>(".wb-send-btn").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-      btn.disabled = true;
-      btn.textContent = "Sending...";
-      try {
-        await sendWinBackEmail(campaign.id, btn.dataset.id!);
-        btn.textContent = "Sent";
-        const row = btn.closest("tr")!;
-        row.querySelector<HTMLElement>(".status-badge")!.textContent = "sent";
-        row.querySelector<HTMLElement>(".status-badge")!.classList.add("status-verified");
-      } catch (err) {
-        btn.disabled = false;
-        btn.textContent = "Send";
-        alert(`Failed to send: ${err}`);
-      }
-    });
-  });
-
-  container.querySelector<HTMLButtonElement>("#wb-send-all-btn")?.addEventListener("click", async () => {
-    const btn = container.querySelector<HTMLButtonElement>("#wb-send-all-btn")!;
-    btn.disabled = true;
-    btn.textContent = "Sending...";
-    try {
-      const result = await sendAllWinBackEmails(campaign.id);
-      btn.textContent = `Done (${result.sent} sent, ${result.failed} failed)`;
-      await showCampaignDetail(container, campaign.id);
-    } catch (err) {
-      btn.disabled = false;
-      btn.textContent = "Send all via Gmail";
-      alert(`Error: ${err}`);
-    }
   });
 
   container.querySelector<HTMLButtonElement>("#wb-mailchimp-btn")?.addEventListener("click", async () => {

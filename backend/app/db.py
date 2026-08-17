@@ -2799,14 +2799,6 @@ def update_win_back_campaign_progress(campaign_id: str, generated: int, status: 
         )
 
 
-def mark_win_back_email_sent(email_id: str, method: str, sent_at: str) -> None:
-    with get_connection() as conn:
-        conn.execute(
-            "UPDATE win_back_emails SET send_status = 'sent', send_method = ?, sent_at = ? WHERE id = ?",
-            (method, sent_at, email_id),
-        )
-
-
 # ---------------------------------------------------------------------------
 # List Email Campaigns (per-lead drafts live in email_drafts, tagged campaign_id)
 # ---------------------------------------------------------------------------
