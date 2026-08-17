@@ -711,6 +711,24 @@ def _migration_037_calendar_oauth(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_038_oauth_state_purpose(conn: sqlite3.Connection) -> None:
+    """Lets one already-registered OAuth redirect URI serve every OAuth
+    integration this app ever adds, not just email. Google/Microsoft only
+    need `/email-oauth/{provider}/callback` allowlisted once, ever — a new
+    integration (calendar today, anything else later) requests its own
+    scopes but reuses that same redirect URI, and this `purpose` column is
+    how the shared callback route knows which service's token table
+    (email_oauth_accounts vs calendar_oauth_accounts) to write the grant
+    into. Without this, every new OAuth-based connector would need its own
+    redirect URI manually added to the Google Cloud Console / Azure App
+    Registration by hand before it could work — the opposite of the
+    self-service "click connect" experience every other feature in
+    Connectors already has."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(oauth_states)")}
+    if "purpose" not in cols:
+        conn.execute("ALTER TABLE oauth_states ADD COLUMN purpose TEXT NOT NULL DEFAULT 'email'")
+
+
 def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
     """Five FK-shaped lead_id columns had no explicit index (audit
     schema_index_scan.py) despite being queried on every lead-record render
@@ -919,8 +937,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (35, _migration_035_saved_views),
     (36, _migration_036_custom_fields),
     (37, _migration_037_calendar_oauth),
+    (38, _migration_038_oauth_state_purpose),
 ]
-CURRENT_SCHEMA_VERSION = 37
+CURRENT_SCHEMA_VERSION = 38
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1327,11 +1346,11 @@ def delete_other_sessions_for_user(user_id: str, keep_token: Optional[str] = Non
 
 # --- OAuth CSRF-state store (email account linking) ---
 
-def create_oauth_state(state: str, user_id: str, provider: str, created_at: str) -> None:
+def create_oauth_state(state: str, user_id: str, provider: str, created_at: str, purpose: str = "email") -> None:
     with get_connection() as conn:
         conn.execute(
-            "INSERT INTO oauth_states (state, user_id, provider, created_at) VALUES (?, ?, ?, ?)",
-            (state, user_id, provider, created_at),
+            "INSERT INTO oauth_states (state, user_id, provider, created_at, purpose) VALUES (?, ?, ?, ?, ?)",
+            (state, user_id, provider, created_at, purpose),
         )
 
 

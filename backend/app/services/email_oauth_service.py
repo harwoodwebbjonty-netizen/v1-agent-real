@@ -104,15 +104,15 @@ def get_authorization_url(provider: str, user_id: str) -> str:
     raise ValueError(f"Unknown provider: {provider}")
 
 
-async def handle_oauth_callback(provider: str, code: str, state: str) -> None:
-    """Verify the anti-CSRF `state` nonce (one-time, bound to the user who
-    started the flow), then exchange the code for tokens, fetch the connected
-    email address, and store the account (one row per user+provider, upserted)."""
+async def handle_oauth_callback(provider: str, code: str, user_id: str) -> None:
+    """Exchanges the code for tokens, fetches the connected email address,
+    and stores the account (one row per user+provider, upserted). The
+    anti-CSRF `state` nonce is verified once, by the shared callback route
+    in email_oauth.py (which also owns the calendar OAuth callback — see
+    migration 038's docstring for why there's only one registered redirect
+    URI for every OAuth integration) — `user_id` here is already resolved
+    from that verified state."""
     settings = get_settings()
-    state_row = db.consume_oauth_state(state)
-    if state_row is None or state_row["provider"] != provider:
-        raise OAuthError("Invalid or expired authorization state. Please try connecting again.")
-    user_id = state_row["user_id"]
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         if provider == "gmail":

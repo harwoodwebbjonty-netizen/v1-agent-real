@@ -1,21 +1,18 @@
-import logging
-
-from fastapi import APIRouter, Depends, HTTPException, Query
-from fastapi.responses import HTMLResponse
+from fastapi import APIRouter, Depends, HTTPException
 
 from app import db
-
-logger = logging.getLogger("app.calendar_oauth")
 from app.dependencies import CurrentUser, get_current_user
 from app.services.calendar_oauth_service import (
     PROVIDERS,
-    OAuthError,
     OAuthNotConfiguredError,
     get_authorization_url,
-    handle_oauth_callback,
 )
 
 router = APIRouter(prefix="/calendar-oauth", tags=["calendar-oauth"])
+
+# No callback route here — the OAuth redirect URI for every integration
+# this app has is /email-oauth/{provider}/callback, shared, registered once.
+# See email_oauth.py's callback and migration 038's docstring for why.
 
 
 def _validate_provider(provider: str) -> None:
@@ -31,21 +28,6 @@ def get_connect_url(provider: str, current_user: CurrentUser = Depends(get_curre
     except OAuthNotConfiguredError as exc:
         raise HTTPException(status_code=400, detail=str(exc))
     return {"url": url}
-
-
-@router.get("/{provider}/callback", response_class=HTMLResponse)
-async def oauth_callback(provider: str, code: str = Query(...), state: str = Query(...)) -> str:
-    # No auth dependency here on purpose — see email_oauth.py's identical callback.
-    _validate_provider(provider)
-    try:
-        await handle_oauth_callback(provider, code, state)
-    except OAuthError:
-        logger.warning("Calendar OAuth callback failed for provider %s", provider)
-        return (
-            "<html><body><h2>Connection failed</h2>"
-            "<p>You can close this window and try again in the app.</p></body></html>"
-        )
-    return "<html><body><h2>Connected!</h2><p>You can close this window and return to the app.</p></body></html>"
 
 
 @router.get("/accounts")

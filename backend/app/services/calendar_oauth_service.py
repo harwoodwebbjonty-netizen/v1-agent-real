@@ -46,15 +46,20 @@ class OAuthError(Exception):
 
 
 def _redirect_uri(provider: str) -> str:
+    # Deliberately the SAME path email OAuth uses, not a calendar-specific
+    # one — see migration 038's docstring. Google/Microsoft only need one
+    # redirect URI ever registered for this app; which service a given
+    # consent grant is for is carried by the `purpose` on the state row,
+    # not by the URI.
     settings = get_settings()
     base = settings.public_base_url or settings.oauth_redirect_base_url
-    return f"{base}/calendar-oauth/{provider}/callback"
+    return f"{base}/email-oauth/{provider}/callback"
 
 
 def get_authorization_url(provider: str, user_id: str) -> str:
     settings = get_settings()
     state = secrets.token_urlsafe(24)
-    db.create_oauth_state(state, user_id, provider, now_iso())
+    db.create_oauth_state(state, user_id, provider, now_iso(), purpose="calendar")
     if provider == "gmail":
         if not settings.google_oauth_client_id:
             raise OAuthNotConfiguredError("Google OAuth is not configured yet.")
@@ -86,12 +91,11 @@ def get_authorization_url(provider: str, user_id: str) -> str:
     raise ValueError(f"Unknown provider: {provider}")
 
 
-async def handle_oauth_callback(provider: str, code: str, state: str) -> None:
+async def handle_oauth_callback(provider: str, code: str, user_id: str) -> None:
+    """`user_id` is already resolved by the shared callback route in
+    email_oauth.py — see email_oauth_service.handle_oauth_callback's
+    docstring for why this no longer consumes the state itself."""
     settings = get_settings()
-    state_row = db.consume_oauth_state(state)
-    if state_row is None or state_row["provider"] != provider:
-        raise OAuthError("Invalid or expired authorization state. Please try connecting again.")
-    user_id = state_row["user_id"]
 
     async with httpx.AsyncClient(timeout=15.0) as client:
         if provider == "gmail":

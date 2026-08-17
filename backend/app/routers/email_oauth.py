@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse
 
 from app import db
+from app.services import calendar_oauth_service
 
 logger = logging.getLogger("app.email_oauth")
 from app.dependencies import CurrentUser, get_current_user
@@ -37,14 +38,31 @@ def get_connect_url(provider: str, current_user: CurrentUser = Depends(get_curre
 async def oauth_callback(provider: str, code: str = Query(...), state: str = Query(...)) -> str:
     # No auth dependency here on purpose — this is hit by the browser
     # redirecting back from Google/Microsoft, not an authenticated app
-    # request. `state` carries the id of the user who started the flow.
+    # request. Shared by every OAuth-based connector this app has (email
+    # today, calendar too) — one registered redirect URI, ever, no matter
+    # how many integrations get added later. Which service a grant belongs
+    # to is carried by the state row's `purpose` (see migration 038), not
+    # by the URI, so this dispatches on that instead of each service owning
+    # its own callback route.
     _validate_provider(provider)
+    state_row = db.consume_oauth_state(state)
+    if state_row is None or state_row["provider"] != provider:
+        logger.warning("OAuth callback with invalid/expired state for provider %s", provider)
+        return (
+            "<html><body><h2>Connection failed</h2>"
+            "<p>You can close this window and try again in the app.</p></body></html>"
+        )
+    user_id = state_row["user_id"]
+    purpose = state_row["purpose"] if "purpose" in state_row.keys() else "email"
     try:
-        await handle_oauth_callback(provider, code, state)
+        if purpose == "calendar":
+            await calendar_oauth_service.handle_oauth_callback(provider, code, user_id)
+        else:
+            await handle_oauth_callback(provider, code, user_id)
     except OAuthError:
         # Deliberately generic — never reflect the exception (it can carry the
         # provider's raw token-endpoint response) into this HTML page.
-        logger.warning("OAuth callback failed for provider %s", provider)
+        logger.warning("OAuth callback failed for provider %s (purpose=%s)", provider, purpose)
         return (
             "<html><body><h2>Connection failed</h2>"
             "<p>You can close this window and try again in the app.</p></body></html>"
