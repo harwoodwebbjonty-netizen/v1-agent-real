@@ -657,6 +657,35 @@ def _migration_035_saved_views(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_036_custom_fields(conn: sqlite3.Connection) -> None:
+    """Custom fields on leads (audit Stage 3 roadmap item). Two tables, not
+    one: `custom_field_definitions` is the small, admin-managed schema (what
+    fields exist and their type — text/number/date), `lead_custom_field_values`
+    is the sparse one-to-many data (most leads won't have a value for most
+    fields). This is the genuine key-value option from the roadmap's own
+    fork, not a fixed set of extra columns — a field can be added/removed
+    without a migration, matching why a single team tool benefits from this
+    now rather than only once a second organisation exists."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS custom_field_definitions (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE,
+            field_type TEXT NOT NULL DEFAULT 'text',
+            created_at TEXT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS lead_custom_field_values (
+            id TEXT PRIMARY KEY,
+            lead_id TEXT NOT NULL,
+            field_id TEXT NOT NULL,
+            value TEXT NOT NULL DEFAULT '',
+            UNIQUE(lead_id, field_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_lead_custom_field_values_lead_id ON lead_custom_field_values(lead_id);
+        """
+    )
+
+
 def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
     """Five FK-shaped lead_id columns had no explicit index (audit
     schema_index_scan.py) despite being queried on every lead-record render
@@ -863,8 +892,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (33, _migration_033_lead_id_indexes),
     (34, _migration_034_lead_tags),
     (35, _migration_035_saved_views),
+    (36, _migration_036_custom_fields),
 ]
-CURRENT_SCHEMA_VERSION = 35
+CURRENT_SCHEMA_VERSION = 36
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1627,6 +1657,52 @@ def delete_saved_view(view_id: str) -> None:
         conn.execute("DELETE FROM saved_views WHERE id = ?", (view_id,))
 
 
+# --- custom fields (admin-defined schema, per-lead values) ---
+
+def list_custom_field_definitions() -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM custom_field_definitions ORDER BY created_at").fetchall()
+
+
+def get_custom_field_definition(field_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM custom_field_definitions WHERE id = ?", (field_id,)).fetchone()
+
+
+def create_custom_field_definition(id: str, name: str, field_type: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO custom_field_definitions (id, name, field_type, created_at) VALUES (?, ?, ?, ?)",
+            (id, name, field_type, created_at),
+        )
+
+
+def delete_custom_field_definition(field_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM lead_custom_field_values WHERE field_id = ?", (field_id,))
+        conn.execute("DELETE FROM custom_field_definitions WHERE id = ?", (field_id,))
+
+
+def set_custom_field_value(id: str, lead_id: str, field_id: str, value: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """
+            INSERT INTO lead_custom_field_values (id, lead_id, field_id, value)
+            VALUES (?, ?, ?, ?)
+            ON CONFLICT(lead_id, field_id) DO UPDATE SET value = excluded.value
+            """,
+            (id, lead_id, field_id, value),
+        )
+
+
+def get_custom_field_values(lead_id: str) -> dict[str, str]:
+    with get_connection() as conn:
+        rows = conn.execute(
+            "SELECT field_id, value FROM lead_custom_field_values WHERE lead_id = ?", (lead_id,)
+        ).fetchall()
+        return {r["field_id"]: r["value"] for r in rows}
+
+
 # --- lead lists (private cold call lists — leads with list_id stay out of the shared feed) ---
 
 def create_lead_list(id: str, name: str, owner_user_id: str, created_at: str) -> None:
@@ -1834,6 +1910,20 @@ def get_tags_for_leads(lead_ids: list[str]) -> dict[str, list[str]]:
                 f"SELECT lead_id, tag FROM lead_tags WHERE lead_id IN ({ph}) ORDER BY created_at", chunk
             ):
                 result[r["lead_id"]].append(r["tag"])
+    return result
+
+
+def get_custom_field_values_for_leads(lead_ids: list[str]) -> dict[str, dict[str, str]]:
+    result: dict[str, dict[str, str]] = {lid: {} for lid in lead_ids}
+    if not lead_ids:
+        return result
+    with get_connection() as conn:
+        for chunk in _id_chunks(lead_ids):
+            ph = ", ".join("?" for _ in chunk)
+            for r in conn.execute(
+                f"SELECT lead_id, field_id, value FROM lead_custom_field_values WHERE lead_id IN ({ph})", chunk
+            ):
+                result[r["lead_id"]][r["field_id"]] = r["value"]
     return result
 
 

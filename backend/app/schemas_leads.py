@@ -71,6 +71,7 @@ class LeadOut(BaseModel):
     phones: list[PhoneOut]
     emails: list[EmailOut]
     tags: list[str] = []
+    custom_fields: dict[str, str] = {}
     intelligence: Optional[LeadIntelligenceOut]
 
 

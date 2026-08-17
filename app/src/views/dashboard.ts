@@ -23,6 +23,7 @@ import {
   listSavedViews,
   lookupCompanyPhone,
   scrapeLeadEmail,
+  setLeadCustomFieldValue,
   updateLead,
   updateLeadEmail,
   updateLeadPhone,
@@ -50,6 +51,7 @@ import {
   subscribeIndustryFilter,
 } from "../components/industryFilter";
 import { confirmDialog, openOverlay } from "../components/modal";
+import { refreshCustomFields } from "../customFields";
 import {
   initSidePanel,
   openSidePanel,
@@ -259,6 +261,10 @@ export function initDashboard(): void {
     },
     onDeleteTag: async (id, tag) => {
       await deleteLeadTag(id, tag);
+      await refreshLeads();
+    },
+    onSetCustomFieldValue: async (id, fieldId, value) => {
+      await setLeadCustomFieldValue(id, fieldId, value);
       await refreshLeads();
     },
     onScrapeEmail: async (id) => {
@@ -682,7 +688,7 @@ export function initDashboard(): void {
     if (!getCurrentUser()) return;
     void (async () => {
       try {
-        await Promise.all([refreshLeads(), refreshTeamMembers()]);
+        await Promise.all([refreshLeads(), refreshTeamMembers(), refreshCustomFields()]);
       } catch (err) {
         showToast(`Could not load leads: ${err}`);
       }

@@ -13,6 +13,7 @@ import {
   generateLeadIntelligence,
   listPendingEmailDrafts,
   scrapeLeadEmail,
+  setLeadCustomFieldValue,
   updateLead,
   updateLeadEmail,
   updateLeadPhone,
@@ -263,6 +264,10 @@ export function initActionCentre(): void {
     },
     onDeleteTag: async (id, tag) => {
       await deleteLeadTag(id, tag);
+      await refreshLeads();
+    },
+    onSetCustomFieldValue: async (id, fieldId, value) => {
+      await setLeadCustomFieldValue(id, fieldId, value);
       await refreshLeads();
     },
     onScrapeEmail: async (id) => {

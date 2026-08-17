@@ -1,6 +1,7 @@
 import type { EmailEntry, Lead, LeadIntelligence, LeadIntelligenceVersion, PhoneEntry, UserInfo } from "../api";
 import { EMAIL_PATTERN, getLeadIntelligenceHistory, PHONE_PATTERN, setLeadFollowUp } from "../api";
 import { copyToClipboard } from "../contact";
+import { getCustomFields, subscribeCustomFields } from "../customFields";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { openTab } from "../tabs";
 import { escapeHtml } from "../utils";
@@ -24,6 +25,7 @@ let onUpdateEmail: ((id: string, emailId: string, email: string) => Promise<void
 let onDeleteEmail: ((id: string, emailId: string) => Promise<void>) | null = null;
 let onAddTag: ((id: string, tag: string) => Promise<void>) | null = null;
 let onDeleteTag: ((id: string, tag: string) => Promise<void>) | null = null;
+let onSetCustomFieldValue: ((id: string, fieldId: string, value: string) => Promise<void>) | null = null;
 let onSaveNotes: ((id: string, notes: string) => Promise<void>) | null = null;
 let onSaveDetails:
   | ((id: string, contactName: string, contactTitle: string, website: string, linkedin: string) => Promise<void>)
@@ -106,6 +108,7 @@ function render(): void {
 
   renderAssignment(lead);
   renderTags(lead);
+  renderCustomFields(lead);
   renderPhones(lead);
   renderEmails(lead);
   renderFollowUp(lead);
@@ -376,6 +379,37 @@ function renderTags(lead: Lead): void {
   });
 }
 
+function customFieldInputType(fieldType: string): string {
+  return fieldType === "number" ? "number" : fieldType === "date" ? "date" : "text";
+}
+
+function renderCustomFields(lead: Lead): void {
+  const el = document.querySelector("#custom-fields-section")!;
+  const definitions = getCustomFields();
+  if (definitions.length === 0) {
+    el.innerHTML = '<p class="empty-hint">No custom fields yet — an admin can add some in Settings.</p>';
+    return;
+  }
+  el.innerHTML = definitions
+    .map(
+      (f) => `
+      <label class="custom-field-row">
+        <span class="custom-field-label">${escapeHtml(f.name)}</span>
+        <input type="${customFieldInputType(f.field_type)}" class="search-input custom-field-input"
+          data-field-id="${f.id}" value="${escapeHtml(lead.custom_fields[f.id] ?? "")}" />
+      </label>`
+    )
+    .join("");
+  el.querySelectorAll<HTMLInputElement>(".custom-field-input").forEach((input) => {
+    input.addEventListener("blur", async () => {
+      if (!currentLead || !onSetCustomFieldValue) return;
+      const fieldId = input.dataset.fieldId!;
+      if (input.value === (currentLead.custom_fields[fieldId] ?? "")) return;
+      await onSetCustomFieldValue(currentLead.id, fieldId, input.value);
+    });
+  });
+}
+
 function renderPhones(lead: Lead): void {
   const el = document.querySelector("#phones-section")!;
   if (lead.phones.length === 0) {
@@ -549,6 +583,10 @@ function emailRowHtml(e: EmailEntry): string {
   `;
 }
 
+subscribeCustomFields(() => {
+  if (currentLead) render();
+});
+
 export function openSidePanel(lead: Lead): void {
   currentLead = lead;
   editingPhoneId = null;
@@ -594,6 +632,7 @@ export interface SidePanelCallbacks {
   onDeleteEmail: (id: string, emailId: string) => Promise<void>;
   onAddTag: (id: string, tag: string) => Promise<void>;
   onDeleteTag: (id: string, tag: string) => Promise<void>;
+  onSetCustomFieldValue: (id: string, fieldId: string, value: string) => Promise<void>;
   /** Independent AI scraper — separate action from phone lookup, never automatic. */
   onScrapeEmail: (id: string) => Promise<void>;
   /** Manual trigger only — also used for "Refresh" (same backend action). Never automatic. */
@@ -615,6 +654,7 @@ export function setSidePanelCallbacks(callbacks: SidePanelCallbacks): void {
   onDeleteEmail = callbacks.onDeleteEmail;
   onAddTag = callbacks.onAddTag;
   onDeleteTag = callbacks.onDeleteTag;
+  onSetCustomFieldValue = callbacks.onSetCustomFieldValue;
   onSaveNotes = callbacks.onSaveNotes;
   onSaveDetails = callbacks.onSaveDetails;
   onScrapeEmail = callbacks.onScrapeEmail;

@@ -27,6 +27,7 @@ import {
   scoreLeadList,
   scrapeLeadEmail,
   sendEmailDraft,
+  setLeadCustomFieldValue,
   setLeadShared,
   toggleListLeadCalled,
   updateEmailDraft,
@@ -1102,6 +1103,7 @@ export function initColdCallLists(): void {
     onDeleteEmail: async (id, emailId) => { await deleteLeadEmail(id, emailId); await refreshCurrentList(); },
     onAddTag: async (id, tag) => { await addLeadTag(id, tag); await refreshCurrentList(); },
     onDeleteTag: async (id, tag) => { await deleteLeadTag(id, tag); await refreshCurrentList(); },
+    onSetCustomFieldValue: async (id, fieldId, value) => { await setLeadCustomFieldValue(id, fieldId, value); await refreshCurrentList(); },
     onScrapeEmail: async (id) => { await scrapeLeadEmail(id); await refreshCurrentList(); },
     onGenerateIntelligence: async (id) => { await generateLeadIntelligence(id); await refreshCurrentList(); },
   };

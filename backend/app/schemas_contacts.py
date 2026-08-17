@@ -65,3 +65,14 @@ class AddTagRequest(BaseModel):
         if len(value) > 40:
             raise ValueError("Tag is too long (max 40 characters)")
         return value
+
+
+class SetCustomFieldValueRequest(BaseModel):
+    value: str
+
+    @field_validator("value")
+    @classmethod
+    def validate_value(cls, value: str) -> str:
+        if len(value) > 500:
+            raise ValueError("Value is too long (max 500 characters)")
+        return value

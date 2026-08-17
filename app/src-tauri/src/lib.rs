@@ -331,6 +331,40 @@ async fn delete_lead_tag(app_handle: tauri::AppHandle, lead_id: String, tag: Str
     backend_client::delete_tag(&base_url, &session.token, &lead_id, &tag).await
 }
 
+// --- Custom fields (admin-defined schema, per-lead values) ---
+
+#[tauri::command]
+async fn list_custom_fields(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::CustomField>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_custom_fields(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn create_custom_field(
+    app_handle: tauri::AppHandle, name: String, field_type: String,
+) -> Result<backend_client::CustomField, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_custom_field(&base_url, &session.token, &name, &field_type).await
+}
+
+#[tauri::command]
+async fn delete_custom_field(app_handle: tauri::AppHandle, field_id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_custom_field(&base_url, &session.token, &field_id).await
+}
+
+#[tauri::command]
+async fn set_lead_custom_field_value(
+    app_handle: tauri::AppHandle, lead_id: String, field_id: String, value: String,
+) -> Result<LeadRecord, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::set_lead_custom_field_value(&base_url, &session.token, &lead_id, &field_id, &value).await
+}
+
 /// Independent AI email scraper — manual trigger only, never runs as a side
 /// effect of the phone-lookup flow above.
 #[tauri::command]
@@ -1385,6 +1419,10 @@ pub fn run() {
       delete_lead_email,
       add_lead_tag,
       delete_lead_tag,
+      list_custom_fields,
+      create_custom_field,
+      delete_custom_field,
+      set_lead_custom_field_value,
       scrape_lead_email,
       verify_lead_emails,
       generate_lead_intelligence,

@@ -22,6 +22,7 @@ from app.routers import (
     call_logs,
     ch_feed,
     credit_settings,
+    custom_fields,
     email_oauth,
     email_templates,
     email_writer,
@@ -90,6 +91,7 @@ app.include_router(credit_settings.router)
 app.include_router(audit.router)
 app.include_router(roles.router)
 app.include_router(saved_views.router)
+app.include_router(custom_fields.router)
 
 
 async def _sequence_scheduler_loop() -> None:

@@ -81,6 +81,7 @@ export interface Lead {
   phones: PhoneEntry[];
   emails: EmailEntry[];
   tags: string[];
+  custom_fields: Record<string, string>;
   intelligence: LeadIntelligence | null;
 }
 
@@ -387,6 +388,33 @@ export async function addLeadTag(leadId: string, tag: string): Promise<Lead> {
 
 export async function deleteLeadTag(leadId: string, tag: string): Promise<Lead> {
   return invoke<Lead>("delete_lead_tag", { leadId, tag });
+}
+
+// --- Custom fields (admin-defined schema, per-lead values) ---
+
+export type CustomFieldType = "text" | "number" | "date";
+
+export interface CustomField {
+  id: string;
+  name: string;
+  field_type: CustomFieldType;
+  created_at: string;
+}
+
+export async function listCustomFields(): Promise<CustomField[]> {
+  return invoke<CustomField[]>("list_custom_fields");
+}
+
+export async function createCustomField(name: string, fieldType: CustomFieldType): Promise<CustomField> {
+  return invoke<CustomField>("create_custom_field", { name, fieldType });
+}
+
+export async function deleteCustomField(fieldId: string): Promise<void> {
+  await invoke("delete_custom_field", { fieldId });
+}
+
+export async function setLeadCustomFieldValue(leadId: string, fieldId: string, value: string): Promise<Lead> {
+  return invoke<Lead>("set_lead_custom_field_value", { leadId, fieldId, value });
 }
 
 /** Independent AI email scraper — manual trigger only, never runs automatically. */

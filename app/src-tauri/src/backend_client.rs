@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use serde::{Deserialize, Serialize};
 
 /// Compiled-in default backend URL. Not a secret — safe to compile into the
@@ -139,6 +141,8 @@ pub struct LeadRecord {
     pub emails: Vec<EmailRecord>,
     #[serde(default)]
     pub tags: Vec<String>,
+    #[serde(default)]
+    pub custom_fields: HashMap<String, String>,
     pub intelligence: Option<LeadIntelligence>,
 }
 
@@ -353,6 +357,86 @@ pub async fn delete_tag(base_url: &str, token: &str, lead_id: &str, tag: &str) -
     let response = client
         .delete(&url)
         .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+// --- Custom fields (admin-defined schema, per-lead values) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CustomField {
+    pub id: String,
+    pub name: String,
+    pub field_type: String,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct CustomFieldsResponse {
+    fields: Vec<CustomField>,
+}
+
+pub async fn list_custom_fields(base_url: &str, token: &str) -> Result<Vec<CustomField>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/custom-fields", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: CustomFieldsResponse = handle_response(response).await?;
+    Ok(parsed.fields)
+}
+
+#[derive(Serialize)]
+struct CreateCustomFieldRequest<'a> {
+    name: &'a str,
+    field_type: &'a str,
+}
+
+pub async fn create_custom_field(base_url: &str, token: &str, name: &str, field_type: &str) -> Result<CustomField, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/custom-fields", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateCustomFieldRequest { name, field_type })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn delete_custom_field(base_url: &str, token: &str, field_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/custom-fields/{}", base_url, field_id);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct SetCustomFieldValueRequest<'a> {
+    value: &'a str,
+}
+
+pub async fn set_lead_custom_field_value(
+    base_url: &str, token: &str, lead_id: &str, field_id: &str, value: &str,
+) -> Result<LeadRecord, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/custom-fields/{}", base_url, lead_id, field_id);
+    let response = client
+        .put(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&SetCustomFieldValueRequest { value })
         .send()
         .await
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;

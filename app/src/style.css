@@ -3653,6 +3653,19 @@ button.p-filter-chip.active {
   opacity: 1;
 }
 
+.custom-field-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  margin-bottom: var(--space-2);
+}
+
+.custom-field-label {
+  font-size: var(--text-xs);
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+}
+
 /* Status filter group */
 .ccl-status-filter { display: flex; gap: var(--space-1); }
 

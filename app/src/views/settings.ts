@@ -3,13 +3,16 @@ import {
   type BrandVoice,
   type CreditLimits,
   type CreditUsage,
+  type CustomFieldType,
   checkBackendHealth,
   type PermissionCatalogue,
   type Role,
   adminSetUserPassword,
   assignUserRole,
+  createCustomField,
   createRole,
   createTeamMember,
+  deleteCustomField,
   deleteRole,
   deleteTeamMember,
   getAuditLog,
@@ -30,6 +33,7 @@ import {
 import { getCurrentUser, hasPermission, isAdmin, logout, subscribeAuth, updateLocalUser } from "../auth";
 import { renderAvatarHtml } from "../avatar";
 import { CONTACT_STATUS_ORDER } from "../constants";
+import { getCustomFields, refreshCustomFields, subscribeCustomFields } from "../customFields";
 import { getCompactRows, getDefaultContactStatus, setCompactRows, setDefaultContactStatus } from "../preferences";
 import { refreshLeads } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
@@ -88,6 +92,22 @@ export function initSettings(): void {
         <button id="new-role-btn" class="btn btn-secondary btn-sm">+ New role</button>
         <div id="role-editor" class="role-editor hidden"></div>
         <span id="roles-status" class="status-message"></span>
+      </section>
+
+      <section class="card hidden" id="custom-fields-card">
+        <h2 class="card-title">Custom Fields</h2>
+        <p class="card-subtitle">Fields every rep can fill in on a lead — e.g. Deal Size, Renewal Date. Visible to everyone; only admins can add or remove them.</p>
+        <ul id="custom-fields-list" class="history-list"></ul>
+        <div class="card-actions">
+          <input id="new-custom-field-name" type="text" class="search-input" placeholder="Field name" maxlength="60" />
+          <select id="new-custom-field-type" class="inline-edit">
+            <option value="text">Text</option>
+            <option value="number">Number</option>
+            <option value="date">Date</option>
+          </select>
+          <button id="add-custom-field-btn" class="btn btn-secondary btn-sm">+ Add field</button>
+        </div>
+        <span id="custom-fields-status" class="status-message"></span>
       </section>
 
       <section class="card hidden" id="audit-card">
@@ -436,6 +456,62 @@ export function initSettings(): void {
   container.querySelector<HTMLButtonElement>("#audit-refresh-btn")!.addEventListener("click", () => void renderAudit());
   subscribeAuth(renderAudit);
   void renderAudit();
+
+  // --- Custom fields (everyone can see the list; only admins add/remove) ---
+  const customFieldsCard = container.querySelector<HTMLElement>("#custom-fields-card")!;
+  const customFieldsList = container.querySelector<HTMLUListElement>("#custom-fields-list")!;
+  const customFieldsStatus = container.querySelector<HTMLSpanElement>("#custom-fields-status")!;
+  const newFieldNameInput = container.querySelector<HTMLInputElement>("#new-custom-field-name")!;
+  const newFieldTypeSelect = container.querySelector<HTMLSelectElement>("#new-custom-field-type")!;
+
+  function renderCustomFieldsList(): void {
+    customFieldsCard.classList.toggle("hidden", !isAdmin());
+    const fields = getCustomFields();
+    customFieldsList.innerHTML =
+      fields.length === 0
+        ? '<li class="empty-hint">No custom fields yet</li>'
+        : fields
+            .map(
+              (f) => `
+        <li class="history-list-row">
+          <span>${escapeHtml(f.name)} <span class="view-shared-badge">${escapeHtml(f.field_type)}</span></span>
+          <button class="btn btn-ghost btn-sm custom-field-delete-btn" data-id="${f.id}">Delete</button>
+        </li>`
+            )
+            .join("");
+    customFieldsList.querySelectorAll<HTMLButtonElement>(".custom-field-delete-btn").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const field = fields.find((f) => f.id === btn.dataset.id);
+        if (!field) return;
+        if (!window.confirm(`Delete the "${field.name}" field? Its saved values on every lead will be lost.`)) return;
+        try {
+          await deleteCustomField(field.id);
+          await refreshCustomFields();
+        } catch (err) {
+          customFieldsStatus.textContent = `Failed: ${err}`;
+        }
+      });
+    });
+  }
+  subscribeAuth(renderCustomFieldsList);
+  subscribeCustomFields(renderCustomFieldsList);
+  void refreshCustomFields();
+
+  container.querySelector("#add-custom-field-btn")!.addEventListener("click", async () => {
+    const name = newFieldNameInput.value.trim();
+    if (!name) {
+      customFieldsStatus.textContent = "Give the field a name.";
+      return;
+    }
+    customFieldsStatus.textContent = "";
+    try {
+      await createCustomField(name, newFieldTypeSelect.value as CustomFieldType);
+      newFieldNameInput.value = "";
+      await refreshCustomFields();
+    } catch (err) {
+      customFieldsStatus.textContent = `Failed: ${err}`;
+    }
+  });
 
   document.querySelector("#add-member-btn")!.addEventListener("click", async () => {
     const nameInput = document.querySelector<HTMLInputElement>("#new-member-name")!;

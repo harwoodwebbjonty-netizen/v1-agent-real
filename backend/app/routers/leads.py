@@ -19,6 +19,7 @@ from app.schemas_contacts import (
     AddTagRequest,
     EmailOut,
     PhoneOut,
+    SetCustomFieldValueRequest,
     UpdateEmailRequest,
     UpdatePhoneRequest,
 )
@@ -100,6 +101,7 @@ class LeadBatch:
         self.phones = db.get_phones_for_leads(ids)
         self.emails = db.get_emails_for_leads(ids)
         self.tags = db.get_tags_for_leads(ids)
+        self.custom_fields = db.get_custom_field_values_for_leads(ids)
         self.intel_latest = db.get_latest_intelligence_for_leads(ids)
         self.intel_meta = db.get_intelligence_meta_for_leads(ids)
 
@@ -160,11 +162,13 @@ def _to_lead_out(
         phone_rows = batch.phones.get(lead_id, [])
         email_rows = batch.emails.get(lead_id, [])
         tags = batch.tags.get(lead_id, [])
+        custom_fields = batch.custom_fields.get(lead_id, {})
     else:
         intelligence = _to_intelligence_out(lead_id, db.get_latest_lead_intelligence(lead_id))
         phone_rows = db.list_phones(lead_id)
         email_rows = db.list_emails(lead_id)
         tags = db.list_tags(lead_id)
+        custom_fields = db.get_custom_field_values(lead_id)
     next_best_action = compute_next_best_action(
         status=row["status"],
         contact_status=row["contact_status"],
@@ -216,6 +220,7 @@ def _to_lead_out(
             for e in email_rows
         ],
         tags=list(tags),
+        custom_fields=dict(custom_fields),
         intelligence=intelligence,
     )
 
@@ -521,6 +526,23 @@ def delete_tag(lead_id: str, tag: str, current_user: CurrentUser = Depends(get_c
         raise HTTPException(status_code=404, detail="Lead not found")
     _require_lead_access(lead, current_user)
     db.delete_tag(lead_id, tag)
+    return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
+
+
+# --- Custom field values (field definitions themselves are managed in Settings, see custom_fields.py) ---
+
+@router.put("/{lead_id}/custom-fields/{field_id}", response_model=LeadOut)
+def set_custom_field_value(
+    lead_id: str, field_id: str, body: SetCustomFieldValueRequest,
+    current_user: CurrentUser = Depends(get_current_user), activity: ActivityContext = Depends(get_activity_context),
+) -> LeadOut:
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+    if db.get_custom_field_definition(field_id) is None:
+        raise HTTPException(status_code=404, detail="Custom field not found")
+    db.set_custom_field_value(id=new_id(), lead_id=lead_id, field_id=field_id, value=body.value)
     return _to_lead_out(db.get_lead(lead_id), _user_name_map(), activity)
 
 
