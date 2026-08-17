@@ -12,7 +12,7 @@ from app import db
 from app.core.config import get_settings
 from app.core.import_safety import enforce_import_row_cap, sanitize_cell
 from app.dependencies import CurrentUser, get_current_user, require_permission
-from app.services.auth_service import days_since, new_id, now_iso
+from app.services.auth_service import new_id, now_iso
 from app.services.companies_house_service import (
     CHRateLimitError,
     build_ch_data_json,
@@ -174,8 +174,13 @@ async def _generate_campaign(
                     # data already stored on the lead to avoid a redundant call.
                     ch_context = _format_ch_data(lead) or await _fetch_ch_data_for_company(lead["company"])
 
+                    # Once a lead has ever been enriched, reuse that research
+                    # indefinitely rather than re-scraping on a TTL — the
+                    # personalisation data (and the Apify LinkedIn scrape behind
+                    # it) is treated as durable per-lead history, not a cache
+                    # that expires.
                     intel = db.get_latest_lead_intelligence(lead_id)
-                    if not intel or days_since(intel["created_at"]) > 30:
+                    if not intel:
                         try:
                             linkedin_posts = await get_or_fetch_linkedin_posts(
                                 lead, user_id, max_posts=WIN_BACK_MAX_LINKEDIN_POSTS, charge=False,
@@ -343,10 +348,10 @@ def _clean_prior_body(body: str) -> str:
 
 
 def _format_prior_emails(lead_id: str, exclude_campaign_id: Optional[str]) -> str:
-    """Formats up to three earlier win-back emails for this lead into a compact
-    'already sent' brief the writer uses to avoid repeating itself. Empty string
-    when the lead has no prior emails."""
-    rows = db.get_prior_win_back_emails_for_lead(lead_id, exclude_campaign_id, limit=3)
+    """Formats every earlier win-back email for this lead into a compact
+    'already sent' brief the writer uses to build on what's already been said
+    and avoid repeating itself. Empty string when the lead has no prior emails."""
+    rows = db.get_prior_win_back_emails_for_lead(lead_id, exclude_campaign_id)
     if not rows:
         return ""
     blocks = []

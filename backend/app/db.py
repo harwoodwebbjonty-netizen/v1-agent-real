@@ -2502,11 +2502,11 @@ def count_win_back_emails(campaign_id: str) -> int:
 
 
 def get_prior_win_back_emails_for_lead(
-    lead_id: str, exclude_campaign_id: Optional[str] = None, limit: int = 3
+    lead_id: str, exclude_campaign_id: Optional[str] = None, limit: Optional[int] = None
 ) -> list[sqlite3.Row]:
-    """Win-back emails already generated for this lead in OTHER campaigns, most
-    recent first. Feeds the next campaign's writer the earlier emails so it does
-    not repeat the same subject, opening or hook.
+    """Every win-back email already generated for this lead in OTHER campaigns,
+    most recent first. Feeds the next campaign's writer the full history so it
+    builds on everything already sent rather than just the last few emails.
 
     Deliberately NOT gated on send_status = 'sent': the Mailchimp export path (a
     primary way campaigns go out) never marks its emails 'sent', so filtering on
@@ -2514,7 +2514,10 @@ def get_prior_win_back_emails_for_lead(
     earlier campaign is, in practice, one the contact received — and even for a
     draft that was never sent, steering the new email to a fresh angle costs
     nothing. The current campaign is excluded so a lead's own in-progress email
-    is never fed back to itself."""
+    is never fed back to itself.
+
+    `limit=None` (the default) returns every prior email. SQLite treats a
+    negative LIMIT as "no limit", so that's how an absent limit is expressed."""
     with get_connection() as conn:
         return conn.execute(
             """SELECT campaign_id, subject, body, send_status, sent_at, created_at
@@ -2523,7 +2526,7 @@ def get_prior_win_back_emails_for_lead(
                  AND (? IS NULL OR campaign_id != ?)
                ORDER BY COALESCE(sent_at, created_at) DESC, id DESC
                LIMIT ?""",
-            (lead_id, exclude_campaign_id, exclude_campaign_id, limit),
+            (lead_id, exclude_campaign_id, exclude_campaign_id, limit if limit is not None else -1),
         ).fetchall()
 
 
