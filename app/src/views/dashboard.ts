@@ -1,6 +1,7 @@
 import { open, save } from "@tauri-apps/plugin-dialog";
 import {
   type Lead,
+  type SavedView,
   addLeadEmail,
   addLeadPhone,
   addLeadTag,
@@ -9,14 +10,17 @@ import {
   chEnrichAuto,
   chEnrichStatus,
   chEnrichStop,
+  createSavedView,
   dedupLeads,
   deleteLeadEmail,
   deleteLeadPhone,
   deleteLeadTag,
+  deleteSavedView,
   exportLogCsv,
   generateLeadIntelligence,
   getBatchActivitySummaries,
   importLeadsToDashboard,
+  listSavedViews,
   lookupCompanyPhone,
   scrapeLeadEmail,
   updateLead,
@@ -41,8 +45,11 @@ import {
   getSelectedIndustries,
   initFiltersToggle,
   renderIndustrySidebar,
+  setChargesFilter,
+  setIndustryFilter,
   subscribeIndustryFilter,
 } from "../components/industryFilter";
+import { confirmDialog, openOverlay } from "../components/modal";
 import {
   initSidePanel,
   openSidePanel,
@@ -58,6 +65,7 @@ import { getLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
 import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
 import { showToast } from "../toast";
+import { escapeHtml } from "../utils";
 
 export function initDashboard(): void {
   const companiesInput = document.querySelector<HTMLTextAreaElement>("#companies")!;
@@ -78,6 +86,8 @@ export function initDashboard(): void {
   const statUnverified = document.querySelector<HTMLSpanElement>("#stat-unverified")!;
   const statNotFound = document.querySelector<HTMLSpanElement>("#stat-not_found")!;
   const industrySidebar = document.querySelector<HTMLElement>("#industry-sidebar")!;
+  const viewsToggleBtn = document.querySelector<HTMLButtonElement>("#views-toggle-btn")!;
+  const viewsPopover = document.querySelector<HTMLElement>("#views-popover")!;
   const sortableHeaders = document.querySelectorAll<HTMLTableCellElement>("#results-table th[data-sort]");
   const statCards = document.querySelectorAll<HTMLDivElement>(".stats-grid .stat-card[data-status-filter]");
 
@@ -89,6 +99,7 @@ export function initDashboard(): void {
   let contactStatusMinRank: number | null = null;
   let dashPhoneFilter: "all" | "has-phone" | "no-phone" = "all";
   let dashEnrichFilter: "all" | "has-charges" | "enriched" | "not-enriched" = "all";
+  let savedViews: SavedView[] = [];
 
   // Animates a stat card's number from its current displayed value to the
   // new one — purely cosmetic, runs once per data refresh, cheap (a single
@@ -259,6 +270,187 @@ export function initDashboard(): void {
       await refreshLeads();
     },
   };
+
+  // --- Saved/shared filter views: capture every filter dimension the
+  // toolbar exposes into one JSON blob the backend stores opaquely, so a
+  // new filter only ever needs a frontend change (add a field here), never
+  // a migration, to become saveable. ---
+  interface DashboardFilterState {
+    search: string;
+    statusFilter: Lead["status"] | null;
+    contactStatusMinRank: number | null;
+    phoneFilter: "all" | "has-phone" | "no-phone";
+    enrichFilter: "all" | "has-charges" | "enriched" | "not-enriched";
+    industries: string[];
+    hasCharges: boolean;
+    chargeTypes: string[];
+    sortColumn: SortColumn;
+    sortDirection: SortDirection;
+  }
+
+  function captureCurrentFilters(): DashboardFilterState {
+    return {
+      search: searchText,
+      statusFilter,
+      contactStatusMinRank,
+      phoneFilter: dashPhoneFilter,
+      enrichFilter: dashEnrichFilter,
+      industries: Array.from(getSelectedIndustries()),
+      hasCharges: getHasChargesFilter(),
+      chargeTypes: Array.from(getSelectedChargeTypes()),
+      sortColumn,
+      sortDirection,
+    };
+  }
+
+  function applySavedFilters(raw: Record<string, unknown>): void {
+    const f = raw as Partial<DashboardFilterState>;
+    searchText = typeof f.search === "string" ? f.search : "";
+    searchInput.value = searchText;
+    statusFilter = f.statusFilter ?? null;
+    contactStatusMinRank = typeof f.contactStatusMinRank === "number" ? f.contactStatusMinRank : null;
+    dashPhoneFilter = f.phoneFilter ?? "all";
+    dashEnrichFilter = f.enrichFilter ?? "all";
+    sortColumn = f.sortColumn ?? null;
+    sortDirection = f.sortDirection ?? "asc";
+
+    dashPhoneBtns.forEach((b) => b.classList.toggle("active", b.dataset.phone === dashPhoneFilter));
+    dashEnrichBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === dashEnrichFilter));
+    statCards.forEach((card) => {
+      const cardValue = (card.dataset.statusFilter || null) as Lead["status"] | null;
+      card.classList.toggle("stat-card-active", cardValue === statusFilter);
+    });
+
+    // These two call notify() internally, which re-renders via subscribeIndustryFilter.
+    setIndustryFilter(Array.isArray(f.industries) ? f.industries : []);
+    setChargesFilter(!!f.hasCharges, Array.isArray(f.chargeTypes) ? f.chargeTypes : []);
+    renderTable();
+  }
+
+  function renderViewsPopover(): void {
+    const currentUser = getCurrentUser();
+    viewsPopover.innerHTML = `
+      <div class="sidebar-section">
+        <div class="sidebar-section-header"><span>Saved Views</span></div>
+        <button id="save-view-btn" class="btn btn-secondary btn-sm">Save current as...</button>
+        ${
+          savedViews.length === 0
+            ? '<p class="empty-hint" style="margin-top:6px">No saved views yet</p>'
+            : savedViews
+                .map(
+                  (v) => `
+          <div class="saved-view-row">
+            <button class="saved-view-apply" data-view-id="${v.id}">${escapeHtml(v.name)}${
+                    v.is_shared ? ' <span class="view-shared-badge">Shared</span>' : ""
+                  }</button>
+            ${
+              currentUser && (v.owner_user_id === currentUser.id || currentUser.role === "admin")
+                ? `<button class="saved-view-delete" data-view-id="${v.id}" title="Delete">✕</button>`
+                : ""
+            }
+          </div>`
+                )
+                .join("")
+        }
+      </div>
+    `;
+
+    viewsPopover.querySelectorAll<HTMLButtonElement>(".saved-view-apply").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const view = savedViews.find((v) => v.id === btn.dataset.viewId);
+        if (view) applySavedFilters(view.filters);
+        viewsPopover.classList.add("hidden");
+      });
+    });
+
+    viewsPopover.querySelectorAll<HTMLButtonElement>(".saved-view-delete").forEach((btn) => {
+      btn.addEventListener("click", async (e) => {
+        e.stopPropagation();
+        const view = savedViews.find((v) => v.id === btn.dataset.viewId);
+        if (!view) return;
+        const action = await confirmDialog({
+          title: "Delete saved view?",
+          descriptionHtml: `"${escapeHtml(view.name)}" will be removed${
+            view.is_shared ? " for everyone on the team" : ""
+          }. This can't be undone.`,
+          actions: [
+            { id: "cancel", label: "Cancel", variant: "secondary" },
+            { id: "delete", label: "Delete", variant: "primary" },
+          ],
+        });
+        if (action !== "delete") return;
+        await deleteSavedView(view.id);
+        await refreshSavedViews();
+      });
+    });
+
+    viewsPopover.querySelector("#save-view-btn")?.addEventListener("click", (e) => {
+      e.stopPropagation();
+      openSaveViewModal();
+    });
+  }
+
+  async function refreshSavedViews(): Promise<void> {
+    try {
+      savedViews = await listSavedViews();
+    } catch {
+      savedViews = [];
+    }
+    renderViewsPopover();
+  }
+
+  function openSaveViewModal(): void {
+    const { overlay, close } = openOverlay(
+      `<div class="conflict-modal">
+        <div class="conflict-modal-title">Save current filters as a view</div>
+        <input id="sv-name-input" type="text" class="search-input" placeholder="View name" maxlength="60" style="width:100%;margin-bottom:8px" />
+        <label class="checkbox-row" style="margin-bottom:8px">
+          <input type="checkbox" id="sv-shared-cb" />
+          Share with the whole team
+        </label>
+        <p id="sv-error" style="color:var(--danger);font-size:0.82rem;min-height:1.2em;margin-bottom:4px"></p>
+        <div class="conflict-modal-actions">
+          <button id="sv-save-btn" class="btn btn-primary">Save</button>
+          <button id="sv-cancel-btn" class="btn btn-ghost">Cancel</button>
+        </div>
+      </div>`,
+      { onEscape: () => close() }
+    );
+
+    const nameInput = overlay.querySelector<HTMLInputElement>("#sv-name-input")!;
+    const sharedCb = overlay.querySelector<HTMLInputElement>("#sv-shared-cb")!;
+    const errorEl = overlay.querySelector<HTMLParagraphElement>("#sv-error")!;
+    setTimeout(() => nameInput.focus(), 40);
+
+    overlay.querySelector("#sv-cancel-btn")!.addEventListener("click", close);
+
+    overlay.querySelector("#sv-save-btn")!.addEventListener("click", async () => {
+      const name = nameInput.value.trim();
+      if (!name) {
+        errorEl.textContent = "Give this view a name.";
+        return;
+      }
+      try {
+        await createSavedView(name, sharedCb.checked, { ...captureCurrentFilters() });
+        close();
+        await refreshSavedViews();
+        showToast("View saved.");
+      } catch (err) {
+        errorEl.textContent = `Failed: ${err}`;
+      }
+    });
+  }
+
+  viewsToggleBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    viewsPopover.classList.toggle("hidden");
+  });
+  viewsPopover.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => viewsPopover.classList.add("hidden"));
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") viewsPopover.classList.add("hidden");
+  });
+  void refreshSavedViews();
 
   subscribe(renderTable);
   subscribeIndustryFilter(renderTable);

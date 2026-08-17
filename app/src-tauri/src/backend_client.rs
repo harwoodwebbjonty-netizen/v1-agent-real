@@ -1623,6 +1623,76 @@ pub async fn disconnect_email_oauth_account(base_url: &str, token: &str, provide
     Ok(())
 }
 
+// --- Saved/shared filter views (Leads list) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SavedView {
+    pub id: String,
+    pub name: String,
+    pub owner_user_id: String,
+    pub owner_name: Option<String>,
+    pub is_shared: bool,
+    pub filters: serde_json::Value,
+    pub created_at: String,
+}
+
+#[derive(Deserialize)]
+struct SavedViewsResponse {
+    views: Vec<SavedView>,
+}
+
+pub async fn list_saved_views(base_url: &str, token: &str) -> Result<Vec<SavedView>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/saved-views", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let parsed: SavedViewsResponse = handle_response(response).await?;
+    Ok(parsed.views)
+}
+
+#[derive(Serialize)]
+struct CreateSavedViewRequest<'a> {
+    name: &'a str,
+    is_shared: bool,
+    filters: &'a serde_json::Value,
+}
+
+pub async fn create_saved_view(
+    base_url: &str,
+    token: &str,
+    name: &str,
+    is_shared: bool,
+    filters: &serde_json::Value,
+) -> Result<SavedView, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/saved-views", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&CreateSavedViewRequest { name, is_shared, filters })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn delete_saved_view(base_url: &str, token: &str, view_id: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/saved-views/{}", base_url, view_id);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
 #[derive(Serialize)]
 struct SendEmailDraftRequest<'a> {
     provider: &'a str,

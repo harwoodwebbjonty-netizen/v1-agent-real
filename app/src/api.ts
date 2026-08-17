@@ -807,6 +807,34 @@ export async function getLeadTimeline(leadId: string): Promise<TimelineEntry[]> 
   return invoke<TimelineEntry[]>("get_lead_timeline", { leadId });
 }
 
+// --- Saved/shared filter views (Leads list) ---
+
+export interface SavedView {
+  id: string;
+  name: string;
+  owner_user_id: string;
+  owner_name: string | null;
+  is_shared: boolean;
+  filters: Record<string, unknown>;
+  created_at: string;
+}
+
+export async function listSavedViews(): Promise<SavedView[]> {
+  return invoke<SavedView[]>("list_saved_views");
+}
+
+export async function createSavedView(
+  name: string,
+  isShared: boolean,
+  filters: Record<string, unknown>
+): Promise<SavedView> {
+  return invoke<SavedView>("create_saved_view", { name, isShared, filters });
+}
+
+export async function deleteSavedView(viewId: string): Promise<void> {
+  await invoke("delete_saved_view", { viewId });
+}
+
 // --- AI Email Writer: OAuth email accounts (real sending — Gmail/Microsoft) ---
 
 export type EmailProvider = "gmail" | "microsoft";

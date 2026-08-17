@@ -1629,6 +1629,14 @@ a:hover {
   color: var(--danger-deep);
 }
 
+.view-shared-badge {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 .search-input {
   font-family: inherit;
   font-size: var(--text-sm);

@@ -635,6 +635,28 @@ def _migration_034_lead_tags(conn: sqlite3.Connection) -> None:
     )
 
 
+def _migration_035_saved_views(conn: sqlite3.Connection) -> None:
+    """Saved/shared filter views (audit Stage 3 roadmap item). The full
+    filter state (search text, industry/status/charges selections, sort)
+    is stored as one JSON blob rather than individual columns — it mirrors
+    exactly what the frontend's filterLeads()/dashboard filter state already
+    holds, and a new filter field only ever needs a frontend change, not a
+    migration, to become saveable."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS saved_views (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            name TEXT NOT NULL,
+            is_shared INTEGER NOT NULL DEFAULT 0,
+            filters_json TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_saved_views_user_id ON saved_views(user_id);
+        """
+    )
+
+
 def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
     """Five FK-shaped lead_id columns had no explicit index (audit
     schema_index_scan.py) despite being queried on every lead-record render
@@ -840,8 +862,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (32, _migration_032_encrypt_oauth_tokens),
     (33, _migration_033_lead_id_indexes),
     (34, _migration_034_lead_tags),
+    (35, _migration_035_saved_views),
 ]
-CURRENT_SCHEMA_VERSION = 34
+CURRENT_SCHEMA_VERSION = 35
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -1574,6 +1597,34 @@ def add_tag(id: str, lead_id: str, tag: str, created_at: str) -> None:
 def delete_tag(lead_id: str, tag: str) -> None:
     with get_connection() as conn:
         conn.execute("DELETE FROM lead_tags WHERE lead_id = ? AND tag = ?", (lead_id, tag))
+
+
+# --- saved filter views (leads list) ---
+
+def create_saved_view(id: str, user_id: str, name: str, is_shared: bool, filters_json: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO saved_views (id, user_id, name, is_shared, filters_json, created_at) VALUES (?, ?, ?, ?, ?, ?)",
+            (id, user_id, name, 1 if is_shared else 0, filters_json, created_at),
+        )
+
+
+def list_saved_views(user_id: str) -> list[sqlite3.Row]:
+    """Every view the user owns, plus every shared view regardless of owner."""
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM saved_views WHERE user_id = ? OR is_shared = 1 ORDER BY created_at", (user_id,)
+        ).fetchall()
+
+
+def get_saved_view(view_id: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM saved_views WHERE id = ?", (view_id,)).fetchone()
+
+
+def delete_saved_view(view_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM saved_views WHERE id = ?", (view_id,))
 
 
 # --- lead lists (private cold call lists — leads with list_id stay out of the shared feed) ---

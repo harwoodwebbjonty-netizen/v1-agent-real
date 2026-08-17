@@ -1,13 +1,6 @@
 import type { Lead } from "../api";
 import { escapeHtml } from "../utils";
 
-const SAVED_VIEWS_KEY = "savedIndustryViews";
-
-interface SavedView {
-  name: string;
-  industries: string[];
-}
-
 let selected = new Set<string>();
 let hasChargesFilter = false;
 let selectedChargeTypes = new Set<string>();
@@ -31,9 +24,16 @@ export function getSelectedChargeTypes(): Set<string> {
 
 /** External setter — used by Analytics' industry chart click-through to
  * filter the Dashboard down to one industry without duplicating this
- * already-real filter mechanism. */
+ * already-real filter mechanism. Also used when applying a saved view. */
 export function setIndustryFilter(industries: string[]): void {
   selected = new Set(industries);
+  notify();
+}
+
+/** External setter for the charges filter — used when applying a saved view. */
+export function setChargesFilter(hasCharges: boolean, chargeTypes: string[]): void {
+  hasChargesFilter = hasCharges;
+  selectedChargeTypes = new Set(chargeTypes);
   notify();
 }
 
@@ -67,18 +67,6 @@ export function initFiltersToggle(): void {
   });
 }
 
-function loadSavedViews(): SavedView[] {
-  try {
-    return JSON.parse(localStorage.getItem(SAVED_VIEWS_KEY) || "[]");
-  } catch {
-    return [];
-  }
-}
-
-function persistSavedViews(views: SavedView[]): void {
-  localStorage.setItem(SAVED_VIEWS_KEY, JSON.stringify(views));
-}
-
 function toggleIndustry(name: string): void {
   if (selected.has(name)) {
     selected.delete(name);
@@ -90,26 +78,6 @@ function toggleIndustry(name: string): void {
 
 function clearIndustryFilter(): void {
   selected.clear();
-  notify();
-}
-
-function saveCurrentView(name: string): void {
-  const views = loadSavedViews();
-  views.push({ name, industries: Array.from(selected) });
-  persistSavedViews(views);
-  notify();
-}
-
-function applyView(name: string): void {
-  const view = loadSavedViews().find((v) => v.name === name);
-  if (view) {
-    selected = new Set(view.industries);
-    notify();
-  }
-}
-
-function deleteView(name: string): void {
-  persistSavedViews(loadSavedViews().filter((v) => v.name !== name));
   notify();
 }
 
@@ -132,7 +100,6 @@ function extractChargeTypes(leads: Lead[]): string[] {
 export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): void {
   const industries = Array.from(new Set(leads.map((l) => l.industry || "Uncategorized"))).sort();
   const chargeTypes = extractChargeTypes(leads);
-  const views = loadSavedViews();
 
   container.innerHTML = `
     <div class="sidebar-section">
@@ -177,19 +144,6 @@ export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): vo
               .join("")
       }
     </div>
-    <div class="sidebar-section">
-      <div class="sidebar-section-header"><span>Saved Views</span></div>
-      <button id="save-view-btn" class="btn btn-secondary btn-sm">Save current as...</button>
-      ${views
-        .map(
-          (v) => `
-        <div class="saved-view-row">
-          <button class="saved-view-apply" data-view="${escapeHtml(v.name)}">${escapeHtml(v.name)}</button>
-          <button class="saved-view-delete" data-view="${escapeHtml(v.name)}" title="Delete">✕</button>
-        </div>`
-        )
-        .join("")}
-    </div>
   `;
 
   container.querySelector<HTMLInputElement>("#charges-filter-cb")?.addEventListener("change", (e) => {
@@ -221,14 +175,4 @@ export function renderIndustrySidebar(container: HTMLElement, leads: Lead[]): vo
     cb.addEventListener("change", () => toggleIndustry(cb.dataset.industry!));
   });
   container.querySelector("#clear-industry-filter-btn")?.addEventListener("click", clearIndustryFilter);
-  container.querySelector("#save-view-btn")?.addEventListener("click", () => {
-    const name = prompt("Name this filter view:");
-    if (name) saveCurrentView(name);
-  });
-  container.querySelectorAll<HTMLButtonElement>(".saved-view-apply").forEach((btn) => {
-    btn.addEventListener("click", () => applyView(btn.dataset.view!));
-  });
-  container.querySelectorAll<HTMLButtonElement>(".saved-view-delete").forEach((btn) => {
-    btn.addEventListener("click", () => deleteView(btn.dataset.view!));
-  });
 }

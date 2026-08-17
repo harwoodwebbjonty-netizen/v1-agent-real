@@ -29,6 +29,7 @@ from app.routers import (
     leads,
     list_campaigns,
     roles,
+    saved_views,
     sequences,
     users,
     win_back,
@@ -88,6 +89,7 @@ app.include_router(win_back.router)
 app.include_router(credit_settings.router)
 app.include_router(audit.router)
 app.include_router(roles.router)
+app.include_router(saved_views.router)
 
 
 async def _sequence_scheduler_loop() -> None:

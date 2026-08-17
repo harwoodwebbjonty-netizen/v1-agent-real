@@ -863,6 +863,32 @@ async fn disconnect_email_oauth_account(app_handle: tauri::AppHandle, provider: 
 }
 
 #[tauri::command]
+async fn list_saved_views(app_handle: tauri::AppHandle) -> Result<Vec<backend_client::SavedView>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::list_saved_views(&base_url, &session.token).await
+}
+
+#[tauri::command]
+async fn create_saved_view(
+    app_handle: tauri::AppHandle,
+    name: String,
+    is_shared: bool,
+    filters: serde_json::Value,
+) -> Result<backend_client::SavedView, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_saved_view(&base_url, &session.token, &name, is_shared, &filters).await
+}
+
+#[tauri::command]
+async fn delete_saved_view(app_handle: tauri::AppHandle, view_id: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_saved_view(&base_url, &session.token, &view_id).await
+}
+
+#[tauri::command]
 async fn send_email_draft(
     app_handle: tauri::AppHandle,
     draft_id: String,
@@ -1410,6 +1436,9 @@ pub fn run() {
       connect_email_account,
       list_email_oauth_accounts,
       disconnect_email_oauth_account,
+      list_saved_views,
+      create_saved_view,
+      delete_saved_view,
       send_email_draft,
       export_drafts_to_mailchimp,
       list_sequences,
