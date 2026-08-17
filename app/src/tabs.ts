@@ -13,7 +13,8 @@ export type ViewName =
   | "outreach"
   | "win-back"
   | "analytics"
-  | "settings";
+  | "settings"
+  | "connectors";
 
 export interface Tab {
   id: string;

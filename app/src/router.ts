@@ -14,6 +14,7 @@ const ALL_VIEWS: ViewName[] = [
   "outreach",
   "analytics",
   "settings",
+  "connectors",
 ];
 
 /** Shows the active tab's view container, hides the rest, and keeps the

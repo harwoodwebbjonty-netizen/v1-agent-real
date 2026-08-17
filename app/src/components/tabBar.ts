@@ -4,7 +4,9 @@ import { getActiveTabId, openTab, type ViewName } from "../tabs";
 // Each top-level nav section maps to a "view" permission. A section is shown only
 // if the user's role grants it (admin has all). Outreach's inner sub-tabs
 // (email writer, sequences) live under one shared "view_outreach" permission
-// and aren't gated separately.
+// and aren't gated separately. "connectors" is deliberately absent — every
+// signed-in user manages their own connections regardless of role, same as
+// the backend's email-oauth endpoints (no permission dependency at all).
 export const NAV_PERMISSIONS: Partial<Record<ViewName, string>> = {
   "action-centre": "view_today",
   "activity-feed": "view_activity_feed",
@@ -37,6 +39,7 @@ export const NAV_TITLES: Record<ViewName, string> = {
   calendar: "Calendar",
   analytics: "Analytics",
   settings: "Settings",
+  connectors: "Connectors",
 };
 
 export function initTabBar(): void {

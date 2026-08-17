@@ -4,7 +4,6 @@ import {
   type CreditLimits,
   type CreditUsage,
   checkBackendHealth,
-  connectEmailAccount,
   type PermissionCatalogue,
   type Role,
   adminSetUserPassword,
@@ -18,12 +17,10 @@ import {
   getRoles,
   setDefaultRole,
   updateRole,
-  disconnectEmailOAuthAccount,
   exportLogCsv,
   getBackendBaseUrl,
   getBrandVoice,
   getCreditUsage,
-  listEmailOAuthAccounts,
   migrateLocalLeadsToTeam,
   saveCreditLimits,
   setBackendBaseUrl,
@@ -172,17 +169,6 @@ export function initSettings(): void {
         </div>
       </section>
 
-      <section class="card">
-        <h2 class="card-title">Email Accounts</h2>
-        <p class="card-subtitle">Connect a real account so the AI Email Writer can send for real. Consent happens in your browser, never inside this app.</p>
-        <ul id="email-accounts-list" class="history-list"></ul>
-        <div class="card-actions">
-          <button id="connect-gmail-btn" class="btn btn-secondary btn-sm">Connect Gmail</button>
-          <button id="connect-microsoft-btn" class="btn btn-secondary btn-sm">Connect Microsoft</button>
-          <button id="check-email-connection-btn" class="btn btn-ghost btn-sm">Check connection</button>
-        </div>
-        <span id="email-accounts-status" class="status-message"></span>
-      </section>
     </main>
   `;
 
@@ -556,60 +542,6 @@ export function initSettings(): void {
     } catch (err) {
       bvStatus.textContent = `Failed to save: ${err}`;
     }
-  });
-
-  // --- Email accounts (OAuth sending) ---
-  const emailAccountsList = document.querySelector<HTMLUListElement>("#email-accounts-list")!;
-  const emailAccountsStatus = document.querySelector<HTMLSpanElement>("#email-accounts-status")!;
-
-  async function renderEmailAccounts(): Promise<void> {
-    try {
-      const accounts = await listEmailOAuthAccounts();
-      emailAccountsList.innerHTML =
-        accounts.length === 0
-          ? '<li class="empty-hint">No accounts connected yet.</li>'
-          : accounts
-              .map(
-                (a) => `
-              <li class="history-list-row">
-                <span>${escapeHtml(a.provider)} — ${escapeHtml(a.email_address)}</span>
-                <button class="btn btn-ghost btn-sm email-disconnect-btn" data-provider="${a.provider}">Disconnect</button>
-              </li>`
-              )
-              .join("");
-      emailAccountsList.querySelectorAll<HTMLButtonElement>(".email-disconnect-btn").forEach((btn) => {
-        btn.addEventListener("click", async () => {
-          await disconnectEmailOAuthAccount(btn.dataset.provider as "gmail" | "microsoft");
-          await renderEmailAccounts();
-        });
-      });
-    } catch (err) {
-      emailAccountsStatus.textContent = `Failed to load: ${err}`;
-    }
-  }
-  void renderEmailAccounts();
-
-  document.querySelector("#connect-gmail-btn")!.addEventListener("click", async () => {
-    try {
-      await connectEmailAccount("gmail");
-      emailAccountsStatus.textContent = "Continue in your browser, then click \"Check connection\".";
-    } catch (err) {
-      emailAccountsStatus.textContent = `Failed: ${err}`;
-    }
-  });
-
-  document.querySelector("#connect-microsoft-btn")!.addEventListener("click", async () => {
-    try {
-      await connectEmailAccount("microsoft");
-      emailAccountsStatus.textContent = "Continue in your browser, then click \"Check connection\".";
-    } catch (err) {
-      emailAccountsStatus.textContent = `Failed: ${err}`;
-    }
-  });
-
-  document.querySelector("#check-email-connection-btn")!.addEventListener("click", async () => {
-    emailAccountsStatus.textContent = "";
-    await renderEmailAccounts();
   });
 
   // --- Credit limits ---
