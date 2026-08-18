@@ -2852,6 +2852,26 @@ button.p-filter-chip.active {
   margin-top: var(--space-3);
 }
 
+.ew-sent-confirmation {
+  text-align: center;
+  padding: var(--space-4) 0;
+}
+
+.ew-sent-check {
+  width: 48px;
+  height: 48px;
+  line-height: 48px;
+  border-radius: 50%;
+  background: var(--signal-green);
+  color: #fff;
+  font-size: 1.4rem;
+  margin: 0 auto var(--space-3);
+}
+
+.ew-sent-confirmation .ew-preview-content {
+  text-align: left;
+}
+
 /* ============================================================
    Activity Feed — pulse dot column + modal + global feed
    ============================================================ */

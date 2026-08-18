@@ -132,6 +132,7 @@ export function initEmailWriter(): EmailWriterHandle {
           <button id="ew-preview-send-btn" class="btn btn-primary" type="button">Send</button>
           <button id="ew-preview-edit-btn" class="btn btn-secondary" type="button">Edit</button>
           <button id="ew-preview-back-btn" class="btn btn-ghost" type="button">Return to Draft</button>
+          <button id="ew-preview-done-btn" class="btn btn-primary hidden" type="button">Done</button>
         </div>
       </div>
     </div>
@@ -514,6 +515,12 @@ export function initEmailWriter(): EmailWriterHandle {
 
   async function openPreview(session: DraftSession): Promise<void> {
     previewSession = session;
+    const sendBtn = document.querySelector<HTMLButtonElement>("#ew-preview-send-btn")!;
+    sendBtn.classList.remove("hidden");
+    sendBtn.disabled = false;
+    document.querySelector<HTMLButtonElement>("#ew-preview-edit-btn")!.classList.remove("hidden");
+    document.querySelector<HTMLButtonElement>("#ew-preview-back-btn")!.classList.remove("hidden");
+    document.querySelector<HTMLButtonElement>("#ew-preview-done-btn")!.classList.add("hidden");
     const lead = getLeads().find((l) => l.id === session.leadId);
     const to = lead?.emails[0]?.email ?? "";
     const accounts = await listEmailOAuthAccounts().catch(() => []);
@@ -541,6 +548,7 @@ export function initEmailWriter(): EmailWriterHandle {
   document.querySelector("#ew-preview-close-btn")!.addEventListener("click", () => previewOverlay.classList.add("hidden"));
   document.querySelector("#ew-preview-back-btn")!.addEventListener("click", () => previewOverlay.classList.add("hidden"));
   document.querySelector("#ew-preview-edit-btn")!.addEventListener("click", () => previewOverlay.classList.add("hidden"));
+  document.querySelector("#ew-preview-done-btn")!.addEventListener("click", () => previewOverlay.classList.add("hidden"));
   document.querySelector("#ew-preview-send-btn")!.addEventListener("click", () => void handleSend());
 
   async function handleSend(): Promise<void> {
@@ -555,15 +563,35 @@ export function initEmailWriter(): EmailWriterHandle {
       if (status) status.textContent = "Connect a Gmail or Microsoft account in Settings to send real email.";
       return;
     }
+    const sendBtn = document.querySelector<HTMLButtonElement>("#ew-preview-send-btn")!;
+    sendBtn.disabled = true;
     if (status) status.textContent = "Sending...";
     try {
+      const to = getLeads().find((l) => l.id === previewSession!.leadId)?.emails[0]?.email ?? "";
       await sendEmailDraft(previewSession.draftId, provider);
-      if (status) status.textContent = "Sent!";
       previewSession.dirty = false;
       renderDraftTabs();
+      showSentConfirmation(previewSession, to);
     } catch (err) {
       if (status) status.textContent = `Failed to send: ${err}`;
+      sendBtn.disabled = false;
     }
+  }
+
+  function showSentConfirmation(session: DraftSession, to: string): void {
+    previewBodyEl.innerHTML = `
+      <div class="ew-sent-confirmation">
+        <div class="ew-sent-check">&check;</div>
+        <h3>Email sent</h3>
+        <p class="empty-hint">To ${escapeHtml(to || "—")} &middot; ${escapeHtml(new Date().toLocaleString())}</p>
+        <h4>${escapeHtml(session.subject)}</h4>
+        <div class="ew-preview-content">${session.bodyHtml}</div>
+      </div>
+    `;
+    document.querySelector<HTMLButtonElement>("#ew-preview-send-btn")!.classList.add("hidden");
+    document.querySelector<HTMLButtonElement>("#ew-preview-edit-btn")!.classList.add("hidden");
+    document.querySelector<HTMLButtonElement>("#ew-preview-back-btn")!.classList.add("hidden");
+    document.querySelector<HTMLButtonElement>("#ew-preview-done-btn")!.classList.remove("hidden");
   }
 
   // --- AI Assistant pane ---
