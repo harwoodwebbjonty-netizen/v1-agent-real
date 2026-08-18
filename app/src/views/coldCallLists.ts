@@ -240,8 +240,8 @@ export function initColdCallLists(): void {
             <button class="ccl-phone-btn" data-phone="no-phone">No Phone</button>
           </div>
           <div class="ccl-scope-filter">
-            <button class="ccl-scope-btn active" data-scope="all">All Leads</button>
-            <button class="ccl-scope-btn" data-scope="this-list">This List</button>
+            <button class="ccl-scope-btn" data-scope="all">All Leads</button>
+            <button class="ccl-scope-btn active" data-scope="this-list">This List</button>
             <button class="ccl-scope-btn" data-scope="unassigned">Unassigned</button>
           </div>
           <div class="ccl-enrich-filter ccl-enrich-inline">
@@ -1260,11 +1260,11 @@ export function initColdCallLists(): void {
   async function openListDetail(listId: string): Promise<void> {
     currentListId = listId;
     sortColumn = null; sortDirection = "asc"; searchText = "";
-    calledFilter = "all"; enrichFilter = "all"; scopeFilter = "all"; phoneFilter = "all";
+    calledFilter = "all"; enrichFilter = "all"; scopeFilter = "this-list"; phoneFilter = "all";
     selectedLeadIds.clear(); lastToggledIndex = -1;
     container.querySelectorAll(".ccl-filter-btn").forEach((b) => b.classList.toggle("active", (b as HTMLElement).dataset.called === "all"));
     enrichFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.enrich === "all"));
-    scopeFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.scope === "all"));
+    scopeFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.scope === "this-list"));
     phoneFilterBtns.forEach((b) => b.classList.toggle("active", b.dataset.phone === "all"));
     sortSelect.value = ""; listSearchInput.value = ""; listDetailStatus.textContent = "";
     addCompaniesPanel.classList.add("hidden"); toggleAddBtn.textContent = "+ Add companies";
