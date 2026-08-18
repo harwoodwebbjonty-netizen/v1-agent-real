@@ -263,6 +263,62 @@
   .mgr-empty{color:var(--faint);font-size:.85rem;padding:8px 0;line-height:1.5;}
   .rag.grey{color:var(--faint);background:var(--surface-2);}
   @media (max-width:760px){.mgr-prep-body{grid-template-columns:1fr;}}
+  /* prep sheet — status chips + present button */
+  .mgr-prep-badges{display:flex;align-items:center;gap:9px;flex-wrap:wrap;}
+  .mgr-chip{font-size:.68rem;font-weight:800;padding:4px 10px;border-radius:999px;letter-spacing:.02em;white-space:nowrap;}
+  .mgr-chip.streak{color:var(--green);background:var(--green-soft);}
+  .mgr-chip.steady{color:var(--green);background:var(--green-soft);}
+  .mgr-chip.swingy{color:var(--amber);background:var(--amber-soft);}
+  .mgr-present-btn{display:inline-flex;align-items:center;gap:7px;border:1px solid var(--accent-line);background:var(--accent-soft);color:var(--accent-deep);font-family:var(--font);font-weight:800;font-size:.76rem;padding:7px 13px;border-radius:999px;cursor:pointer;}
+  .mgr-present-btn:hover{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .mgr-present-btn svg{width:14px;height:14px;}
+  /* prep sheet — score band */
+  .mgr-prep-score{display:flex;align-items:center;gap:20px;flex-wrap:wrap;padding:16px 18px;border-bottom:1px solid var(--border);}
+  .mgr-prep-bigscore{flex:0 0 auto;}
+  .mgr-prep-bigscore .big{font-size:2rem;line-height:1;font-weight:800;letter-spacing:-.03em;color:var(--ink);}
+  .mgr-prep-bigscore .big.green{color:var(--green);}.mgr-prep-bigscore .big.amber{color:var(--amber);}.mgr-prep-bigscore .big.red{color:var(--red);}
+  .mgr-prep-bigscore .lbl{font-size:.62rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-top:5px;}
+  .mgr-prep-spark{display:flex;flex-direction:column;align-items:center;gap:2px;}
+  .mgr-prep-sparklbl{font-size:.58rem;color:var(--faint);font-weight:700;text-transform:uppercase;letter-spacing:.04em;}
+  .mgr-prep-score .say{flex:1 1 220px;font-size:.9rem;line-height:1.5;color:var(--ink);font-weight:600;}
+  /* prep sheet — per-metric breakdown table */
+  .mgr-prep-detail{border-bottom:1px solid var(--border);overflow-x:auto;}
+  .mgr-prep-detail table{width:100%;border-collapse:collapse;min-width:440px;}
+  .mgr-prep-detail th{text-align:right;font-size:.62rem;font-weight:800;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);padding:10px 14px;background:var(--surface-2);border-bottom:1px solid var(--border);}
+  .mgr-prep-detail th:first-child{text-align:left;}
+  .mgr-prep-detail td{padding:11px 14px;font-size:.86rem;color:var(--ink);border-bottom:1px solid var(--border-2);text-align:right;}
+  .mgr-prep-detail tr:last-child td{border-bottom:none;}
+  .mgr-prep-detail td.m-name{text-align:left;font-weight:700;}
+  .mgr-prep-detail td.m-val{font-weight:800;}
+  .mgr-prep-detail td.m-tgt{color:var(--muted);}
+  /* prep sheet — effort & conversion tiles */
+  .mgr-prep-effort{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:1px;background:var(--border);border-bottom:1px solid var(--border);}
+  .mgr-eff{background:var(--surface);padding:13px 14px;text-align:center;}
+  .mgr-eff .v{font-size:1.1rem;font-weight:800;color:var(--ink);letter-spacing:-.01em;}
+  .mgr-eff .k{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:4px;}
+  /* prep sheet — focus-for-the-week list */
+  .mgr-prep-body h4.mgr-h4-gap{margin-top:20px;}
+  .mgr-metric-tag{flex:0 0 auto;font-weight:800;font-size:.64rem;text-transform:uppercase;letter-spacing:.03em;padding:3px 8px;border-radius:6px;margin-top:1px;background:var(--accent-soft);color:var(--accent-deep);white-space:nowrap;}
+  /* full-page "present to BDE" overlay */
+  body.mgr-present-lock{overflow:hidden;}
+  .mgr-present-overlay{position:fixed;inset:0;z-index:2000;background:var(--bg);overflow-y:auto;display:none;}
+  .mgr-present-overlay.open{display:block;}
+  .mgr-present-shell{max-width:1040px;margin:0 auto;padding:0 22px 60px;}
+  .mgr-present-bar{position:sticky;top:0;z-index:2;display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px 0;margin-bottom:20px;background:var(--bg);border-bottom:1px solid var(--border);}
+  .mgr-present-title{font-weight:800;font-size:1.05rem;color:var(--ink);display:flex;align-items:baseline;gap:10px;}
+  .mgr-present-title small{font-weight:700;font-size:.82rem;color:var(--muted);}
+  .mgr-present-close{display:inline-flex;align-items:center;gap:8px;border:1px solid var(--border);background:var(--surface);color:var(--ink);font-family:var(--font);font-weight:700;font-size:.85rem;padding:9px 16px;border-radius:999px;cursor:pointer;box-shadow:var(--shadow-sm);}
+  .mgr-present-close:hover{background:var(--surface-2);}
+  .mgr-present-close svg{width:15px;height:15px;}
+  .mgr-prep-present{box-shadow:0 20px 60px -20px rgba(16,24,40,.25);}
+  .mgr-prep-present .mgr-prep-who{font-size:1.3rem;}
+  .mgr-prep-present .mgr-prep-bigscore .big{font-size:2.6rem;}
+  .mgr-prep-present .mgr-prep-score .say{font-size:1.02rem;}
+  .mgr-prep-present .mgr-prep-detail td{font-size:.95rem;padding:14px 16px;}
+  .mgr-prep-present .mgr-eff .v{font-size:1.3rem;}
+  .mgr-prep-present .mgr-prep-body{font-size:.95rem;}
+  .mgr-prep-present .mgr-actions li,.mgr-prep-present .mgr-points li{font-size:.95rem;}
+  @media (max-width:640px){.mgr-present-shell{padding:0 14px 40px;}}
 </style>
 </head>
 <body>
@@ -1869,45 +1925,117 @@ function mgrTalkingPoints(prof) {
   if (!pts.length) pts.push("On track across the board — keep the momentum and set the next stretch target.");
   return pts;
 }
-function mgrBuildPrep(prof) {
-  const wrap = mgrEl("div", "mgr-prep");
-  wrap.id = "managerPrep";
+// Plain-English one-line read of how the person is doing (data-driven).
+function mgrPrepHeadline(prof, trend, streak, cons) {
+  const s = mgrScoreSeries(prof);
+  if (!s.length) return "No weeks recorded yet — start a scorecard to build this review.";
+  const parts = [];
+  if (trend.delta !== null) {
+    if (trend.dir === "up") parts.push("Up " + Math.round(trend.delta * 100) + " points on last week");
+    else if (trend.dir === "down") parts.push("Down " + Math.round(-trend.delta * 100) + " points on last week" + (trend.declining >= 2 ? ", " + trend.declining + " weeks running" : ""));
+    else parts.push("Holding level with last week");
+  } else {
+    parts.push("First week on record");
+  }
+  if (streak >= 2) parts.push(streak + " weeks green in a row");
+  else if (streak === 1) parts.push("green this week");
+  if (cons.label === "Swingy") parts.push("swings week to week");
+  else if (cons.label === "Steady") parts.push("steady week to week");
+  return parts.join(" · ") + ".";
+}
+function mgrBuildPrep(prof, present) {
+  const wrap = mgrEl("div", "mgr-prep" + (present ? " mgr-prep-present" : ""));
+  wrap.id = present ? "managerPrepFull" : "managerPrep";
   const weeks = mgrAllWeeks(prof);
   const latest = weeks.length ? weeks[weeks.length - 1] : null;
   const prev = weeks.length >= 2 ? weeks[weeks.length - 2] : null;
+  const trend = mgrTrend(prof);
+  const streak = mgrStreak(prof);
+  const cons = mgrConsistency(prof);
+  const lscore = mgrLatestScore(prof);
 
+  // ---- header: who + status chips (+ present button on the inline sheet) ----
   const top = mgrEl("div", "mgr-prep-top");
   const who = mgrEl("div", "mgr-prep-who");
   who.appendChild(document.createTextNode(prof.name || "Untitled"));
   const small = document.createElement("small");
   small.textContent = latest ? ("BDE · week commencing " + latest.wc + (latest.live ? " (in progress)" : "")) : "BDE · no weeks recorded";
   who.appendChild(small);
-  const right = mgrEl("div");
-  right.style.display = "flex"; right.style.alignItems = "center"; right.style.gap = "12px";
-  const trend = mgrTrend(prof);
+  const right = mgrEl("div", "mgr-prep-badges");
+  if (streak >= 1) right.appendChild(mgrEl("span", "mgr-chip streak", streak + (streak === 1 ? " wk green" : " wks green")));
+  if (cons.label !== "New") right.appendChild(mgrEl("span", "mgr-chip " + cons.cls, cons.label));
   if (trend.delta !== null && trend.dir !== "flat") {
     right.appendChild(mgrEl("span", "mgr-trend " + trend.dir,
       (trend.dir === "up" ? "▲ up" : "▼ down") + (trend.dir === "down" && trend.declining >= 1 ? " " + trend.declining + " wks" : " vs last week")));
   }
-  const lscore = mgrLatestScore(prof);
   right.appendChild(mgrEl("span", "rag " + (lscore === null ? "grey" : ragFor(lscore).cls), lscore === null ? "No data" : "Weighted " + pctText(lscore)));
+  if (!present) {
+    const pbtn = mgrEl("button", "mgr-present-btn");
+    pbtn.type = "button";
+    pbtn.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3m13-5v3a2 2 0 0 1-2 2h-3"/></svg>Present to BDE';
+    pbtn.addEventListener("click", () => mgrOpenPresent(prof.id));
+    right.appendChild(pbtn);
+  }
   top.appendChild(who); top.appendChild(right);
   wrap.appendChild(top);
 
-  const grid = mgrEl("div", "mgr-prep-grid");
+  // ---- score band: headline number + sparkline + plain-English read ----
+  const band = mgrEl("div", "mgr-prep-score");
+  const bigWrap = mgrEl("div", "mgr-prep-bigscore");
+  bigWrap.appendChild(mgrEl("div", "big " + (lscore === null ? "" : ragFor(lscore).cls), lscore === null ? "–" : pctText(lscore)));
+  bigWrap.appendChild(mgrEl("div", "lbl", "Weighted score"));
+  band.appendChild(bigWrap);
+  const series = mgrScoreSeries(prof);
+  if (series.length >= 2) {
+    const sp = mgrEl("div", "mgr-prep-spark");
+    sp.innerHTML = mgrSparkline(series, "var(--accent)");
+    sp.appendChild(mgrEl("span", "mgr-prep-sparklbl", series.length + " weeks"));
+    band.appendChild(sp);
+  }
+  band.appendChild(mgrEl("div", "say", mgrPrepHeadline(prof, trend, streak, cons)));
+  wrap.appendChild(band);
+
+  // ---- per-metric breakdown: this week vs target, RAG, move vs last week ----
+  const detail = mgrEl("div", "mgr-prep-detail");
+  const tbl = document.createElement("table");
+  const thead = document.createElement("thead");
+  thead.innerHTML = "<tr><th>Metric</th><th>This week</th><th>Target</th><th>% of target</th><th>vs last week</th></tr>";
+  tbl.appendChild(thead);
+  const tb = document.createElement("tbody");
   METRICS.forEach(m => {
     const raw = latest ? (latest.rows[m.key] || {}).actual : "";
-    const { pct, rag } = computeCell(m, raw);
-    const cell = mgrEl("div", "mgr-mini");
-    const v = mgrEl("div", "v " + (pct === null ? "" : rag.cls));
-    v.textContent = (raw === "" || raw === undefined || raw === null || isNaN(parseFloat(raw)))
-      ? "–" : (m.isPercent ? parseFloat(raw) + "%" : String(parseFloat(raw)));
-    cell.appendChild(v);
-    cell.appendChild(mgrEl("div", "k", m.name.replace(" (hours)", "") + " / " + getTarget(m) + (m.isPercent ? "%" : "")));
-    grid.appendChild(cell);
+    const { pct } = computeCell(m, raw);
+    const prevPct = prev ? computeCell(m, (prev.rows[m.key] || {}).actual).pct : null;
+    const badge = mgrMoveBadge(prevPct, pct);
+    const tr = document.createElement("tr");
+    tr.appendChild(mgrEl("td", "m-name", m.name.replace(" (hours)", "")));
+    const tdA = mgrEl("td", "m-val", (raw === "" || raw === undefined || raw === null || isNaN(parseFloat(raw)))
+      ? "–" : (m.isPercent ? parseFloat(raw) + "%" : String(parseFloat(raw))));
+    tr.appendChild(tdA);
+    tr.appendChild(mgrEl("td", "m-tgt", getTarget(m) + (m.isPercent ? "%" : "")));
+    const tdP = document.createElement("td");
+    tdP.appendChild(mgrPctSpan(pct));
+    tr.appendChild(tdP);
+    const tdM = document.createElement("td");
+    tdM.appendChild(mgrEl("span", "mgr-move " + badge.cls, badge.text));
+    tr.appendChild(tdM);
+    tb.appendChild(tr);
   });
-  wrap.appendChild(grid);
+  tbl.appendChild(tb);
+  detail.appendChild(tbl);
+  wrap.appendChild(detail);
 
+  // ---- effort & conversion tiles over the selected period ----
+  const conv = mgrConversion(prof);
+  const effort = mgrEl("div", "mgr-prep-effort");
+  const eff = (v, k) => { const c = mgrEl("div", "mgr-eff"); c.appendChild(mgrEl("div", "v", v)); c.appendChild(mgrEl("div", "k", k)); return c; };
+  effort.appendChild(eff(conv.hasCalls ? String(conv.calls) : "–", "Calls · " + mgrPeriodLabel()));
+  effort.appendChild(eff(conv.hasLeads ? String(conv.leads) : "–", "Qualified leads"));
+  effort.appendChild(eff(conv.callsPerLead === null ? "–" : Math.round(conv.callsPerLead) + " : 1", "Calls per lead"));
+  effort.appendChild(eff(mgrFmtSecs(conv.talkPerCall), "Talk time per call"));
+  wrap.appendChild(effort);
+
+  // ---- two-column: actions review + focus + talking points ----
   const pbody = mgrEl("div", "mgr-prep-body");
   const left = document.createElement("div");
   left.appendChild(mgrEl("h4", "", "Since last week's actions"));
@@ -1934,6 +2062,29 @@ function mgrBuildPrep(prof) {
   }
   if (!anyAction) left.appendChild(mgrEl("div", "mgr-empty", "No actions were recorded on the previous week's scorecard. Add an Action against a metric and it'll show here next week with how the number moved."));
   else left.appendChild(actionsUl);
+  // agreed focus for the week ahead = actions recorded on the latest week
+  left.appendChild(mgrEl("h4", "mgr-h4-gap", "Agreed focus for the week ahead"));
+  const focusUl = mgrEl("ul", "mgr-actions");
+  let anyFocus = false;
+  if (latest) {
+    METRICS.forEach(m => {
+      const act = ((latest.rows[m.key] || {}).action || "").trim();
+      if (!act) return;
+      anyFocus = true;
+      const li = document.createElement("li");
+      const { pct } = computeCell(m, (latest.rows[m.key] || {}).actual);
+      li.appendChild(mgrEl("span", "mgr-metric-tag", m.name.replace(" (hours)", "")));
+      const txt = mgrEl("span", "txt");
+      txt.appendChild(document.createTextNode(act));
+      const sub = document.createElement("small");
+      sub.textContent = "Now at " + (pct === null ? "–" : pctText(pct)) + " of target";
+      txt.appendChild(sub);
+      li.appendChild(txt);
+      focusUl.appendChild(li);
+    });
+  }
+  if (!anyFocus) left.appendChild(mgrEl("div", "mgr-empty", "No actions set for the current week yet — agree one or two in the sit-down and record them against the metrics on the scorecard."));
+  else left.appendChild(focusUl);
   const rightCol = document.createElement("div");
   rightCol.appendChild(mgrEl("h4", "", "Talking points"));
   const pointsUl = mgrEl("ul", "mgr-points");
@@ -1943,6 +2094,43 @@ function mgrBuildPrep(prof) {
   wrap.appendChild(pbody);
   return wrap;
 }
+// Full-page "present to the BDE" overlay — a distraction-free copy of the prep
+// sheet that covers the whole screen and closes cleanly back to the dashboard.
+function mgrOpenPresent(id) {
+  const prof = STORE && STORE.profiles ? STORE.profiles[id] : null;
+  if (!prof) return;
+  let ov = document.getElementById("mgrPresentOverlay");
+  if (!ov) {
+    ov = mgrEl("div", "mgr-present-overlay");
+    ov.id = "mgrPresentOverlay";
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = "";
+  const shell = mgrEl("div", "mgr-present-shell");
+  const bar = mgrEl("div", "mgr-present-bar");
+  const title = mgrEl("div", "mgr-present-title");
+  title.appendChild(document.createTextNode("1-on-1 review"));
+  title.appendChild(mgrEl("small", "", prof.name || "Untitled"));
+  bar.appendChild(title);
+  const close = mgrEl("button", "mgr-present-close");
+  close.type = "button";
+  close.innerHTML = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>Close';
+  close.addEventListener("click", mgrClosePresent);
+  bar.appendChild(close);
+  shell.appendChild(bar);
+  shell.appendChild(mgrBuildPrep(prof, true));
+  ov.appendChild(shell);
+  ov.classList.add("open");
+  document.body.classList.add("mgr-present-lock");
+  document.addEventListener("keydown", mgrPresentKey);
+}
+function mgrClosePresent() {
+  const ov = document.getElementById("mgrPresentOverlay");
+  if (ov) { ov.classList.remove("open"); ov.innerHTML = ""; }
+  document.body.classList.remove("mgr-present-lock");
+  document.removeEventListener("keydown", mgrPresentKey);
+}
+function mgrPresentKey(e) { if (e.key === "Escape") mgrClosePresent(); }
 function renderManagerView() {
   const body = document.getElementById("managerBody");
   if (!body || !STORE) return;
