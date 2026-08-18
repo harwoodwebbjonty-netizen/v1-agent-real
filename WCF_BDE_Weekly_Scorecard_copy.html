@@ -163,6 +163,106 @@
   .drop-zone.dragover{border-color:var(--accent);background:var(--accent-soft);color:var(--accent-deep);}
   .drop-zone.disabled{opacity:.5;cursor:not-allowed;pointer-events:none;}
   .cell-actual{font-size:.68rem;color:var(--faint);font-weight:600;margin-top:3px;line-height:1.2;}
+
+  /* ---------------- Manager view (additive) ---------------- */
+  /* Four tabs now share the sidebar rail, so let them wrap to a tidy 2x2. */
+  .nav-tabs{flex-wrap:wrap;}
+  .nav-tabs button{flex:1 1 40%;}
+  .mgr-top{display:flex;align-items:flex-start;justify-content:space-between;gap:18px;flex-wrap:wrap;padding:20px 26px 0;}
+  .mgr-sub{font-size:.82rem;color:var(--muted);}
+  .mgr-seg{display:inline-flex;background:var(--surface-2);border:1px solid var(--border);border-radius:11px;padding:3px;gap:2px;}
+  .mgr-seg button{border:none;background:transparent;font-family:var(--font);font-size:.76rem;font-weight:700;color:var(--muted);padding:7px 14px;border-radius:8px;cursor:pointer;}
+  .mgr-seg button.active{background:var(--surface);color:var(--accent-deep);box-shadow:var(--shadow-sm);}
+  #managerBody{padding:24px 26px;}
+  .mgr-section{margin-bottom:30px;}
+  .mgr-section:last-child{margin-bottom:0;}
+  .mgr-head{display:flex;align-items:center;gap:10px;margin-bottom:4px;flex-wrap:wrap;}
+  .mgr-head h2{margin:0;font-size:1.05rem;font-weight:800;letter-spacing:-.01em;color:var(--ink);}
+  .mgr-cap{font-size:.8rem;color:var(--faint);margin:0 0 16px;max-width:760px;line-height:1.5;}
+  .mgr-tag{font-size:.6rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--accent-deep);background:var(--accent-soft);border:1px solid var(--accent-line);padding:3px 7px;border-radius:999px;}
+  .mgr-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:14px;}
+  .mgr-kpi{border:1px solid var(--border);border-radius:var(--radius);padding:16px;background:var(--surface);box-shadow:var(--shadow-sm);}
+  .mgr-kpi .num{font-size:1.7rem;font-weight:800;letter-spacing:-.02em;line-height:1;color:var(--ink);}
+  .mgr-kpi .num.green{color:var(--green);}.mgr-kpi .num.amber{color:var(--amber);}.mgr-kpi .num.red{color:var(--red);}
+  .mgr-kpi .label{font-size:.66rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;font-weight:700;margin-top:8px;}
+  .mgr-kpi .note{font-size:.72rem;color:var(--faint);margin-top:5px;font-weight:600;}
+  .mgr-attn{display:flex;flex-direction:column;gap:10px;}
+  .mgr-attn-row{display:flex;align-items:center;gap:14px;padding:13px 16px;border:1px solid var(--border);border-left-width:4px;border-radius:var(--radius-sm);background:var(--surface);box-shadow:var(--shadow-sm);flex-wrap:wrap;}
+  .mgr-attn-row.red{border-left-color:var(--red);}
+  .mgr-attn-row.amber{border-left-color:var(--amber);}
+  .mgr-attn-row.grey{border-left-color:var(--faint);}
+  .mgr-attn-name{font-weight:800;font-size:.95rem;min-width:120px;color:var(--ink);}
+  .mgr-attn-why{font-size:.83rem;color:var(--muted);flex:1;min-width:180px;}
+  .mgr-attn-why b{color:var(--ink);font-weight:700;}
+  .mgr-btn{background:transparent;border:1px solid var(--border);border-radius:9px;font-family:var(--font);font-weight:700;font-size:.74rem;color:var(--accent-deep);padding:7px 12px;cursor:pointer;white-space:nowrap;}
+  .mgr-btn:hover{background:var(--accent-soft);border-color:var(--accent-line);}
+  .mgr-ok{padding:16px;border:1px dashed var(--border);border-radius:var(--radius-sm);background:var(--surface-2);color:var(--muted);font-size:.9rem;font-weight:600;}
+  .mgr-lb{display:flex;flex-direction:column;gap:9px;}
+  .mgr-lb-row{display:flex;align-items:center;gap:14px;padding:12px 16px;border:1px solid var(--border);border-radius:var(--radius-sm);background:var(--surface);box-shadow:var(--shadow-sm);flex-wrap:wrap;}
+  .mgr-rank{flex:0 0 auto;width:28px;height:28px;display:flex;align-items:center;justify-content:center;border-radius:8px;background:var(--surface-2);color:var(--muted);font-weight:800;font-size:.82rem;}
+  .mgr-rank.lead{background:linear-gradient(160deg,#ff6b81,var(--accent));color:#fff;}
+  .mgr-lb-id{flex:1 1 160px;min-width:0;}
+  .mgr-lb-name{font-weight:800;font-size:.95rem;color:var(--ink);display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+  .mgr-lb-meta{font-size:.73rem;color:var(--faint);margin-top:3px;display:flex;gap:12px;flex-wrap:wrap;}
+  .mgr-lb-meta .steady{color:var(--green);font-weight:700;}
+  .mgr-lb-meta .swingy{color:var(--amber);font-weight:700;}
+  .mgr-lb-score{font-weight:800;font-size:1.12rem;letter-spacing:-.02em;min-width:60px;text-align:right;}
+  .mgr-trend{display:inline-flex;align-items:center;gap:4px;font-weight:800;font-size:.78rem;white-space:nowrap;}
+  .mgr-trend.up{color:var(--green);}.mgr-trend.down{color:var(--red);}.mgr-trend.flat{color:var(--muted);}
+  .mgr-ribbon{display:inline-flex;align-items:center;gap:5px;font-size:.62rem;font-weight:800;letter-spacing:.04em;text-transform:uppercase;color:#fff;background:linear-gradient(160deg,#ff6b81,var(--accent));padding:3px 8px;border-radius:999px;}
+  .mgr-spark{display:block;flex:0 0 auto;}
+  .mgr-tw{overflow-x:auto;border:1px solid var(--border);border-radius:var(--radius);}
+  .mgr-table{width:100%;border-collapse:collapse;font-size:.85rem;min-width:520px;}
+  .mgr-table thead th{background:var(--surface-2);color:var(--muted);font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.06em;text-align:center;padding:11px 14px;border-bottom:1px solid var(--border);}
+  .mgr-table thead th:first-child{text-align:left;}
+  .mgr-table tbody td{padding:12px 14px;border-bottom:1px solid var(--border);text-align:center;}
+  .mgr-table tbody td:first-child{text-align:left;font-weight:700;color:var(--ink);}
+  .mgr-table tbody tr:last-child td{border-bottom:none;}
+  .mgr-table tr.team td{background:var(--surface-2);font-weight:800;color:var(--ink);}
+  .mgr-pct{font-weight:800;}
+  .mgr-pct.green{color:var(--green);}.mgr-pct.amber{color:var(--amber);}.mgr-pct.red{color:var(--red);}
+  .mgr-pct.blank{color:var(--faint);}
+  .mgr-cellsub{font-size:.66rem;color:var(--faint);font-weight:600;margin-top:2px;}
+  .mgr-bar{position:relative;height:7px;border-radius:999px;background:var(--surface-2);overflow:hidden;margin-top:6px;}
+  .mgr-bar span{position:absolute;left:0;top:0;bottom:0;border-radius:999px;}
+  .mgr-bar span.green{background:var(--green);}.mgr-bar span.amber{background:var(--amber);}.mgr-bar span.red{background:var(--red);}
+  .mgr-conv{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;}
+  .mgr-conv-card{border:1px solid var(--border);border-radius:var(--radius);padding:15px 16px;background:var(--surface);box-shadow:var(--shadow-sm);}
+  .mgr-conv-card.flag{border-color:var(--amber);background:var(--amber-soft);}
+  .mgr-conv-name{font-weight:800;font-size:.9rem;display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--ink);}
+  .mgr-conv-metrics{display:flex;gap:18px;margin-top:12px;}
+  .mgr-conv-metrics>div{flex:1;}
+  .mgr-conv-metrics .v{font-size:1.15rem;font-weight:800;letter-spacing:-.02em;color:var(--ink);}
+  .mgr-conv-metrics .k{font-size:.64rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;font-weight:700;margin-top:3px;}
+  .mgr-callout{margin-top:16px;display:flex;gap:12px;align-items:flex-start;padding:13px 15px;border-radius:var(--radius-sm);background:var(--accent-soft);border:1px solid var(--accent-line);font-size:.84rem;line-height:1.5;color:var(--ink);}
+  .mgr-callout b{color:var(--accent-deep);}
+  .mgr-people{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;}
+  .mgr-person-pill{border:1px solid var(--border);background:var(--surface);border-radius:999px;padding:7px 14px;font-size:.8rem;font-weight:700;color:var(--muted);cursor:pointer;font-family:var(--font);}
+  .mgr-person-pill.active{background:var(--accent-soft);border-color:var(--accent-line);color:var(--accent-deep);}
+  .mgr-prep{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;box-shadow:var(--shadow-sm);}
+  .mgr-prep-top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;padding:16px 18px;background:var(--surface-2);border-bottom:1px solid var(--border);}
+  .mgr-prep-who{font-weight:800;font-size:1.05rem;color:var(--ink);}
+  .mgr-prep-who small{display:block;font-weight:600;font-size:.74rem;color:var(--muted);margin-top:2px;}
+  .mgr-prep-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(92px,1fr));gap:1px;background:var(--border);border-bottom:1px solid var(--border);}
+  .mgr-mini{background:var(--surface);padding:12px 10px;text-align:center;}
+  .mgr-mini .v{font-weight:800;font-size:1.02rem;color:var(--ink);}
+  .mgr-mini .v.green{color:var(--green);}.mgr-mini .v.amber{color:var(--amber);}.mgr-mini .v.red{color:var(--red);}
+  .mgr-mini .k{font-size:.6rem;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:4px;}
+  .mgr-prep-body{padding:18px;display:grid;grid-template-columns:1fr 1fr;gap:22px;}
+  .mgr-prep-body h4{margin:0 0 12px;font-size:.68rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:800;}
+  .mgr-actions{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px;}
+  .mgr-actions li{display:flex;gap:11px;align-items:flex-start;font-size:.85rem;line-height:1.45;color:var(--ink);}
+  .mgr-move{flex:0 0 auto;font-weight:800;font-size:.72rem;padding:2px 7px;border-radius:6px;margin-top:1px;white-space:nowrap;}
+  .mgr-move.up{background:var(--green-soft);color:var(--green);}
+  .mgr-move.down{background:var(--red-soft);color:var(--red);}
+  .mgr-move.flat{background:var(--surface-2);color:var(--muted);}
+  .mgr-actions li .txt small{display:block;font-size:.72rem;color:var(--faint);font-weight:600;margin-top:2px;}
+  .mgr-points{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:11px;}
+  .mgr-points li{position:relative;padding-left:16px;font-size:.85rem;line-height:1.5;color:var(--ink);}
+  .mgr-points li::before{content:"";position:absolute;left:0;top:8px;width:6px;height:6px;border-radius:50%;background:var(--accent);}
+  .mgr-empty{color:var(--faint);font-size:.85rem;padding:8px 0;line-height:1.5;}
+  .rag.grey{color:var(--faint);background:var(--surface-2);}
+  @media (max-width:760px){.mgr-prep-body{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -172,6 +272,7 @@
       <div class="nav-tabs">
         <button id="navScorecard" class="active">Scorecard</button>
         <button id="navDashboard">Dashboard</button>
+        <button id="navManager">Manager</button>
         <button id="navSettings">Settings</button>
       </div>
 
@@ -278,6 +379,22 @@
           <button class="btn-secondary" id="monthViewBtn">Group by month</button>
         </div>
         <div id="dashboardBody" class="dashboard-section"></div>
+      </div>
+
+      <div id="managerView" style="display:none">
+        <div class="header">
+          <h1>Manager view</h1>
+          <span class="saved-indicator" id="managerIndicator"></span>
+        </div>
+        <div class="mgr-top">
+          <div><div class="mgr-sub" id="managerSub"></div></div>
+          <div class="mgr-seg" id="managerSeg" role="group" aria-label="Time period">
+            <button type="button" data-period="week" class="active">This week</button>
+            <button type="button" data-period="month">Month</button>
+            <button type="button" data-period="quarter">Quarter</button>
+          </div>
+        </div>
+        <div id="managerBody"></div>
       </div>
 
       <div id="settingsView" style="display:none">
@@ -1548,19 +1665,533 @@ function makeStatCard(num, label, cls) {
   return div;
 }
 
+/* ======================= Manager view =======================
+   A manager's-eye view across the whole team, built entirely from the
+   same weekly data already entered. Strictly read-only: nothing here
+   writes to STORE or SETTINGS. All maths reuses the existing scoring
+   helpers (weightedPctForRows / computeCell / ragFor / getGreen). */
+let managerPeriod = "week";       // "week" | "month" | "quarter"
+let managerPrepPersonId = null;   // which person the 1-on-1 sheet shows
+
+function mgrEl(tag, cls, text) {
+  const e = document.createElement(tag);
+  if (cls) e.className = cls;
+  if (text !== undefined) e.textContent = text;
+  return e;
+}
+// Every week for a profile (saved history + the live in-progress entry if
+// dated), de-duplicated by week and sorted oldest -> newest.
+function mgrAllWeeks(profile) {
+  const map = {};
+  Object.values(profile.history || {}).forEach(e => {
+    if (e && e.weekCommencing) map[e.weekCommencing] = { wc: e.weekCommencing, rows: e.rows || {}, live: false };
+  });
+  if (profile.weekCommencing && !map[profile.weekCommencing]) {
+    map[profile.weekCommencing] = { wc: profile.weekCommencing, rows: profile.rows || {}, live: true };
+  }
+  return Object.values(map).sort((a, b) => a.wc < b.wc ? -1 : a.wc > b.wc ? 1 : 0);
+}
+// The weeks inside the selected period (last N entries; "week" = latest only).
+function mgrScopedWeeks(profile) {
+  const all = mgrAllWeeks(profile);
+  const n = managerPeriod === "week" ? 1 : managerPeriod === "month" ? 4 : 13;
+  return all.slice(-n);
+}
+function mgrPeriodLabel() {
+  return managerPeriod === "week" ? "the latest week"
+    : managerPeriod === "month" ? "the last 4 weeks" : "the last 13 weeks";
+}
+// Weighted score averaged across the scoped weeks (null if no scored data).
+function mgrScore(profile) {
+  const s = mgrScopedWeeks(profile).map(w => weightedPctForRows(w.rows, METRICS, 1)).filter(v => v !== null);
+  return s.length ? s.reduce((a, b) => a + b, 0) / s.length : null;
+}
+// Weighted score for every week across ALL history (for trend/streak/consistency).
+function mgrScoreSeries(profile) {
+  return mgrAllWeeks(profile).map(w => weightedPctForRows(w.rows, METRICS, 1)).filter(v => v !== null);
+}
+function mgrLatestScore(profile) {
+  const s = mgrScoreSeries(profile);
+  return s.length ? s[s.length - 1] : null;
+}
+function mgrTrend(profile) {
+  const s = mgrScoreSeries(profile);
+  if (s.length < 2) return { dir: "flat", delta: null, declining: 0, series: s };
+  const delta = s[s.length - 1] - s[s.length - 2];
+  let declining = 0;
+  for (let i = s.length - 1; i > 0; i--) { if (s[i] < s[i - 1] - 0.0001) declining++; else break; }
+  const dir = delta > 0.005 ? "up" : delta < -0.005 ? "down" : "flat";
+  return { dir, delta, declining, series: s };
+}
+function mgrStreak(profile) {
+  const s = mgrScoreSeries(profile);
+  let n = 0;
+  for (let i = s.length - 1; i >= 0; i--) { if (s[i] >= getGreen()) n++; else break; }
+  return n;
+}
+function mgrConsistency(profile) {
+  const s = mgrScoreSeries(profile).slice(-8);
+  if (s.length < 2) return { label: "New", cls: "" };
+  const mean = s.reduce((a, b) => a + b, 0) / s.length;
+  const sd = Math.sqrt(s.reduce((a, b) => a + (b - mean) * (b - mean), 0) / s.length);
+  return sd <= 0.10 ? { label: "Steady", cls: "steady" } : { label: "Swingy", cls: "swingy" };
+}
+// Average % of target for one metric over a profile's scoped weeks.
+function mgrMetricAvg(profile, m) {
+  const vals = [];
+  mgrScopedWeeks(profile).forEach(w => {
+    const { pct } = computeCell(m, (w.rows[m.key] || {}).actual);
+    if (pct !== null) vals.push(pct);
+  });
+  return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+}
+// Conversion / effort figures over the scoped weeks.
+function mgrConversion(profile) {
+  let calls = 0, leads = 0, talkH = 0, hasCalls = false, hasLeads = false;
+  mgrScopedWeeks(profile).forEach(w => {
+    const c = parseFloat((w.rows.calls || {}).actual);
+    const l = parseFloat((w.rows.leads || {}).actual);
+    const t = parseFloat((w.rows.talkTime || {}).actual);
+    if (!isNaN(c)) { calls += c; hasCalls = true; }
+    if (!isNaN(l)) { leads += l; hasLeads = true; }
+    if (!isNaN(t)) talkH += t;
+  });
+  return {
+    calls, leads, talkH, hasCalls, hasLeads,
+    callsPerLead: (hasCalls && hasLeads && leads > 0) ? calls / leads : null,
+    talkPerCall: (hasCalls && calls > 0) ? (talkH * 3600 / calls) : null,
+  };
+}
+function mgrFmtSecs(s) {
+  if (s === null || isNaN(s)) return "–";
+  s = Math.round(s);
+  if (s < 60) return s + "s";
+  const m = Math.floor(s / 60), r = s % 60;
+  return m + "m " + (r < 10 ? "0" : "") + r + "s";
+}
+// Small inline sparkline from a series of weighted scores (fractions).
+function mgrSparkline(series, colorVar) {
+  const w = 64, h = 22, pad = 3;
+  if (!series || series.length < 2) return "";
+  const lo = Math.min.apply(null, series), hi = Math.max.apply(null, series);
+  const span = (hi - lo) || 1;
+  const pts = series.map((v, i) => {
+    const x = pad + (w - 2 * pad) * (i / (series.length - 1));
+    const y = h - pad - (h - 2 * pad) * ((v - lo) / span);
+    return x.toFixed(1) + "," + y.toFixed(1);
+  }).join(" ");
+  return '<svg class="mgr-spark" width="' + w + '" height="' + h + '" viewBox="0 0 ' + w + ' ' + h +
+    '" fill="none" aria-hidden="true"><polyline points="' + pts + '" stroke="' + colorVar +
+    '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+}
+function mgrPeople() {
+  return Object.values(STORE.profiles).map(p => {
+    const latest = mgrLatestScore(p);
+    return {
+      p, latest, trend: mgrTrend(p),
+      rag: latest === null ? { cls: "blank" } : ragFor(latest),
+      streak: mgrStreak(p), consistency: mgrConsistency(p), score: mgrScore(p),
+    };
+  });
+}
+// Who needs the manager's attention: red first, then slipping, then no data.
+function mgrAttentionList(people) {
+  const out = [];
+  people.forEach(x => {
+    if (x.latest === null) {
+      out.push({ x, cls: "grey", tag: "Not updated", tagCls: "grey", rank: 3,
+        why: "No scorecard data yet — nothing to review until a week is filled in." });
+    } else if (x.rag.cls === "red") {
+      out.push({ x, cls: "red", tag: "Red", tagCls: "red", rank: 0,
+        why: "Weighted <b>" + pctText(x.latest) + "</b> — in the red band" +
+          (x.trend.declining >= 2 ? ", and down " + x.trend.declining + " weeks running." : ".") });
+    } else if (x.trend.declining >= 2) {
+      out.push({ x, cls: "amber", tag: "Trending down", tagCls: "amber", rank: 1,
+        why: "Weighted <b>" + pctText(x.latest) + "</b> but <b>down " + x.trend.declining +
+          " weeks running</b> — slipping before it turns red." });
+    }
+  });
+  return out.sort((a, b) => a.rank - b.rank);
+}
+function mgrKpi(num, cls, label, note) {
+  const c = mgrEl("div", "mgr-kpi");
+  c.appendChild(mgrEl("div", "num " + (cls || ""), num));
+  c.appendChild(mgrEl("div", "label", label));
+  if (note) c.appendChild(mgrEl("div", "note", note));
+  return c;
+}
+function mgrRibbon(text) { return mgrEl("span", "mgr-ribbon", text); }
+function mgrPctSpan(frac) {
+  if (frac === null) return mgrEl("span", "mgr-pct blank", "–");
+  return mgrEl("span", "mgr-pct " + ragFor(frac).cls, pctText(frac));
+}
+function mgrSection(title, caption) {
+  const sec = mgrEl("section", "mgr-section");
+  const head = mgrEl("div", "mgr-head");
+  head.appendChild(mgrEl("h2", "", title));
+  head.appendChild(mgrEl("span", "mgr-tag", "New"));
+  sec.appendChild(head);
+  if (caption) sec.appendChild(mgrEl("p", "mgr-cap", caption));
+  return sec;
+}
+function mgrMoveBadge(prevPct, latPct) {
+  if (prevPct === null || latPct === null) return { cls: "flat", text: "–" };
+  const d = latPct - prevPct;
+  if (d > 0.005) return { cls: "up", text: "▲ " + Math.round(d * 100) + "pt" };
+  if (d < -0.005) return { cls: "down", text: "▼ " + Math.round(-d * 100) + "pt" };
+  return { cls: "flat", text: "no change" };
+}
+// Honest, data-driven talking points for a 1-on-1 (no invented "done" ticks).
+function mgrTalkingPoints(prof) {
+  const weeks = mgrAllWeeks(prof);
+  if (!weeks.length) return ["No data yet — fill in a week to generate talking points."];
+  const latest = weeks[weeks.length - 1].rows;
+  const trend = mgrTrend(prof);
+  const pts = [];
+  let worst = null;
+  METRICS.forEach(m => {
+    const { pct } = computeCell(m, (latest[m.key] || {}).actual);
+    if (pct !== null && (worst === null || pct < worst.pct)) worst = { m, pct };
+  });
+  if (worst) pts.push("Biggest gap this week: " + worst.m.name + " at " + pctText(worst.pct) + " of target.");
+  const c = parseFloat((latest.calls || {}).actual), l = parseFloat((latest.leads || {}).actual);
+  if (!isNaN(c) && !isNaN(l)) {
+    const callsPct = c / getTarget(METRICS.find(m => m.key === "calls"));
+    const leadsPct = l / getTarget(METRICS.find(m => m.key === "leads"));
+    if (callsPct >= 0.9 && leadsPct < getAmber())
+      pts.push("High activity (" + c + " calls) but only " + l + " lead" + (l === 1 ? "" : "s") +
+        " — looks like a conversion issue, not effort. Review call quality together.");
+  }
+  if (trend.declining >= 2) pts.push("Weighted score is down " + trend.declining + " weeks running — worth asking what's changed recently.");
+  if (trend.delta !== null && trend.delta > 0.08) pts.push("Big jump this week (up " + Math.round(trend.delta * 100) + " points) — reinforce what's working.");
+  const fu = parseFloat((latest.followUp || {}).actual);
+  if (!isNaN(fu) && fu < 100) pts.push("Follow-up emails at " + fu + "% — still short of 100%. What's the blocker?");
+  if (!pts.length) pts.push("On track across the board — keep the momentum and set the next stretch target.");
+  return pts;
+}
+function mgrBuildPrep(prof) {
+  const wrap = mgrEl("div", "mgr-prep");
+  wrap.id = "managerPrep";
+  const weeks = mgrAllWeeks(prof);
+  const latest = weeks.length ? weeks[weeks.length - 1] : null;
+  const prev = weeks.length >= 2 ? weeks[weeks.length - 2] : null;
+
+  const top = mgrEl("div", "mgr-prep-top");
+  const who = mgrEl("div", "mgr-prep-who");
+  who.appendChild(document.createTextNode(prof.name || "Untitled"));
+  const small = document.createElement("small");
+  small.textContent = latest ? ("BDE · week commencing " + latest.wc + (latest.live ? " (in progress)" : "")) : "BDE · no weeks recorded";
+  who.appendChild(small);
+  const right = mgrEl("div");
+  right.style.display = "flex"; right.style.alignItems = "center"; right.style.gap = "12px";
+  const trend = mgrTrend(prof);
+  if (trend.delta !== null && trend.dir !== "flat") {
+    right.appendChild(mgrEl("span", "mgr-trend " + trend.dir,
+      (trend.dir === "up" ? "▲ up" : "▼ down") + (trend.dir === "down" && trend.declining >= 1 ? " " + trend.declining + " wks" : " vs last week")));
+  }
+  const lscore = mgrLatestScore(prof);
+  right.appendChild(mgrEl("span", "rag " + (lscore === null ? "grey" : ragFor(lscore).cls), lscore === null ? "No data" : "Weighted " + pctText(lscore)));
+  top.appendChild(who); top.appendChild(right);
+  wrap.appendChild(top);
+
+  const grid = mgrEl("div", "mgr-prep-grid");
+  METRICS.forEach(m => {
+    const raw = latest ? (latest.rows[m.key] || {}).actual : "";
+    const { pct, rag } = computeCell(m, raw);
+    const cell = mgrEl("div", "mgr-mini");
+    const v = mgrEl("div", "v " + (pct === null ? "" : rag.cls));
+    v.textContent = (raw === "" || raw === undefined || raw === null || isNaN(parseFloat(raw)))
+      ? "–" : (m.isPercent ? parseFloat(raw) + "%" : String(parseFloat(raw)));
+    cell.appendChild(v);
+    cell.appendChild(mgrEl("div", "k", m.name.replace(" (hours)", "") + " / " + getTarget(m) + (m.isPercent ? "%" : "")));
+    grid.appendChild(cell);
+  });
+  wrap.appendChild(grid);
+
+  const pbody = mgrEl("div", "mgr-prep-body");
+  const left = document.createElement("div");
+  left.appendChild(mgrEl("h4", "", "Since last week's actions"));
+  const actionsUl = mgrEl("ul", "mgr-actions");
+  let anyAction = false;
+  if (prev) {
+    METRICS.forEach(m => {
+      const act = ((prev.rows[m.key] || {}).action || "").trim();
+      if (!act) return;
+      anyAction = true;
+      const li = document.createElement("li");
+      const prevPct = computeCell(m, (prev.rows[m.key] || {}).actual).pct;
+      const latPct = latest ? computeCell(m, (latest.rows[m.key] || {}).actual).pct : null;
+      const badge = mgrMoveBadge(prevPct, latPct);
+      li.appendChild(mgrEl("span", "mgr-move " + badge.cls, badge.text));
+      const txt = mgrEl("span", "txt");
+      txt.appendChild(document.createTextNode(act));
+      const sub = document.createElement("small");
+      sub.textContent = m.name + ": " + (prevPct === null ? "–" : pctText(prevPct)) + " → " + (latPct === null ? "–" : pctText(latPct));
+      txt.appendChild(sub);
+      li.appendChild(txt);
+      actionsUl.appendChild(li);
+    });
+  }
+  if (!anyAction) left.appendChild(mgrEl("div", "mgr-empty", "No actions were recorded on the previous week's scorecard. Add an Action against a metric and it'll show here next week with how the number moved."));
+  else left.appendChild(actionsUl);
+  const rightCol = document.createElement("div");
+  rightCol.appendChild(mgrEl("h4", "", "Talking points"));
+  const pointsUl = mgrEl("ul", "mgr-points");
+  mgrTalkingPoints(prof).forEach(pt => pointsUl.appendChild(mgrEl("li", "", pt)));
+  rightCol.appendChild(pointsUl);
+  pbody.appendChild(left); pbody.appendChild(rightCol);
+  wrap.appendChild(pbody);
+  return wrap;
+}
+function renderManagerView() {
+  const body = document.getElementById("managerBody");
+  if (!body || !STORE) return;
+  body.innerHTML = "";
+
+  const profiles = Object.values(STORE.profiles);
+  const sub = document.getElementById("managerSub");
+  if (sub) sub.textContent = "Averaging over " + mgrPeriodLabel() + " · " + profiles.length + (profiles.length === 1 ? " person" : " people");
+  document.querySelectorAll("#managerSeg button").forEach(b => b.classList.toggle("active", b.dataset.period === managerPeriod));
+
+  if (!profiles.length) { body.appendChild(mgrEl("div", "mgr-empty", "No scorecards yet.")); return; }
+
+  const people = mgrPeople();
+  const scored = people.filter(x => x.score !== null);
+  const attention = mgrAttentionList(people);
+  const leadsTarget = getTarget(METRICS.find(m => m.key === "leads"));
+
+  // ---- KPI strip ----
+  const teamScore = scored.length ? scored.reduce((a, b) => a + b.score, 0) / scored.length : null;
+  const onTrack = people.filter(x => x.latest !== null && x.latest >= getGreen()).length;
+  let leadSum = 0, leadWeeks = 0;
+  profiles.forEach(p => mgrScopedWeeks(p).forEach(w => { const l = parseFloat((w.rows.leads || {}).actual); if (!isNaN(l)) { leadSum += l; leadWeeks++; } }));
+  const avgLeads = leadWeeks ? leadSum / leadWeeks : null;
+
+  const kpiSec = mgrEl("div", "mgr-section");
+  const kpis = mgrEl("div", "mgr-kpis");
+  kpis.appendChild(mgrKpi(teamScore === null ? "–" : pctText(teamScore), teamScore === null ? "" : ragFor(teamScore).cls, "Team weighted score", "over " + mgrPeriodLabel()));
+  kpis.appendChild(mgrKpi(avgLeads === null ? "–" : avgLeads.toFixed(1), avgLeads === null ? "" : ragFor(avgLeads / leadsTarget).cls, "Avg qualified leads", "of " + leadsTarget + " target per week"));
+  kpis.appendChild(mgrKpi(onTrack + " / " + profiles.length, onTrack ? "green" : "", "On track (green)", onTrack === profiles.length ? "everyone" : "scored green"));
+  kpis.appendChild(mgrKpi(String(attention.length), attention.length ? "red" : "green", "Need attention", attention.length ? "see below" : "all clear"));
+  kpiSec.appendChild(kpis);
+  body.appendChild(kpiSec);
+
+  // ---- Needs attention ----
+  const attnSec = mgrSection("Needs attention", "The first thing to look at: who's red, who's slipping even if still green, and who has no data to review yet.");
+  if (!attention.length) {
+    attnSec.appendChild(mgrEl("div", "mgr-ok", "Everyone with data is on track — no red flags for " + mgrPeriodLabel() + "."));
+  } else {
+    const list = mgrEl("div", "mgr-attn");
+    attention.forEach(a => {
+      const row = mgrEl("div", "mgr-attn-row " + a.cls);
+      row.appendChild(mgrEl("span", "rag " + a.tagCls, a.tag));
+      row.appendChild(mgrEl("span", "mgr-attn-name", a.x.p.name || "Untitled"));
+      const why = mgrEl("span", "mgr-attn-why"); why.innerHTML = a.why;
+      row.appendChild(why);
+      const btn = mgrEl("button", "mgr-btn", "Open 1-on-1 sheet"); btn.type = "button";
+      btn.addEventListener("click", () => {
+        managerPrepPersonId = a.x.p.id; renderManagerView();
+        const el = document.getElementById("managerPrep"); if (el) el.scrollIntoView({ behavior: "smooth", block: "center" });
+      });
+      row.appendChild(btn);
+      list.appendChild(row);
+    });
+    attnSec.appendChild(list);
+  }
+  body.appendChild(attnSec);
+
+  // ---- Leaderboard ----
+  const lbSec = mgrSection("Team leaderboard", "Ranked by weighted score over " + mgrPeriodLabel() + ", with each person's trajectory, green-week streak and how steady they are.");
+  const ranked = scored.slice().sort((a, b) => b.score - a.score);
+  const mostImproved = scored.filter(x => x.trend.delta !== null && x.trend.delta > 0.0001).sort((a, b) => b.trend.delta - a.trend.delta)[0];
+  if (!ranked.length) {
+    lbSec.appendChild(mgrEl("div", "mgr-empty", "No scored weeks in " + mgrPeriodLabel() + " yet."));
+  } else {
+    const lb = mgrEl("div", "mgr-lb");
+    ranked.forEach((x, i) => {
+      const row = mgrEl("div", "mgr-lb-row");
+      row.appendChild(mgrEl("div", "mgr-rank" + (i === 0 ? " lead" : ""), String(i + 1)));
+      const id = mgrEl("div", "mgr-lb-id");
+      const name = mgrEl("div", "mgr-lb-name");
+      name.appendChild(document.createTextNode(x.p.name || "Untitled"));
+      if (i === 0) name.appendChild(mgrRibbon("★ Top"));
+      if (mostImproved && mostImproved.p.id === x.p.id) name.appendChild(mgrRibbon("Most improved"));
+      const meta = mgrEl("div", "mgr-lb-meta");
+      meta.appendChild(mgrEl("span", "", x.streak >= 1 ? "🔥 " + x.streak + " week" + (x.streak === 1 ? "" : "s") + " green" : "No green streak"));
+      if (x.consistency.label !== "New") meta.appendChild(mgrEl("span", x.consistency.cls, x.consistency.label));
+      id.appendChild(name); id.appendChild(meta);
+      const dirColor = x.trend.dir === "up" ? "var(--green)" : x.trend.dir === "down" ? "var(--red)" : "var(--muted)";
+      const spark = document.createElement("span");
+      spark.innerHTML = mgrSparkline(x.trend.series, dirColor);
+      let trendText;
+      if (x.trend.delta === null) trendText = "—";
+      else {
+        const pts = Math.round(Math.abs(x.trend.delta) * 100);
+        trendText = (x.trend.dir === "up" ? "▲ +" + pts : x.trend.dir === "down" ? "▼ -" + pts : "→ " + pts) + "pt";
+      }
+      const score = mgrEl("div", "mgr-lb-score", pctText(x.score));
+      score.style.color = "var(--" + (ragFor(x.score).cls === "blank" ? "muted" : ragFor(x.score).cls) + ")";
+      row.appendChild(id);
+      if (spark.firstChild) row.appendChild(spark);
+      row.appendChild(mgrEl("span", "mgr-trend " + x.trend.dir, trendText));
+      row.appendChild(score);
+      lb.appendChild(row);
+    });
+    people.filter(x => x.latest === null).forEach(x => {
+      const row = mgrEl("div", "mgr-lb-row"); row.style.opacity = ".6";
+      row.appendChild(mgrEl("div", "mgr-rank", "—"));
+      const id = mgrEl("div", "mgr-lb-id");
+      id.appendChild(mgrEl("div", "mgr-lb-name", x.p.name || "Untitled"));
+      id.appendChild(mgrEl("div", "mgr-lb-meta", "Awaiting first entry"));
+      const pill = mgrEl("span", "rag grey", "No data"); pill.style.marginLeft = "auto";
+      row.appendChild(id); row.appendChild(pill);
+      lb.appendChild(row);
+    });
+    lbSec.appendChild(lb);
+  }
+  body.appendChild(lbSec);
+
+  // ---- Team-metric rollup ----
+  const rollSec = mgrSection("Where the team is strong & weak", "Team average against target for every metric over " + mgrPeriodLabel() + ". A gap the whole team shares is a process fix, not five separate chats.");
+  const tw = mgrEl("div", "mgr-tw");
+  const table = mgrEl("table", "mgr-table");
+  const thead = document.createElement("thead");
+  const hr = document.createElement("tr");
+  hr.appendChild(mgrEl("th", "", "Metric"));
+  profiles.forEach(p => hr.appendChild(mgrEl("th", "", p.name || "Untitled")));
+  hr.appendChild(mgrEl("th", "", "Team avg"));
+  thead.appendChild(hr); table.appendChild(thead);
+  const tbody = document.createElement("tbody");
+  METRICS.forEach(m => {
+    const tr = document.createElement("tr");
+    const mtd = mgrEl("td", "", m.name);
+    mtd.appendChild(mgrEl("div", "mgr-cellsub", "target " + targetLabel(m)));
+    tr.appendChild(mtd);
+    const allVals = [];
+    profiles.forEach(p => {
+      const avg = mgrMetricAvg(p, m);
+      if (avg !== null) allVals.push(avg);
+      const td = document.createElement("td");
+      td.appendChild(mgrPctSpan(avg));
+      tr.appendChild(td);
+    });
+    const teamAvg = allVals.length ? allVals.reduce((a, b) => a + b, 0) / allVals.length : null;
+    const ttd = document.createElement("td");
+    ttd.appendChild(mgrPctSpan(teamAvg));
+    if (teamAvg !== null) {
+      const bar = mgrEl("div", "mgr-bar");
+      const s = mgrEl("span", ragFor(teamAvg).cls);
+      s.style.width = Math.min(100, Math.round(teamAvg * 100)) + "%";
+      bar.appendChild(s); ttd.appendChild(bar);
+    }
+    tr.appendChild(ttd);
+    tbody.appendChild(tr);
+  });
+  const wr = document.createElement("tr"); wr.className = "team";
+  wr.appendChild(mgrEl("td", "", "Weighted score"));
+  profiles.forEach(p => { const sc = mgrScore(p); wr.appendChild(mgrEl("td", "", sc === null ? "–" : pctText(sc))); });
+  wr.appendChild(mgrEl("td", "", teamScore === null ? "–" : pctText(teamScore)));
+  tbody.appendChild(wr);
+  table.appendChild(tbody); tw.appendChild(table); rollSec.appendChild(tw);
+  const metricAvgs = METRICS.map(m => {
+    const vals = [];
+    profiles.forEach(p => { const a = mgrMetricAvg(p, m); if (a !== null) vals.push(a); });
+    return { m, avg: vals.length ? vals.reduce((x, y) => x + y, 0) / vals.length : null };
+  }).filter(x => x.avg !== null);
+  if (metricAvgs.length >= 2) {
+    const best = metricAvgs.reduce((a, b) => b.avg > a.avg ? b : a);
+    const worst = metricAvgs.reduce((a, b) => b.avg < a.avg ? b : a);
+    const co = mgrEl("div", "mgr-callout");
+    co.appendChild(mgrEl("span", "", "⚠"));
+    const txt = mgrEl("span");
+    txt.innerHTML = "Biggest team gap: <b>" + worst.m.name + " (" + pctText(worst.avg) + ")</b>. Strongest area: <b>" + best.m.name + " (" + pctText(best.avg) + ")</b>. Fixing the shared gap once lifts everyone.";
+    co.appendChild(txt); rollSec.appendChild(co);
+  }
+  body.appendChild(rollSec);
+
+  // ---- Effort vs result (conversion) ----
+  const convSec = mgrSection("Effort vs. result", "Calls needed per lead, and talk time per call, over " + mgrPeriodLabel() + " — separating a quality problem (lots of activity, few leads) from a capacity problem (low activity).");
+  const convData = profiles.map(p => ({ p, c: mgrConversion(p) })).filter(x => x.c.hasCalls);
+  if (!convData.length) {
+    convSec.appendChild(mgrEl("div", "mgr-empty", "No call data in " + mgrPeriodLabel() + " yet."));
+  } else {
+    const withCPL = convData.filter(x => x.c.callsPerLead !== null).map(x => x.c.callsPerLead);
+    const bestCPL = withCPL.length ? Math.min.apply(null, withCPL) : null;
+    const grid = mgrEl("div", "mgr-conv");
+    convData.forEach(({ p, c }) => {
+      const flagged = c.callsPerLead === null || (bestCPL !== null && c.callsPerLead > bestCPL * 2);
+      const card = mgrEl("div", "mgr-conv-card" + (flagged ? " flag" : ""));
+      const nameRow = mgrEl("div", "mgr-conv-name");
+      nameRow.appendChild(document.createTextNode(p.name || "Untitled"));
+      nameRow.appendChild(c.callsPerLead === null ? mgrEl("span", "rag amber", "No leads") : (flagged ? mgrEl("span", "rag amber", "Quality gap") : mgrEl("span", "rag green", "Efficient")));
+      card.appendChild(nameRow);
+      const metrics = mgrEl("div", "mgr-conv-metrics");
+      const d1 = document.createElement("div");
+      d1.appendChild(mgrEl("div", "v", c.callsPerLead === null ? (c.calls ? Math.round(c.calls) + " / 0" : "–") : String(Math.round(c.callsPerLead))));
+      d1.appendChild(mgrEl("div", "k", "Calls / lead"));
+      const d2 = document.createElement("div");
+      d2.appendChild(mgrEl("div", "v", mgrFmtSecs(c.talkPerCall)));
+      d2.appendChild(mgrEl("div", "k", "Talk / call"));
+      metrics.appendChild(d1); metrics.appendChild(d2);
+      card.appendChild(metrics);
+      grid.appendChild(card);
+    });
+    convSec.appendChild(grid);
+    const worstConv = convData.slice().sort((a, b) => {
+      const av = a.c.callsPerLead === null ? Infinity : a.c.callsPerLead;
+      const bv = b.c.callsPerLead === null ? Infinity : b.c.callsPerLead;
+      return bv - av;
+    })[0];
+    const bestConv = convData.filter(x => x.c.callsPerLead !== null).sort((a, b) => a.c.callsPerLead - b.c.callsPerLead)[0];
+    if (worstConv && bestConv && worstConv.p.id !== bestConv.p.id) {
+      const co = mgrEl("div", "mgr-callout");
+      co.appendChild(mgrEl("span", "", "💡"));
+      const txt = mgrEl("span");
+      const worstDesc = worstConv.c.callsPerLead === null ? (Math.round(worstConv.c.calls) + " calls and no leads yet") : (Math.round(worstConv.c.callsPerLead) + " calls per lead");
+      txt.appendChild(document.createTextNode((worstConv.p.name || "Untitled") + " is working hardest for the fewest results — "));
+      const b1 = document.createElement("b"); b1.textContent = worstDesc; txt.appendChild(b1);
+      txt.appendChild(document.createTextNode(" vs " + (bestConv.p.name || "Untitled") + "'s " + Math.round(bestConv.c.callsPerLead) + ". Sit in on a couple of calls before pushing the numbers higher."));
+      co.appendChild(txt); convSec.appendChild(co);
+    }
+  }
+  body.appendChild(convSec);
+
+  // ---- 1-on-1 prep sheet ----
+  const prepSec = mgrSection("1-on-1 prep sheet", "Everything for the weekly sit-down on one page: their numbers, last week's actions and how the figures moved, plus talking points drawn from the data.");
+  if (!managerPrepPersonId || !STORE.profiles[managerPrepPersonId]) {
+    managerPrepPersonId = (attention[0] && attention[0].x.p.id) || (ranked[0] && ranked[0].p.id) || profiles[0].id;
+  }
+  const pills = mgrEl("div", "mgr-people");
+  profiles.forEach(p => {
+    const pill = mgrEl("button", "mgr-person-pill" + (p.id === managerPrepPersonId ? " active" : ""), p.name || "Untitled");
+    pill.type = "button";
+    pill.addEventListener("click", () => {
+      managerPrepPersonId = p.id; renderManagerView();
+      const el = document.getElementById("managerPrep"); if (el) el.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    });
+    pills.appendChild(pill);
+  });
+  prepSec.appendChild(pills);
+  prepSec.appendChild(mgrBuildPrep(STORE.profiles[managerPrepPersonId]));
+  body.appendChild(prepSec);
+}
+
 function switchMode(next) {
   mode = next;
   document.getElementById("scorecardView").style.display = next === "scorecard" ? "" : "none";
   document.getElementById("dashboardView").style.display = next === "dashboard" ? "" : "none";
+  document.getElementById("managerView").style.display = next === "manager" ? "" : "none";
   document.getElementById("settingsView").style.display = next === "settings" ? "" : "none";
   document.getElementById("scorecardNav").style.display = next === "scorecard" ? "" : "none";
   document.getElementById("navScorecard").classList.toggle("active", next === "scorecard");
   document.getElementById("navDashboard").classList.toggle("active", next === "dashboard");
+  document.getElementById("navManager").classList.toggle("active", next === "manager");
   document.getElementById("navSettings").classList.toggle("active", next === "settings");
   if (next === "dashboard") {
     initDashboardFilters();
     renderDashboardResults();
   }
+  if (next === "manager") renderManagerView();
   if (next === "settings") syncGoalInputs();
 }
 
@@ -2015,7 +2646,9 @@ async function init() {
 
   document.getElementById("navScorecard").addEventListener("click", () => switchMode("scorecard"));
   document.getElementById("navDashboard").addEventListener("click", () => switchMode("dashboard"));
+  document.getElementById("navManager").addEventListener("click", () => switchMode("manager"));
   document.getElementById("navSettings").addEventListener("click", () => switchMode("settings"));
+  document.querySelectorAll("#managerSeg button").forEach(b => b.addEventListener("click", () => { managerPeriod = b.dataset.period; renderManagerView(); }));
   document.getElementById("resetGoalsBtn").addEventListener("click", resetGoals);
   document.getElementById("amberThreshold").addEventListener("input", onAmberInput);
   document.getElementById("greenThreshold").addEventListener("input", onGreenInput);
@@ -2051,6 +2684,7 @@ async function init() {
     loadWeekIntoForm();
     setIndicator("Updated from another device " + new Date().toLocaleTimeString());
     if (mode === "dashboard") renderDashboardResults();
+    if (mode === "manager") renderManagerView();
   });
 
   onSnapshot(settingsDocRef, snap => {
@@ -2062,6 +2696,7 @@ async function init() {
     syncGoalInputs();
     refreshTargetDisplays();
     if (mode === "dashboard") renderDashboardResults();
+    if (mode === "manager") renderManagerView();
   });
 }
 
