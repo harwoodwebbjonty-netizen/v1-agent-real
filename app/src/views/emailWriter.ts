@@ -12,6 +12,7 @@ import {
   EMAIL_PRESETS,
   applyEmailTemplate,
   createEmailTemplate,
+  createManualEmailDraft,
   generateEmailDraft,
   generateEmailPersonalisation,
   getBrandVoice,
@@ -282,6 +283,7 @@ export function initEmailWriter(): EmailWriterHandle {
         </select>
         <button id="ew-generate-btn" class="btn btn-primary" type="button">${session.draftId ? "Regenerate" : "Generate"}</button>
         <span class="ew-cost-hint">~$0.02 per generation</span>
+        ${session.draftId ? "" : `<button id="ew-write-manually-btn" class="btn btn-ghost" type="button">Write it myself</button>`}
         <span id="ew-generate-status" class="status-message"></span>
       </div>
 
@@ -391,6 +393,25 @@ export function initEmailWriter(): EmailWriterHandle {
     }
 
     generateBtn.addEventListener("click", () => void doGenerate());
+
+    document.querySelector<HTMLButtonElement>("#ew-write-manually-btn")?.addEventListener("click", () => void (async () => {
+      const btn = document.querySelector<HTMLButtonElement>("#ew-write-manually-btn")!;
+      btn.disabled = true;
+      try {
+        const created = await createManualEmailDraft(session.leadId);
+        session.draftId = created.id;
+        // The server returns a blank draft — keep whatever the rep already
+        // typed rather than letting that clobber it.
+        session.subject = subjectInput.value;
+        session.bodyHtml = sanitizeHtmlFragment(bodyEl.innerHTML);
+        session.dirty = true;
+        renderEditor();
+        renderDraftTabs();
+      } catch (err) {
+        generateStatus.textContent = `Failed: ${err}`;
+        btn.disabled = false;
+      }
+    })());
 
     document.querySelectorAll<HTMLButtonElement>(".ew-quick-btn").forEach((btn) => {
       btn.addEventListener("click", () => void doGenerate(btn.dataset.instruction));

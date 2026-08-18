@@ -765,6 +765,12 @@ export interface EmailDraft {
 }
 
 /** Manual trigger only — spends Anthropic credits. */
+/** Starts a blank draft with no AI call — for writing an email by hand
+ * instead of generating one. No credit spend. */
+export async function createManualEmailDraft(leadId: string): Promise<EmailDraft> {
+  return invoke<EmailDraft>("create_manual_email_draft", { leadId });
+}
+
 export async function generateEmailDraft(
   leadId: string,
   instruction: string,

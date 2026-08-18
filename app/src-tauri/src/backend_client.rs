@@ -1442,6 +1442,18 @@ pub async fn generate_email_draft(
     handle_response(response).await
 }
 
+pub async fn create_manual_email_draft(base_url: &str, token: &str, lead_id: &str) -> Result<EmailDraft, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/leads/{}/email-drafts/manual", base_url, lead_id);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
 pub async fn generate_follow_up_draft(base_url: &str, token: &str, lead_id: &str) -> Result<EmailDraft, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/leads/{}/follow-up-draft", base_url, lead_id);

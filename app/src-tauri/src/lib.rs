@@ -784,6 +784,13 @@ async fn apply_email_template(
 // --- AI Email Writer: drafts ---
 
 #[tauri::command]
+async fn create_manual_email_draft(app_handle: tauri::AppHandle, lead_id: String) -> Result<backend_client::EmailDraft, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::create_manual_email_draft(&base_url, &session.token, &lead_id).await
+}
+
+#[tauri::command]
 async fn generate_email_draft(
     app_handle: tauri::AppHandle,
     lead_id: String,
@@ -1475,6 +1482,7 @@ pub fn run() {
       update_email_template,
       delete_email_template,
       apply_email_template,
+      create_manual_email_draft,
       generate_email_draft,
       refine_email_draft,
       update_email_draft,

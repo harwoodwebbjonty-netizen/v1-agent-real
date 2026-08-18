@@ -142,6 +142,27 @@ async def generate_draft(
     return _to_draft_out(db.get_email_draft(draft_id))
 
 
+@router.post("/leads/{lead_id}/email-drafts/manual", response_model=EmailDraftOut)
+def create_manual_draft(lead_id: str, current_user: CurrentUser = Depends(get_current_user)) -> EmailDraftOut:
+    """Starts a blank draft with no AI call and no credit spend — for reps who
+    want to write an email by hand instead of generating one. Save/Send/Preview
+    all key off draft_id existing, which otherwise only ever gets set via the
+    AI generation endpoints above."""
+    lead = db.get_lead(lead_id)
+    if lead is None:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    _require_lead_access(lead, current_user)
+
+    draft_id = new_id()
+    created_at = now_iso()
+    db.create_email_draft(
+        draft_id, lead_id, current_user.id,
+        {"subject": "", "body": "", "tone": "Custom", "length": "Medium"},
+        created_at,
+    )
+    return _to_draft_out(db.get_email_draft(draft_id))
+
+
 @router.post("/leads/{lead_id}/follow-up-draft", response_model=EmailDraftOut)
 @limiter.limit(get_settings().rate_limit)
 async def generate_follow_up_draft(
