@@ -1,3 +1,4 @@
+import logging
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -41,6 +42,7 @@ from app.services.lead_timeline_service import build_timeline, recent_activity_s
 from app.services.template_variables import build_lead_context
 
 router = APIRouter(tags=["email-writer"])
+logger = logging.getLogger("app.email_writer")
 
 
 def _to_draft_out(row: sqlite3.Row) -> EmailDraftOut:
@@ -119,6 +121,7 @@ async def generate_draft(
     try:
         result = await generate_email(lead_context, brand_voice, body.instruction, body.preset, body.length)
     except Exception:
+        logger.exception("Email generation failed for lead %s", lead_id)
         raise HTTPException(status_code=502, detail="AI failed to generate the email. Please try again.")
 
     db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
@@ -182,6 +185,7 @@ async def generate_follow_up_draft(
     try:
         result = await generate_email(lead_context, brand_voice, instruction, "Follow Up", "Short")
     except Exception:
+        logger.exception("Follow-up draft generation failed for lead %s", lead_id)
         raise HTTPException(status_code=502, detail="AI failed to generate the follow-up. Please try again.")
 
     db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
@@ -222,6 +226,7 @@ async def refine_draft(
     try:
         result = await refine_email(lead_context, brand_voice, draft["subject"], draft["body"], body.instruction, [])
     except Exception:
+        logger.exception("Email refine failed for draft %s", draft_id)
         raise HTTPException(status_code=502, detail="AI failed to refine the email. Please try again.")
 
     db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
@@ -291,6 +296,7 @@ async def get_personalisation(
     try:
         options = await generate_personalisation(lead_context, body.count)
     except Exception:
+        logger.exception("Personalisation generation failed for lead %s", lead_id)
         raise HTTPException(status_code=502, detail="AI failed to generate personalisation. Please try again.")
     db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
     return PersonalisationResponse(options=options)
@@ -306,6 +312,7 @@ async def get_cta_suggestions(
     try:
         ctas = await generate_cta_suggestions(lead_context, body.goal)
     except Exception:
+        logger.exception("CTA suggestion generation failed for lead %s", lead_id)
         raise HTTPException(status_code=502, detail="AI failed to generate CTA suggestions. Please try again.")
     db.record_credit_spend(new_id(), current_user.id, "email_writer", db.CREDIT_COST["email_writer"], now_iso())
     return CtaSuggestionsResponse(ctas=ctas)
