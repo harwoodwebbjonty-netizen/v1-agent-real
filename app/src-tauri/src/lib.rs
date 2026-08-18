@@ -1338,10 +1338,10 @@ async fn preview_win_back_campaign_email(
 // --- List email campaigns ---
 
 #[tauri::command]
-async fn create_list_campaign(app_handle: tauri::AppHandle, list_id: String, name: String, idea: String, offers: String, link_url: String, link_text: String, signature: String) -> Result<ListCampaign, String> {
+async fn create_list_campaign(app_handle: tauri::AppHandle, list_id: String, lead_ids: Vec<String>, name: String, idea: String, offers: String, link_url: String, link_text: String, signature: String) -> Result<ListCampaign, String> {
     let session = require_session(&app_handle)?;
     let base_url = app_state::resolve_base_url(&app_handle);
-    backend_client::create_list_campaign(&base_url, &session.token, &list_id, &name, &idea, &offers, &link_url, &link_text, &signature).await
+    backend_client::create_list_campaign(&base_url, &session.token, &list_id, lead_ids, &name, &idea, &offers, &link_url, &link_text, &signature).await
 }
 
 #[tauri::command]

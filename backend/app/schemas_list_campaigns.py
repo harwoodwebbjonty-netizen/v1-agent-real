@@ -6,7 +6,10 @@ ListCampaignStatus = Literal["generating", "ready", "stopped", "error"]
 
 
 class CreateListCampaignRequest(BaseModel):
-    list_id: str
+    # Exactly one of list_id (a saved cold-call list) or lead_ids (an ad-hoc,
+    # hand-picked set of leads) must be given — see create_campaign().
+    list_id: str = ""
+    lead_ids: list[str] = []
     name: str = ""
     idea: str
     offers: str = ""

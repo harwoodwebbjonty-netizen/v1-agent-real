@@ -4,6 +4,7 @@ background task; per-lead drafts live in email_drafts and are edited/sent throug
 the existing email-writer endpoints. See services/list_campaign_service.py."""
 
 import asyncio
+import json
 import sqlite3
 
 from fastapi import APIRouter, Depends, HTTPException, Request
@@ -52,16 +53,27 @@ async def create_campaign(
 ) -> ListCampaignOut:
     if not body.idea.strip():
         raise HTTPException(status_code=400, detail="Add an email idea before generating.")
+    if not body.list_id and not body.lead_ids:
+        raise HTTPException(status_code=400, detail="Pick a list or select some leads first.")
 
-    lead_list = db.get_lead_list(body.list_id)
-    if lead_list is None:
-        raise HTTPException(status_code=404, detail="List not found")
-    if lead_list["owner_user_id"] != current_user.id and current_user.role != "admin":
-        raise HTTPException(status_code=403, detail="You don't have access to this list.")
-
-    lead_ids = [lead["id"] for lead in db.list_leads(body.list_id)]
-    if not lead_ids:
-        raise HTTPException(status_code=400, detail="This list has no leads.")
+    lead_ids_json = ""
+    if body.list_id:
+        lead_list = db.get_lead_list(body.list_id)
+        if lead_list is None:
+            raise HTTPException(status_code=404, detail="List not found")
+        if lead_list["owner_user_id"] != current_user.id and current_user.role != "admin":
+            raise HTTPException(status_code=403, detail="You don't have access to this list.")
+        lead_ids = [lead["id"] for lead in db.list_leads(body.list_id)]
+        if not lead_ids:
+            raise HTTPException(status_code=400, detail="This list has no leads.")
+        default_name = lead_list["name"]
+    else:
+        # Ad-hoc campaign — a hand-picked set of leads, not tied to a saved
+        # list. Leads are a shared pool visible to every user (see
+        # CLAUDE.md), so no per-lead ownership check is needed here.
+        lead_ids = body.lead_ids
+        lead_ids_json = json.dumps(lead_ids)
+        default_name = f"{len(lead_ids)} selected lead{'' if len(lead_ids) == 1 else 's'}"
 
     allowed, spent, limit = db.check_credit_limit(current_user.id, "email_writer")
     if not allowed:
@@ -72,10 +84,11 @@ async def create_campaign(
         )
 
     campaign_id = new_id()
-    name = body.name.strip() or lead_list["name"]
+    name = body.name.strip() or default_name
     db.create_list_campaign(
         campaign_id, body.list_id, current_user.id, name, body.idea.strip(), body.offers.strip(),
         body.link_url.strip(), body.link_text.strip(), body.signature.strip(), len(lead_ids), now_iso(),
+        lead_ids_json,
     )
     asyncio.create_task(
         generate_campaign(
@@ -133,7 +146,7 @@ async def resume_campaign(request: Request, campaign_id: str, current_user: Curr
         raise HTTPException(status_code=404, detail="Campaign not found")
     _require_campaign_access(row, current_user)
 
-    missing = db.list_campaign_lead_ids_without_draft(campaign_id, row["list_id"])
+    missing = db.list_campaign_lead_ids_without_draft(campaign_id, row["list_id"], row["lead_ids_json"])
     if not missing:
         return _to_campaign_out(row)
 

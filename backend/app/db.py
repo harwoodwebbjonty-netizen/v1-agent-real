@@ -729,6 +729,20 @@ def _migration_038_oauth_state_purpose(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE oauth_states ADD COLUMN purpose TEXT NOT NULL DEFAULT 'email'")
 
 
+def _migration_039_list_campaign_lead_ids(conn: sqlite3.Connection) -> None:
+    """Lets a list campaign target an arbitrary hand-picked set of leads
+    instead of only a whole saved list — the Outreach merge (v0.6.24) needs
+    this so "select a few specific leads" and "pick a whole list" both use
+    the same real generation pipeline (instruction-building, campaign link,
+    signature — all backend-only logic in list_campaign_service.py that
+    shouldn't be duplicated client-side). `list_id` stays NOT NULL for the
+    existing list-based path; an ad-hoc campaign stores '' there and its
+    target leads in this new column instead."""
+    cols = {row["name"] for row in conn.execute("PRAGMA table_info(list_email_campaigns)")}
+    if "lead_ids_json" not in cols:
+        conn.execute("ALTER TABLE list_email_campaigns ADD COLUMN lead_ids_json TEXT NOT NULL DEFAULT ''")
+
+
 def _migration_033_lead_id_indexes(conn: sqlite3.Connection) -> None:
     """Five FK-shaped lead_id columns had no explicit index (audit
     schema_index_scan.py) despite being queried on every lead-record render
@@ -938,8 +952,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (36, _migration_036_custom_fields),
     (37, _migration_037_calendar_oauth),
     (38, _migration_038_oauth_state_purpose),
+    (39, _migration_039_list_campaign_lead_ids),
 ]
-CURRENT_SCHEMA_VERSION = 38
+CURRENT_SCHEMA_VERSION = 39
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -2807,15 +2822,16 @@ def update_win_back_campaign_progress(campaign_id: str, generated: int, status: 
 def create_list_campaign(
     id: str, list_id: str, owner_user_id: str, name: str, idea: str, offers: str,
     link_url: str, link_text: str, signature: str, total_target: int, created_at: str,
+    lead_ids_json: str = "",
 ) -> None:
     with get_connection() as conn:
         conn.execute(
             """INSERT INTO list_email_campaigns
                (id, list_id, owner_user_id, name, idea, offers, link_url, link_text,
-                signature, status, total_target, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?)""",
+                signature, status, total_target, created_at, updated_at, lead_ids_json)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'generating', ?, ?, ?, ?)""",
             (id, list_id, owner_user_id, name, idea, offers, link_url, link_text,
-             signature, total_target, created_at, created_at),
+             signature, total_target, created_at, created_at, lead_ids_json),
         )
 
 
@@ -2869,20 +2885,34 @@ def list_campaign_drafts(campaign_id: str) -> list[sqlite3.Row]:
         ).fetchall()
 
 
-def list_campaign_lead_ids_without_draft(campaign_id: str, list_id: str) -> list[str]:
-    """Leads on the campaign's list that have no draft yet — used by resume to
-    fill only the leads a credit-stopped run never reached."""
+def list_campaign_lead_ids_without_draft(campaign_id: str, list_id: str, lead_ids_json: str = "") -> list[str]:
+    """Target leads for the campaign that have no draft yet — used by resume
+    to fill only the leads a credit-stopped run never reached. `list_id`
+    empty means an ad-hoc campaign (specific hand-picked leads, not a saved
+    list) — its target set lives in `lead_ids_json` instead of `leads.list_id`."""
     with get_connection() as conn:
-        rows = conn.execute(
-            """SELECT l.id FROM leads l
-               WHERE l.list_id = ?
-                 AND NOT EXISTS (
-                     SELECT 1 FROM email_drafts ed
-                     WHERE ed.campaign_id = ? AND ed.lead_id = l.id
-                 )""",
-            (list_id, campaign_id),
-        ).fetchall()
-        return [r["id"] for r in rows]
+        if list_id:
+            rows = conn.execute(
+                """SELECT l.id FROM leads l
+                   WHERE l.list_id = ?
+                     AND NOT EXISTS (
+                         SELECT 1 FROM email_drafts ed
+                         WHERE ed.campaign_id = ? AND ed.lead_id = l.id
+                     )""",
+                (list_id, campaign_id),
+            ).fetchall()
+            return [r["id"] for r in rows]
+
+        target_ids = json.loads(lead_ids_json) if lead_ids_json else []
+        if not target_ids:
+            return []
+        existing = {
+            r["lead_id"]
+            for r in conn.execute(
+                "SELECT lead_id FROM email_drafts WHERE campaign_id = ?", (campaign_id,)
+            ).fetchall()
+        }
+        return [lid for lid in target_ids if lid not in existing]
 
 
 # ---------------------------------------------------------------------------

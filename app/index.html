@@ -311,12 +311,26 @@
             </div>
           </header>
           <div class="sub-view-tabs">
-            <button class="sub-view-tab active" data-sub="email-writer">Email Writer</button>
-            <button class="sub-view-tab" data-sub="list-campaign">List Campaign</button>
+            <button class="sub-view-tab active" data-sub="compose">Compose &amp; Send</button>
             <button class="sub-view-tab" data-sub="sequences">Sequences</button>
           </div>
-          <div id="view-email-writer"></div>
-          <div id="view-list-campaign" style="display:none"></div>
+          <div id="view-compose">
+            <section class="card outreach-picker">
+              <div class="outreach-picker-row">
+                <input id="or-lead-search" type="search" class="search-input" placeholder="Search leads..." />
+                <select id="or-list-select" class="ccl-filter-select">
+                  <option value="">— or pick a whole list —</option>
+                </select>
+              </div>
+              <ul id="or-lead-list" class="history-list outreach-lead-list"></ul>
+              <p id="or-selection-summary" class="card-subtitle"></p>
+            </section>
+            <div id="outreach-empty-state" class="card">
+              <p class="empty-state">Select one or more leads, or pick a whole list, to start writing.</p>
+            </div>
+            <div id="view-email-writer" style="display:none"></div>
+            <div id="view-list-campaign" style="display:none"></div>
+          </div>
           <div id="view-sequences" style="display:none"></div>
         </div>
         <div id="view-win-back"></div>

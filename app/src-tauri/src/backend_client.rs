@@ -2679,6 +2679,7 @@ struct ListCampaignDraftsWrapper {
 #[derive(Serialize)]
 struct CreateListCampaignRequest {
     list_id: String,
+    lead_ids: Vec<String>,
     name: String,
     idea: String,
     offers: String,
@@ -2693,7 +2694,7 @@ struct ListCampaignSendRequest {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub async fn create_list_campaign(base_url: &str, token: &str, list_id: &str, name: &str, idea: &str, offers: &str, link_url: &str, link_text: &str, signature: &str) -> Result<ListCampaign, String> {
+pub async fn create_list_campaign(base_url: &str, token: &str, list_id: &str, lead_ids: Vec<String>, name: &str, idea: &str, offers: &str, link_url: &str, link_text: &str, signature: &str) -> Result<ListCampaign, String> {
     let client = reqwest::Client::new();
     let url = format!("{}/list-campaigns", base_url);
     let response = client
@@ -2701,6 +2702,7 @@ pub async fn create_list_campaign(base_url: &str, token: &str, list_id: &str, na
         .header("Authorization", format!("Bearer {}", token))
         .json(&CreateListCampaignRequest {
             list_id: list_id.to_string(),
+            lead_ids,
             name: name.to_string(),
             idea: idea.to_string(),
             offers: offers.to_string(),

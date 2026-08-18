@@ -23,9 +23,7 @@ import {
   sendEmailDraft,
   updateEmailDraft,
 } from "../api";
-import { consumePendingEmailWriterLead } from "../emailWriterHandoff";
 import { getLeads, subscribe } from "../state";
-import { getActiveTabId, subscribeTabs } from "../tabs";
 import { escapeHtml, sanitizeHtmlFragment } from "../utils";
 
 const VARIABLES: { key: string; label: string }[] = [
@@ -88,21 +86,19 @@ function newSession(leadId: string): DraftSession {
   };
 }
 
-export function initEmailWriter(): void {
+export interface EmailWriterHandle {
+  /** Pre-loads (or switches the active draft to) the given lead — called by
+   * the unified Outreach picker once exactly one lead is selected. */
+  focusLead: (leadId: string) => void;
+}
+
+export function initEmailWriter(): EmailWriterHandle {
   const container = document.querySelector<HTMLDivElement>("#view-email-writer")!;
   container.innerHTML = `
     <main class="container email-writer-container">
       <div class="email-writer-layout">
-        <section class="card ew-lead-pane">
-          <h2 class="card-title">Lead</h2>
-          <div class="card-actions">
-            <input id="ew-lead-search" type="search" class="search-input" placeholder="Search leads..." />
-          </div>
-          <ul id="ew-lead-list" class="history-list"></ul>
-          <div id="ew-lead-details"></div>
-        </section>
-
         <section class="card ew-editor-pane">
+          <div id="ew-lead-details" class="ew-lead-summary"></div>
           <div id="ew-draft-tabs" class="ew-draft-tabs"></div>
           <div id="ew-editor"></div>
         </section>
@@ -140,8 +136,6 @@ export function initEmailWriter(): void {
     </div>
   `;
 
-  const leadSearchInput = document.querySelector<HTMLInputElement>("#ew-lead-search")!;
-  const leadListEl = document.querySelector<HTMLUListElement>("#ew-lead-list")!;
   const leadDetailsEl = document.querySelector<HTMLDivElement>("#ew-lead-details")!;
   const draftTabsEl = document.querySelector<HTMLDivElement>("#ew-draft-tabs")!;
   const editorEl = document.querySelector<HTMLDivElement>("#ew-editor")!;
@@ -153,7 +147,6 @@ export function initEmailWriter(): void {
 
   let sessions: DraftSession[] = [];
   let activeKey: string | null = null;
-  let leadSearch = "";
   let assistantTab: "chat" | "personalisation" | "cta" = "chat";
   let personalisationOptions: PersonalisationOption[] | null = null;
   let ctaSuggestions: string[] | null = null;
@@ -171,27 +164,12 @@ export function initEmailWriter(): void {
     return getLeads().find((l) => l.id === session.leadId) ?? null;
   }
 
-  // --- Lead pane ---
+  // --- Lead summary (recipient is chosen externally, in outreach.ts) ---
 
   function renderLeadPane(): void {
-    const session = activeSession();
-    const leads = getLeads().filter((l) => l.company.toLowerCase().includes(leadSearch.toLowerCase()));
-    leadListEl.innerHTML = leads
-      .slice(0, 50)
-      .map(
-        (l) => `
-        <li class="history-list-row ew-lead-row ${session?.leadId === l.id ? "active" : ""}" data-lead-id="${escapeHtml(l.id)}">
-          <span>${escapeHtml(l.company)}</span>
-        </li>`
-      )
-      .join("");
-    leadListEl.querySelectorAll<HTMLLIElement>(".ew-lead-row").forEach((row) => {
-      row.addEventListener("click", () => selectLeadForActiveSession(row.dataset.leadId!));
-    });
-
     const lead = selectedLead();
     if (!lead) {
-      leadDetailsEl.innerHTML = '<p class="empty-hint">Select a lead to start writing.</p>';
+      leadDetailsEl.innerHTML = '<p class="empty-hint">Select a lead above to start writing.</p>';
       return;
     }
     leadDetailsEl.innerHTML = `
@@ -795,11 +773,6 @@ export function initEmailWriter(): void {
     renderAssistant();
   }
 
-  leadSearchInput.addEventListener("input", () => {
-    leadSearch = leadSearchInput.value;
-    renderLeadPane();
-  });
-
   document.querySelector("#ew-preview-overlay")!.addEventListener("click", (event) => {
     if (event.target === previewOverlay) previewOverlay.classList.add("hidden");
   });
@@ -834,26 +807,7 @@ export function initEmailWriter(): void {
     await refreshTemplates();
   })();
 
-  // External hand-off from "Generate Email" buttons elsewhere (side panel,
-  // Call Queue, Action Centre, ...). Checked both at startup (in case this
-  // view happens to init after the handoff was set) and every time this
-  // tab actually becomes active — a hand-off set while the user is already
-  // elsewhere only takes effect once they switch here, which is the whole
-  // point of it being a hand-off rather than an immediate jump.
-  function checkPendingHandoff(): boolean {
-    const pendingLeadId = consumePendingEmailWriterLead();
-    if (pendingLeadId) {
-      selectLeadForActiveSession(pendingLeadId);
-      return true;
-    }
-    return false;
-  }
+  renderAll();
 
-  subscribeTabs(() => {
-    if (getActiveTabId() === "email-writer") checkPendingHandoff();
-  });
-
-  if (!checkPendingHandoff()) {
-    renderAll();
-  }
+  return { focusLead: selectLeadForActiveSession };
 }

@@ -2681,11 +2681,10 @@ button.p-filter-chip.active {
 
 @media (min-width: 1600px) {
   .email-writer-layout {
-    grid-template-columns: 220px 1fr 280px 220px;
+    grid-template-columns: 1fr 280px 220px;
   }
 }
 
-.ew-lead-pane,
 .ew-assistant-pane,
 .ew-timeline-pane {
   min-width: 0;
@@ -2699,17 +2698,14 @@ button.p-filter-chip.active {
   min-width: 0;
 }
 
-.ew-lead-row {
-  cursor: pointer;
-  padding: var(--space-2);
-  border-radius: var(--radius-sm);
+/* The recipient is chosen in outreach.ts's picker above, not in this pane
+   any more — this is just a compact read-only summary of who's selected. */
+.ew-lead-summary {
+  margin-bottom: var(--space-4);
 }
 
-.ew-lead-row span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+.ew-lead-summary h4 {
+  margin: 0 0 var(--space-2);
 }
 
 /* Timestamp + summary side-by-side doesn't fit this pane's ~190px content
@@ -2718,14 +2714,6 @@ button.p-filter-chip.active {
   flex-direction: column;
   align-items: flex-start;
   gap: 2px;
-}
-
-.ew-lead-row:hover {
-  background: var(--panel);
-}
-
-.ew-lead-row.active {
-  background: var(--accent-glow);
 }
 
 .ew-draft-tabs {
@@ -4985,6 +4973,41 @@ button.p-filter-chip.active {
 
 /* Outreach page header aligns with its tab bar (no double border) */
 .outreach-head { padding: 22px 26px 0; margin-bottom: 12px; border-bottom: 0; }
+
+/* Unified Outreach recipient picker — drives Email Writer (1 lead) vs the
+   bulk draft-review grid (a whole list, or several hand-picked leads). */
+.outreach-picker { margin-bottom: var(--space-4); }
+
+.outreach-picker-row {
+  display: flex;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.outreach-picker-row > * { flex: 1 1 240px; }
+
+.outreach-lead-list {
+  max-height: 220px;
+  overflow-y: auto;
+  margin-top: var(--space-3);
+}
+
+.outreach-lead-row { padding: var(--space-1) var(--space-2); }
+
+.outreach-lead-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  cursor: pointer;
+  width: 100%;
+}
+
+.outreach-lead-check span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 /* ================================================================
    Sidebar exact-match to the artifact — brand wordmark, bottom user

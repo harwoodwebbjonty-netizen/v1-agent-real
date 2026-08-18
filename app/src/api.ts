@@ -1314,13 +1314,16 @@ export interface ListCampaignDraft {
   sent_at: string | null;
 }
 
+/** Targets exactly one of a saved list (listId) or an ad-hoc hand-picked set
+ * of leads (leadIds) — pass whichever the caller has, leave the other empty. */
 export async function createListCampaign(
-  listId: string,
+  target: { listId: string } | { leadIds: string[] },
   idea: string,
   opts: { name?: string; offers?: string; linkUrl?: string; linkText?: string; signature?: string } = {},
 ): Promise<ListCampaign> {
   return invoke<ListCampaign>("create_list_campaign", {
-    listId,
+    listId: "listId" in target ? target.listId : "",
+    leadIds: "leadIds" in target ? target.leadIds : [],
     name: opts.name ?? "",
     idea,
     offers: opts.offers ?? "",
