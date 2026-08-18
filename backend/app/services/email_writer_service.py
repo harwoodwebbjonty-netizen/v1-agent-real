@@ -37,9 +37,14 @@ EXTRACTION_SCHEMA = {
     "properties": {
         "subject": {"type": "string"},
         "body": {"type": "string"},
-        "estimated_open_rate": {"type": "number", "minimum": 0, "maximum": 1},
-        "estimated_reply_rate": {"type": "number", "minimum": 0, "maximum": 1},
-        "estimated_readability_score": {"type": "number", "minimum": 0, "maximum": 100},
+        # No minimum/maximum here — Anthropic's structured-output schema
+        # validation rejects those keywords on `number` properties (400:
+        # "properties maximum, minimum are not supported"). The intended
+        # range (0-1 / 0-100) is still communicated to the model via the
+        # prompt text below, just not schema-enforced.
+        "estimated_open_rate": {"type": "number"},
+        "estimated_reply_rate": {"type": "number"},
+        "estimated_readability_score": {"type": "number"},
     },
     "required": ["subject", "body", "estimated_open_rate", "estimated_reply_rate", "estimated_readability_score"],
     "additionalProperties": False,
