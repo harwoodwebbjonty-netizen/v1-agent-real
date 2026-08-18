@@ -19,10 +19,10 @@ import { getEvents, refreshCalendarEvents, subscribeCalendarEvents, type Calenda
 import { reportBodyHtml } from "../components/sidePanel";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import { consumePendingOpportunityWorkspaceLead } from "../opportunityWorkspaceHandoff";
-import { getLeads, refreshLeads, subscribe } from "../state";
+import { getLeads, hasLoadedLeads, refreshLeads, subscribe } from "../state";
 import { getActiveTabId, openTab, subscribeTabs } from "../tabs";
 import { showToast } from "../toast";
-import { escapeHtml } from "../utils";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 const STAGE_LABELS: Record<OpportunityStage, string> = {
   none: "Not an opportunity yet",
@@ -72,6 +72,11 @@ export function initOpportunityWorkspace(): void {
   }
 
   function renderList(): void {
+    if (!hasLoadedLeads()) {
+      container.innerHTML = `<main class="container">${skeletonBlockHtml(4)}</main>`;
+      return;
+    }
+
     const opportunities = activeOpportunities();
 
     if (!opportunities.length) {

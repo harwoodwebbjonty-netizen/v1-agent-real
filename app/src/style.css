@@ -1752,6 +1752,13 @@ select.inline-edit { min-width: 110px; }
   background: var(--panel);
 }
 
+.skeleton-block {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+}
+
 /* Right inspector panel — elevated surface, soft drop shadow */
 .side-panel {
   position: fixed;

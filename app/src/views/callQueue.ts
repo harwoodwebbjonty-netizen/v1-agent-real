@@ -17,7 +17,7 @@ import {
   updateLeadPhone,
   type CallOutcome,
 } from "../api";
-import { getEvents, refreshCalendarEvents, subscribeCalendarEvents, type CalendarEvent } from "../calendarEvents";
+import { getEvents, hasLoadedEvents, refreshCalendarEvents, subscribeCalendarEvents, type CalendarEvent } from "../calendarEvents";
 import { setPendingEmailWriterLead } from "../emailWriterHandoff";
 import {
   openSidePanel,
@@ -26,11 +26,11 @@ import {
   setTeamMembers,
   type SidePanelCallbacks,
 } from "../components/sidePanel";
-import { getLeads, refreshLeads, subscribe } from "../state";
+import { getLeads, hasLoadedLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
 import { openTab } from "../tabs";
 import { showToast } from "../toast";
-import { escapeHtml } from "../utils";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 const OUTCOME_LABELS: Record<CallOutcome, string> = {
   connected: "Connected",
@@ -135,6 +135,11 @@ export function initCallQueue(): void {
   };
 
   function render(): void {
+    if (!hasLoadedLeads() || !hasLoadedEvents()) {
+      listEl.innerHTML = skeletonBlockHtml(3);
+      return;
+    }
+
     const calls = dueCalls();
     refreshIfOpen(getLeads());
 

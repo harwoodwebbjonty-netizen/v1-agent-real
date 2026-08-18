@@ -9,6 +9,7 @@ import {
 } from "../calendarEvents";
 import { getCurrentUser, subscribeAuth } from "../auth";
 import { getLeads } from "../state";
+import { showToast } from "../toast";
 import { escapeHtml } from "../utils";
 
 const WEEKDAY_NAMES = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
@@ -375,6 +376,6 @@ export function initCalendar(): void {
   // same pattern as Dashboard's leads and Cold Call Lists' lists.
   subscribeAuth(() => {
     if (!getCurrentUser()) return;
-    void refreshCalendarEvents();
+    void refreshCalendarEvents().catch((err) => showToast(`Could not load calendar events: ${err}`));
   });
 }

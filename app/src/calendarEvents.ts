@@ -10,6 +10,7 @@ import {
 export type { CalendarEvent };
 
 let events: CalendarEvent[] = [];
+let hasLoaded = false;
 const listeners = new Set<() => void>();
 
 function notify(): void {
@@ -25,13 +26,24 @@ export function subscribeCalendarEvents(fn: () => void): () => void {
   return () => listeners.delete(fn);
 }
 
+/** False until the first refreshCalendarEvents() call resolves (success OR
+ * failure) — same "not loaded yet" vs "genuinely empty" distinction as
+ * state.ts's hasLoadedLeads(), for the several screens that read getEvents(). */
+export function hasLoadedEvents(): boolean {
+  return hasLoaded;
+}
+
 export function listEventsForDate(date: string): CalendarEvent[] {
   return events.filter((e) => e.date === date);
 }
 
 export async function refreshCalendarEvents(): Promise<void> {
-  events = await listCalendarEvents();
-  notify();
+  try {
+    events = await listCalendarEvents();
+  } finally {
+    hasLoaded = true;
+    notify();
+  }
 }
 
 export interface NewCalendarEvent {

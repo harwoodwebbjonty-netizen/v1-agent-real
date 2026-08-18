@@ -8,7 +8,7 @@ import {
 } from "../api";
 import { refreshLeads } from "../state";
 import { refreshLeadLists } from "../leadLists";
-import { escapeHtml } from "../utils";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 import { CHARGE_TYPES, buildMultiSelectHtml, bindMultiSelect } from "../components/multiSelect";
 
 // ---------------------------------------------------------------------------
@@ -441,8 +441,12 @@ let pollTimer: ReturnType<typeof setTimeout> | null = null;
 
 export function initAiProspecting(): void {
   const container = document.querySelector<HTMLDivElement>("#view-ai-prospecting")!;
+  let isInitialLoad = true;
 
   async function render(): Promise<void> {
+    if (isInitialLoad) {
+      container.innerHTML = `<main class="container">${skeletonBlockHtml(5)}</main>`;
+    }
     let configured = false;
     let runs: ProspectingRun[] = [];
     let loadFailed = false;
@@ -458,6 +462,7 @@ export function initAiProspecting(): void {
       console.error("AI Prospecting: failed to load status/runs", err);
       loadFailed = true;
     }
+    isInitialLoad = false;
 
     const sicOptions = SIC_CODES.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}`, group: s.group }));
     const locationOptions = UK_COUNTIES.map((c) => ({ value: c, label: c }));

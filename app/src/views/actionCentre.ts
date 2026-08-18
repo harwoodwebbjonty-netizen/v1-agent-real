@@ -35,7 +35,7 @@ import { getLeads, refreshLeads, subscribe } from "../state";
 import { getTeamMembers, refreshTeamMembers, subscribeTeam } from "../team";
 import { openTab } from "../tabs";
 import { showToast } from "../toast";
-import { escapeHtml } from "../utils";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 function todayIso(): string {
   return new Date().toISOString().slice(0, 10);
@@ -325,6 +325,7 @@ export function initActionCentre(): void {
   // Worklist compaction: show the top rows, collapse the rest behind a toggle.
   let worklistExpanded = false;
   const WORKLIST_COLLAPSE_AT = 6;
+  let isInitialLoad = true;
 
   function setCount(key: string, n: number): void {
     const el = container.querySelector<HTMLSpanElement>(`.sec-count[data-count="${key}"]`);
@@ -332,6 +333,13 @@ export function initActionCentre(): void {
   }
 
   function render(): void {
+    if (isInitialLoad) {
+      const skeleton = skeletonBlockHtml(3);
+      sections.worklist.innerHTML = skeleton;
+      sections.opportunities.innerHTML = skeleton;
+      sections.replied.innerHTML = skeleton;
+      return;
+    }
     refreshIfOpen(getLeads());
     const today = todayIso();
 
@@ -576,6 +584,7 @@ export function initActionCentre(): void {
     } catch (err) {
       showToast(`Could not load pending drafts: ${err}`);
     }
+    isInitialLoad = false;
     render();
     bindMailchimpExport();
   }
@@ -617,11 +626,16 @@ export function initActionCentre(): void {
     });
   }
 
+  render();
   subscribe(render);
   subscribeCalendarEvents(render);
   subscribeTeam(() => setTeamMembers(getTeamMembers()));
   subscribeLeadLists(render);
   void Promise.all([refreshLeads(), refreshCalendarEvents(), refreshTeamMembers(), refreshLeadLists()])
     .then(refreshAll)
-    .catch((err) => showToast(`Could not load Today data: ${err}`));
+    .catch((err) => {
+      isInitialLoad = false;
+      showToast(`Could not load Today data: ${err}`);
+      render();
+    });
 }

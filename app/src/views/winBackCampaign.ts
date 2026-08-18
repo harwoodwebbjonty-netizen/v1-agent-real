@@ -19,7 +19,8 @@ import {
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { getCurrentUser, subscribeAuth } from "../auth";
 import { openOverlay } from "../components/modal";
-import { escapeHtml } from "../utils";
+import { showToast } from "../toast";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 // Haiku pricing (claude-haiku-4-5): $0.80/MTok input, $4/MTok output.
 // The win-back system prompt (workflows/win_back_email_prompt.md) alone
@@ -752,7 +753,7 @@ function showGenerationConfig(
     } catch (err) {
       generateBtn.disabled = false;
       updateBtnLabel();
-      alert(`Failed to create campaign: ${err}`);
+      showToast(`Failed to create campaign: ${err}`);
     }
   });
 }
@@ -915,7 +916,7 @@ function renderDetail(container: HTMLElement, detail: WinBackCampaignDetail): vo
     } catch (err) {
       btn.disabled = false;
       btn.textContent = "Run again";
-      alert(`Could not re-run the campaign: ${String(err)}`);
+      showToast(`Could not re-run the campaign: ${String(err)}`);
     }
   });
 
@@ -969,7 +970,8 @@ async function loadCampaignList(container: HTMLElement): Promise<void> {
   try {
     const campaigns = await getWinBackCampaigns();
     renderCampaignList(container, campaigns);
-  } catch {
+  } catch (err) {
+    showToast(`Could not load win-back campaigns: ${err}`);
     renderCampaignList(container, []);
   }
 }
@@ -980,6 +982,7 @@ export function initWinBackCampaign(): void {
 
   subscribeAuth(() => {
     if (!getCurrentUser()) return;
-    loadCampaignList(container);
+    container.innerHTML = `<main class="container">${skeletonBlockHtml(4)}</main>`;
+    void loadCampaignList(container);
   });
 }

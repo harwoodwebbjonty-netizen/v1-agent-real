@@ -10,8 +10,8 @@ import {
   lookupCompanyPhone,
 } from "../api";
 import { formatDate, reportBodyHtml, temperatureClass } from "../components/sidePanel";
-import { getLeads, refreshLeads, subscribe } from "../state";
-import { escapeHtml } from "../utils";
+import { getLeads, hasLoadedLeads, refreshLeads, subscribe } from "../state";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 export function initSalesIntelligence(): void {
   const container = document.querySelector<HTMLDivElement>("#view-sales-intelligence")!;
@@ -69,6 +69,11 @@ export function initSalesIntelligence(): void {
   }
 
   function renderLeadsList(): void {
+    if (!hasLoadedLeads()) {
+      leadsEmptyEl.classList.add("hidden");
+      leadsListEl.innerHTML = skeletonBlockHtml(3);
+      return;
+    }
     const leads = leadsWithIntelligence();
     if (leads.length === 0) {
       leadsListEl.innerHTML = "";

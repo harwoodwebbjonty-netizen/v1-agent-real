@@ -7,7 +7,7 @@ import {
   type ActivityEvent,
   type ChCharge,
 } from "../api";
-import { escapeHtml } from "../utils";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 // ── Filing type labels (all common CH types) ────────────────────────────────
 const FILING_LABELS: Record<string, string> = {
@@ -191,7 +191,7 @@ function renderChBody(): string {
     </div>`;
   }
   if (s.chLoading && s.chCharges.length === 0) {
-    return `<div class="activity-empty-state">Loading filings…</div>`;
+    return skeletonBlockHtml(4);
   }
   if (s.chCharges.length === 0) {
     return `<div class="activity-empty-state">No filings yet — the stream will populate this feed automatically.</div>`;
@@ -258,7 +258,7 @@ function renderDgBody(): string {
       <p class="text-muted">Add <code>COMPANIES_HOUSE_API_KEY</code> to the backend <code>.env</code> to enable lead activity signals.</p>
     </div>`;
   }
-  if (s.dgLoading) return `<div class="activity-empty-state">Loading activity feed…</div>`;
+  if (s.dgLoading && s.dgEvents.length === 0) return skeletonBlockHtml(4);
   if (s.dgEvents.length === 0) return `<div class="activity-empty-state">No events found for the selected filters.</div>`;
   return s.dgEvents.map(renderDgRow).join("");
 }

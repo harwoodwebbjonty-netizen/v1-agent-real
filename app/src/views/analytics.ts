@@ -5,9 +5,9 @@ import { CONTACT_STATUS_ORDER } from "../constants";
 import { setPendingDashboardContactStatusFilter } from "../dashboardFilterHandoff";
 import { getLeadLists, refreshLeadLists, subscribeLeadLists } from "../leadLists";
 import { normalizeSicIndustry } from "../sic";
-import { getLeads, subscribe } from "../state";
+import { getLeads, hasLoadedLeads, subscribe } from "../state";
 import { openTab } from "../tabs";
-import { escapeHtml } from "../utils";
+import { escapeHtml, skeletonBlockHtml } from "../utils";
 
 Chart.register(...registerables);
 
@@ -533,7 +533,15 @@ function renderAnalytics(): void {
   const emptyEl = document.querySelector("#analytics-empty")!;
   const contentEl = document.querySelector("#analytics-content")!;
 
+  if (!hasLoadedLeads()) {
+    emptyEl.innerHTML = skeletonBlockHtml(5);
+    emptyEl.classList.remove("hidden");
+    contentEl.classList.add("hidden");
+    return;
+  }
+
   if (leads.length === 0) {
+    emptyEl.innerHTML = `<p class="empty-state">No leads yet — run some lookups on the Dashboard to see analytics here.</p>`;
     emptyEl.classList.remove("hidden");
     contentEl.classList.add("hidden");
     return;

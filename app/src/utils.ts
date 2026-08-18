@@ -1,3 +1,11 @@
+/** Generic loading placeholder for card/panel layouts that aren't a table
+ * (see components/leadTable.ts's renderSkeletonRows for the table version).
+ * Same static `.skeleton-bar` visual language, just stacked directly in any
+ * container instead of table rows. */
+export function skeletonBlockHtml(lines = 3): string {
+  return `<div class="skeleton-block">${Array.from({ length: lines }, () => `<div class="skeleton-bar"></div>`).join("")}</div>`;
+}
+
 export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
