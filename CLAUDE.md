@@ -105,11 +105,19 @@ steps apply and **call out anything I've missed** before finishing.
 ### Deploying the backend (after ANY backend/ change)
 App releases do **not** deploy the backend — it must be pushed to the VPS
 separately, and Claude is blocked from doing this in auto mode, so always
-give me this command and remind me to run it:
+give me these commands and remind me to run them:
 
 ```
-rsync -az -e "ssh -i ~/.ssh/v1_agent_vps" "/Users/jontyhw/v1 agent/backend/app/" root@213.165.88.45:/opt/v1-agent/backend/app/ && ssh -i ~/.ssh/v1_agent_vps root@213.165.88.45 "systemctl restart phone-lookup-backend"
+rsync -az -e "ssh -i ~/.ssh/v1_agent_vps" "/Users/jontyhw/v1 agent/backend/app/" root@213.165.88.45:/opt/v1-agent/backend/app/ && rsync -az -e "ssh -i ~/.ssh/v1_agent_vps" "/Users/jontyhw/v1 agent/backend/requirements.txt" root@213.165.88.45:/opt/v1-agent/backend/requirements.txt && ssh -i ~/.ssh/v1_agent_vps root@213.165.88.45 "/opt/v1-agent/backend/.venv/bin/pip install -r /opt/v1-agent/backend/requirements.txt && systemctl restart phone-lookup-backend"
 ```
+
+**Always sync + install `requirements.txt`, even if you don't think it changed**
+(discovered 2026-08-18: `backend/app/` and `requirements.txt` are separate
+paths — the old app/-only rsync silently skipped new Python packages,
+crash-looping the service on `ModuleNotFoundError` for a package that had
+been in the repo's `requirements.txt` for weeks). The `pip install` is a
+no-op ("Requirement already satisfied") when nothing changed, so it's safe
+to run unconditionally.
 
 **Production prompts live OUTSIDE `backend/app/` — the command above does NOT
 deploy them.** The five live prompt files are in `workflows/` (repo root), which
@@ -121,9 +129,20 @@ prompt is `read_text()` on every call, but restarting is harmless):
 rsync -az -e "ssh -i ~/.ssh/v1_agent_vps" "/Users/jontyhw/v1 agent/workflows/" root@213.165.88.45:/opt/v1-agent/workflows/
 ```
 
-Verify after deploy: `curl http://213.165.88.45/health` → `{"status":"ok"}` (wait
-~30–40s first — the app has a ~30s startup window where nginx returns a transient
-502; that is not a crash).
+Verify after deploy: `curl http://213.165.88.45/health` → `{"status":"ok"}` (also
+reachable at `https://213-165-88-45.sslip.io/health` — see PROJECT_CONTEXT.md
+"Known Issues" for why that hostname exists). Wait ~30–40s first — the app has
+a ~30s startup window where nginx returns a transient 502; that alone is not a
+crash. **But if a deploy brings in several queued-up DB migrations at once
+(e.g. after a long gap between deploys), startup can genuinely take several
+minutes** — `db.init_db()` backs up the full production DB before migrating,
+and any migration touching a large table (seen 2026-08-18: an index build on
+`ch_charge_feed`) does real work, not a hang. Check `ps aux | grep uvicorn` —
+if the process is alive and burning real CPU, let it finish; restarting mid-
+migration forces the backup+migrate to redo from scratch and risks a partial
+migration. Only dig into `journalctl -u phone-lookup-backend` if it's still
+not healthy after a genuinely long wait (10+ min) or the process isn't there
+at all.
 **The backend is served on port 80 via a proxy — port 8000 is firewalled.**
 New DB migrations run automatically on service restart.
 
