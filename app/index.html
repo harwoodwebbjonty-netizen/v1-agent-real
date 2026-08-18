@@ -328,8 +328,18 @@
             <div id="outreach-empty-state" class="card">
               <p class="empty-state">Select one or more leads, or pick a whole list, to start writing.</p>
             </div>
+            <div id="or-mode-toggle" class="or-mode-toggle" style="display:none">
+              <button type="button" class="or-mode-btn active" data-mode="send">Send an email</button>
+              <button type="button" class="or-mode-btn" data-mode="sequence">Start a sequence</button>
+            </div>
             <div id="view-email-writer" style="display:none"></div>
             <div id="view-list-campaign" style="display:none"></div>
+            <div id="or-sequence-mode" class="card" style="display:none">
+              <p id="or-sequence-mode-summary" class="card-subtitle"></p>
+              <div class="card-actions">
+                <button type="button" id="or-start-sequence-btn" class="btn btn-primary btn-sm">Choose a sequence&hellip;</button>
+              </div>
+            </div>
           </div>
           <div id="view-sequences" style="display:none"></div>
         </div>

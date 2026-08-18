@@ -5,19 +5,24 @@ import { getActiveTabId, subscribeTabs } from "../tabs";
 import { escapeHtml } from "../utils";
 import type { EmailWriterHandle } from "./emailWriter";
 import type { ListCampaignHandle } from "./listCampaign";
+import type { SequencesHandle } from "./sequences";
 
 // Outreach used to be three peer tabs (Email Writer / List Campaign /
 // Sequences) that each owned their own recipient-picking UI. This is the
 // unified front door instead: one recipient picker drives everything —
 // exactly one lead selected shows the rich Email Writer editor, a whole
 // list or several hand-picked leads shows the bulk draft-review grid
-// (listCampaign.ts, shared with the list path via draftReviewGrid.ts).
-// Sequences remains a separate sub-tab for now (folding enrollment into
-// this same picker is a follow-up piece of work, not this pass).
+// (listCampaign.ts, shared with the list path via draftReviewGrid.ts). Once
+// leads are selected, a small mode toggle lets the rep choose "Send an
+// email" (the default — Email Writer / List Campaign as above) vs "Start a
+// sequence" (hands the current selection to sequences.ts's enroll-picker
+// overlay). Sequence *definitions* (creating a sequence, editing its steps)
+// still live only in the separate "Sequences" sub-tab — this toggle is only
+// a second entry point into enrollment.
 
 const LEAD_LIST_CAP = 50;
 
-export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListCampaignHandle): void {
+export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListCampaignHandle, sequences: SequencesHandle): void {
   const container = document.querySelector<HTMLDivElement>("#view-outreach")!;
   const composeView = document.querySelector<HTMLDivElement>("#view-compose")!;
   const sequencesView = document.querySelector<HTMLDivElement>("#view-sequences")!;
@@ -28,10 +33,15 @@ export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListC
   const listSelect = document.querySelector<HTMLSelectElement>("#or-list-select")!;
   const leadListEl = document.querySelector<HTMLUListElement>("#or-lead-list")!;
   const summaryEl = document.querySelector<HTMLParagraphElement>("#or-selection-summary")!;
+  const modeToggleEl = document.querySelector<HTMLDivElement>("#or-mode-toggle")!;
+  const sequenceModeEl = document.querySelector<HTMLDivElement>("#or-sequence-mode")!;
+  const sequenceModeSummaryEl = document.querySelector<HTMLParagraphElement>("#or-sequence-mode-summary")!;
+  const startSequenceBtn = document.querySelector<HTMLButtonElement>("#or-start-sequence-btn")!;
 
   let searchText = "";
   const selectedLeadIds = new Set<string>();
   let selectedListId = "";
+  let mode: "send" | "sequence" = "send";
 
   // Cheap, safe to re-run on any unrelated lead-state change (e.g. a company
   // name edited elsewhere) — only redraws the picker list itself, never
@@ -77,6 +87,28 @@ export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListC
     return getLeadLists().find((l) => l.id === selectedListId)?.name ?? "";
   }
 
+  // Resolves the current selection (whole list or hand-picked leads) down to
+  // a flat lead-id list — what sequences.ts's enroll-picker needs, since
+  // enrollment always happens one lead at a time regardless of how the
+  // selection was made.
+  function currentSelectionLeadIds(): string[] {
+    if (selectedListId) return getLeads().filter((l) => l.list_id === selectedListId).map((l) => l.id);
+    return [...selectedLeadIds];
+  }
+
+  function updateModeToggleUI(): void {
+    modeToggleEl.querySelectorAll<HTMLButtonElement>(".or-mode-btn").forEach((b) => {
+      b.classList.toggle("active", b.dataset.mode === mode);
+    });
+  }
+
+  function renderSequenceModeSummary(): void {
+    const leadIds = currentSelectionLeadIds();
+    sequenceModeSummaryEl.textContent = selectedListId
+      ? `Ready to enroll the whole "${currentListName()}" list (${leadIds.length} lead${leadIds.length === 1 ? "" : "s"}) in a sequence.`
+      : `Ready to enroll ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} in a sequence.`;
+  }
+
   // Heavier — only run when the actual selection changes (checkbox, list
   // dropdown, or an incoming hand-off), never from unrelated re-renders.
   // Re-fetching/regenerating a draft on every unrelated tick would blow
@@ -91,9 +123,27 @@ export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListC
         ? `${selectedLeadIds.size} lead${selectedLeadIds.size === 1 ? "" : "s"} selected.`
         : "";
 
+    const hasSelection = !!selectedListId || selectedLeadIds.size > 0;
+    if (!hasSelection) mode = "send";
+
     emailWriterEl.style.display = "none";
     listCampaignEl.style.display = "none";
+    sequenceModeEl.style.display = "none";
     emptyStateEl.style.display = "none";
+    modeToggleEl.style.display = hasSelection ? "" : "none";
+
+    if (!hasSelection) {
+      emptyStateEl.style.display = "";
+      return;
+    }
+
+    updateModeToggleUI();
+
+    if (mode === "sequence") {
+      sequenceModeEl.style.display = "";
+      renderSequenceModeSummary();
+      return;
+    }
 
     if (selectedListId) {
       listCampaignEl.style.display = "";
@@ -104,8 +154,6 @@ export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListC
     } else if (selectedLeadIds.size >= 2) {
       listCampaignEl.style.display = "";
       listCampaign.start({ kind: "leads", leadIds: [...selectedLeadIds] });
-    } else {
-      emptyStateEl.style.display = "";
     }
   }
 
@@ -118,6 +166,17 @@ export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListC
     selectedListId = listSelect.value;
     if (selectedListId) selectedLeadIds.clear();
     applySelection();
+  });
+
+  modeToggleEl.querySelectorAll<HTMLButtonElement>(".or-mode-btn").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      mode = btn.dataset.mode === "sequence" ? "sequence" : "send";
+      applySelection();
+    });
+  });
+
+  startSequenceBtn.addEventListener("click", () => {
+    sequences.enrollLeads(currentSelectionLeadIds());
   });
 
   subscribe(renderPickerList);
@@ -147,6 +206,7 @@ export function initOutreach(emailWriter: EmailWriterHandle, listCampaign: ListC
     selectedListId = "";
     selectedLeadIds.clear();
     selectedLeadIds.add(pendingLeadId);
+    mode = "send";
     showSubView("compose");
     applySelection();
   }

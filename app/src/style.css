@@ -5029,6 +5029,37 @@ button.p-filter-chip.active {
   white-space: nowrap;
 }
 
+/* Outreach: send-vs-sequence mode toggle, shown above the content area once
+   a recipient selection exists (mirrors the sub-view-tab visual language
+   without reusing its class, so the two tab strips toggle independently). */
+.or-mode-toggle {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.or-mode-btn {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: var(--space-2) var(--space-3);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s, background 0.15s;
+}
+
+.or-mode-btn:hover {
+  color: var(--text);
+}
+
+.or-mode-btn.active {
+  color: var(--accent-core, #E31346);
+  background: var(--accent-glow, #FFF0F4);
+  border-color: var(--accent-border, #F5B7C7);
+}
+
 /* ================================================================
    Sidebar exact-match to the artifact — brand wordmark, bottom user
    block, soft active state (no ring / no hover shift), status line.

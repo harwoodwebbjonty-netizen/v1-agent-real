@@ -14,6 +14,7 @@ import {
   stopSequenceEnrollment,
   updateSequence,
 } from "../api";
+import { openOverlay } from "../components/modal";
 import { getLeads, subscribe } from "../state";
 import { showToast } from "../toast";
 import { escapeHtml } from "../utils";
@@ -25,7 +26,18 @@ const STEP_TYPE_LABELS: Record<SequenceStepType, string> = {
   reminder_task: "Reminder Task",
 };
 
-export function initSequences(): void {
+export interface SequencesHandle {
+  /** Opens a lightweight "pick a sequence to enroll these leads in" overlay
+   * — called by the unified Outreach picker (outreach.ts) once the rep has
+   * selected leads and chosen "Start a sequence" there. Only sequences with
+   * at least one step are offered, since the backend 400s enrolling into a
+   * 0-step sequence. Enrolls leads one at a time via the existing
+   * single-lead endpoint, tolerating individual failures (e.g. a lead
+   * already enrolled) so one bad lead doesn't block the rest. */
+  enrollLeads: (leadIds: string[]) => void;
+}
+
+export function initSequences(): SequencesHandle {
   const container = document.querySelector<HTMLDivElement>("#view-sequences")!;
   let sequences: Sequence[] = [];
   let selectedSequenceId: string | null = null;
@@ -247,6 +259,74 @@ export function initSequences(): void {
     }
   }
 
+  // --- External entry point: enroll a specific set of leads (chosen in the
+  // unified Outreach picker) into a sequence the rep picks here, rather than
+  // requiring them to open a sequence's own detail view first. ---
+
+  async function openEnrollPicker(leadIds: string[]): Promise<void> {
+    if (leadIds.length === 0) return;
+    const candidates = await listSequences().catch(() => sequences);
+    const eligible = candidates.filter((s) => s.step_count > 0);
+
+    if (eligible.length === 0) {
+      showToast("No sequences with steps yet — add steps to a sequence first.");
+      return;
+    }
+
+    const { overlay, close } = openOverlay(
+      `<div class="conflict-modal">
+        <h3 class="conflict-modal-title">Start a sequence</h3>
+        <p class="conflict-modal-desc">Enroll ${leadIds.length} lead${leadIds.length === 1 ? "" : "s"} in:</p>
+        <ul class="history-list" id="seq-enroll-picker-list">
+          ${eligible
+            .map(
+              (s) => `
+            <li class="history-list-row" data-sequence-id="${escapeHtml(s.id)}">
+              <span>${escapeHtml(s.name)} <span class="empty-hint">(${s.step_count} step${s.step_count === 1 ? "" : "s"})</span></span>
+              <button type="button" class="btn btn-primary btn-sm seq-enroll-picker-btn">Enroll</button>
+            </li>`
+            )
+            .join("")}
+        </ul>
+        <p id="seq-enroll-picker-status" class="status-message"></p>
+        <div class="conflict-modal-actions">
+          <button type="button" class="btn btn-ghost btn-sm" id="seq-enroll-picker-cancel">Cancel</button>
+        </div>
+      </div>`,
+      { onEscape: () => close() }
+    );
+
+    const statusEl = overlay.querySelector<HTMLParagraphElement>("#seq-enroll-picker-status")!;
+    overlay.querySelector<HTMLButtonElement>("#seq-enroll-picker-cancel")!.addEventListener("click", () => close());
+
+    overlay.querySelectorAll<HTMLLIElement>("[data-sequence-id]").forEach((row) => {
+      const sequenceId = row.dataset.sequenceId!;
+      row.querySelector<HTMLButtonElement>(".seq-enroll-picker-btn")!.addEventListener("click", async () => {
+        overlay.querySelectorAll<HTMLButtonElement>(".seq-enroll-picker-btn").forEach((b) => (b.disabled = true));
+        let succeeded = 0;
+        let failed = 0;
+        for (let i = 0; i < leadIds.length; i++) {
+          statusEl.textContent = `Enrolling ${i + 1}/${leadIds.length}…`;
+          try {
+            await enrollLeadInSequence(sequenceId, leadIds[i]);
+            succeeded++;
+          } catch {
+            // Tolerate per-lead failures (e.g. already enrolled) and keep going.
+            failed++;
+          }
+        }
+        const seqName = eligible.find((s) => s.id === sequenceId)?.name ?? "sequence";
+        statusEl.textContent = `Enrolled ${succeeded} of ${leadIds.length}${failed ? ` (${failed} failed)` : ""}.`;
+        showToast(`Enrolled ${succeeded} lead${succeeded === 1 ? "" : "s"} in "${seqName}"${failed ? ` — ${failed} failed` : ""}`);
+        await refreshSequences();
+        if (selectedSequenceId === sequenceId) await refreshDetail();
+        setTimeout(() => close(), 900);
+      });
+    });
+  }
+
   subscribe(render);
   void refreshSequences();
+
+  return { enrollLeads: (leadIds: string[]) => void openEnrollPicker(leadIds) };
 }
