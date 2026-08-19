@@ -47,7 +47,7 @@ GOOGLE_SCOPES = "https://www.googleapis.com/auth/gmail.send openid email"
 MICROSOFT_AUTH_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/authorize"
 MICROSOFT_TOKEN_URL = "https://login.microsoftonline.com/common/oauth2/v2.0/token"
 MICROSOFT_USERINFO_URL = "https://graph.microsoft.com/v1.0/me"
-MICROSOFT_SCOPES = "https://graph.microsoft.com/Mail.Send offline_access openid email"
+MICROSOFT_SCOPES = "https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/User.Read offline_access openid email"
 
 PROVIDERS = ("gmail", "microsoft")
 
@@ -132,6 +132,8 @@ async def handle_oauth_callback(provider: str, code: str, user_id: str) -> None:
             userinfo_response = await client.get(
                 GOOGLE_USERINFO_URL, headers={"Authorization": f"Bearer {tokens['access_token']}"}
             )
+            if userinfo_response.status_code != 200:
+                raise OAuthError(f"Google userinfo fetch failed: {userinfo_response.text}")
             email_address = userinfo_response.json().get("email", "")
         elif provider == "microsoft":
             token_response = await client.post(
@@ -151,6 +153,8 @@ async def handle_oauth_callback(provider: str, code: str, user_id: str) -> None:
             userinfo_response = await client.get(
                 MICROSOFT_USERINFO_URL, headers={"Authorization": f"Bearer {tokens['access_token']}"}
             )
+            if userinfo_response.status_code != 200:
+                raise OAuthError(f"Microsoft userinfo fetch failed: {userinfo_response.text}")
             userinfo = userinfo_response.json()
             email_address = userinfo.get("mail") or userinfo.get("userPrincipalName", "")
         else:

@@ -59,10 +59,13 @@ async def oauth_callback(provider: str, code: str = Query(...), state: str = Que
             await calendar_oauth_service.handle_oauth_callback(provider, code, user_id)
         else:
             await handle_oauth_callback(provider, code, user_id)
-    except OAuthError:
-        # Deliberately generic — never reflect the exception (it can carry the
-        # provider's raw token-endpoint response) into this HTML page.
-        logger.warning("OAuth callback failed for provider %s (purpose=%s)", provider, purpose)
+    except OAuthError as exc:
+        # The HTML response stays deliberately generic — never reflect the
+        # exception (it can carry the provider's raw token-endpoint response)
+        # to the browser. Logging it server-side is fine and is what makes
+        # failures like a wrong client secret or a missing scope diagnosable
+        # without live-decrypting stored tokens.
+        logger.warning("OAuth callback failed for provider %s (purpose=%s): %s", provider, purpose, exc)
         return (
             "<html><body><h2>Connection failed</h2>"
             "<p>You can close this window and try again in the app.</p></body></html>"
