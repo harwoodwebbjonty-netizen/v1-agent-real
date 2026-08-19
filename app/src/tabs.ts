@@ -7,6 +7,7 @@ export type ViewName =
   | "opportunity-workspace"
   | "cold-call-lists"
   | "sales-intelligence"
+  | "lender-calculator"
   | "email-writer"
   | "sequences"
   | "calendar"

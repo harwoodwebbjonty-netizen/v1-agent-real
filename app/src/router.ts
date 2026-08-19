@@ -7,6 +7,7 @@ const ALL_VIEWS: ViewName[] = [
   "dashboard",
   "opportunity-workspace",
   "sales-intelligence",
+  "lender-calculator",
   "cold-call-lists",
   "call-queue",
   "win-back",
