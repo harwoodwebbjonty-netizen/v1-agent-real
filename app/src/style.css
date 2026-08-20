@@ -300,6 +300,8 @@ body {
   display: flex;
   flex-direction: column;
   gap: var(--space-6);
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .brand {
@@ -504,7 +506,20 @@ body {
   display: flex;
   flex-direction: column;
   gap: 1px;
+  overflow-y: auto;
+  min-height: 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
+.top-nav::-webkit-scrollbar { width: 6px; }
+.top-nav::-webkit-scrollbar-track { background: transparent; }
+.top-nav::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.15); border-radius: 3px; }
+.top-nav::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.25); }
+/* Collapsed rail needs overflow:visible so the hover-tooltip (::after, positioned
+   at left: calc(100% + 12px)) can escape the 64px-wide rail instead of being clipped
+   by the scroll container. Collapsed mode hides eyebrows entirely, so it rarely
+   needs to scroll in the first place. */
+.app-sidebar.collapsed .top-nav { overflow: visible; }
 
 .nav-link {
   font-family: var(--font-display);
@@ -551,26 +566,8 @@ body {
   transition: background 0.15s ease, transform 0.15s ease;
 }
 
-.nav-link:hover .nav-icon {
-  background: color-mix(in srgb, currentColor 18%, transparent);
-  transform: scale(1.06);
-}
-
-/* Per-section icon colours — always on, regardless of hover/active state */
-[data-nav="action-centre"]  .nav-icon { color: #10b981; }
-[data-nav="activity-feed"]  .nav-icon { color: #f59e0b; }
-[data-nav="ai-prospecting"] .nav-icon { color: #8B5CF6; }
-[data-nav="dashboard"]      .nav-icon { color: #ec4899; }
-[data-nav="cold-call-lists"].nav-icon { color: #06b6d4; }
-[data-nav="outreach"]       .nav-icon { color: #4F6BFF; }
-[data-nav="win-back"]       .nav-icon { color: #f97316; }
-[data-nav="calendar"]       .nav-icon { color: #14b8a6; }
-[data-nav="analytics"]      .nav-icon { color: #a855f7; }
-[data-nav="settings"]       .nav-icon { color: #94a3b8; }
-
 /* Dark-navy sidebar: the rail uses a dark surface, so its text/controls are
-   re-tinted for legibility on navy. Per-section icon colours stay (they read
-   as bright pops on the dark rail). Content area is unaffected. */
+   re-tinted for legibility on navy. Content area is unaffected. */
 .app-sidebar .nav-link {
   color: #C2C6D0;
 }
@@ -579,9 +576,7 @@ body {
   color: #ffffff;
 }
 .app-sidebar .nav-link.active {
-  background: var(--nav-selected);
   color: #ffffff;
-  box-shadow: inset 2px 0 var(--brand-crimson-light);
 }
 .app-sidebar .sidebar-toggle-btn {
   color: #AAAEB8;
@@ -4742,7 +4737,7 @@ button.p-filter-chip.active {
 }
 
 /* live nav counts on the sidebar */
-.nav-count { margin-left: auto; font-family: var(--font-mono); font-size: 10.5px; color: #6b7080; font-variant-numeric: tabular-nums; flex: 0 0 auto; padding-left: 6px; }
+.nav-count { margin-left: auto; font-family: var(--font-mono); font-size: var(--text-3xs); color: #6b7080; font-variant-numeric: tabular-nums; flex: 0 0 auto; padding-left: 6px; }
 .app-sidebar .nav-link.active .nav-count { color: #fff; }
 .app-sidebar.collapsed .nav-count { display: none; }
 
@@ -4760,13 +4755,14 @@ button.p-filter-chip.active {
 .nav-eyebrow {
   display: block;
   font-family: var(--font-mono);
-  font-size: 9.5px;
+  font-size: var(--text-3xs);
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: #5f6577;
-  padding: 12px 12px 5px;
+  padding: var(--space-2) 12px 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
 }
-.top-nav > .nav-eyebrow:first-child { padding-top: 2px; }
+.top-nav > .nav-eyebrow:first-child { padding-top: 2px; border-top: none; }
 .app-sidebar.collapsed .nav-eyebrow { display: none; }
 @media (max-width: 640px) { .nav-eyebrow { display: none; } }
 
@@ -4984,11 +4980,6 @@ button.p-filter-chip.active {
 .app-sidebar [data-nav].nav-link:hover .nav-icon { color: #c2c6d0; }
 .app-sidebar [data-nav].nav-link.active .nav-icon { color: var(--accent-core); }
 
-/* Active nav item: soft crimson tint + thin left bar, no hard outline box */
-.app-sidebar .nav-link.active {
-  background: rgba(227, 19, 70, 0.12);
-  box-shadow: inset 2.5px 0 var(--accent-core);
-}
 .app-sidebar .nav-link:focus:not(:focus-visible) { outline: none; }
 
 /* Daily-brief labels: sentence-case sans (the Priority cell stays mono/uppercase) */
