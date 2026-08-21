@@ -31,6 +31,9 @@
   .layout{max-width:1360px;margin:0 auto;display:flex;gap:22px;align-items:flex-start;}
   .sidebar{width:252px;flex-shrink:0;position:sticky;top:22px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:var(--shadow);padding:20px;}
   .sidebar h2{margin:0 0 14px;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--faint);}
+  .brand-logo{display:flex;align-items:center;gap:9px;margin-bottom:16px;}
+  .brand-logo .mark{width:40px;height:40px;flex:0 0 auto;display:block;}
+  .brand-logo .word{font-family:var(--font);font-weight:800;font-size:1.4rem;letter-spacing:-.02em;color:var(--ink);line-height:1;}
   .nav-tabs{display:flex;gap:4px;margin-bottom:18px;background:var(--surface-2);padding:4px;border-radius:12px;}
   .nav-tabs button{flex:1 1 0;min-width:0;background:transparent;color:var(--muted);padding:8px 2px;font-size:.72rem;font-weight:600;border-radius:8px;border:none;font-family:var(--font);cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:background .15s,color .15s,box-shadow .15s;}
   .nav-tabs button:hover{color:var(--ink);}
@@ -324,6 +327,14 @@
 <body>
   <div class="layout">
     <aside class="sidebar">
+      <div class="brand-logo" aria-label="WIN">
+        <svg class="mark" viewBox="8 14 84 84" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+          <circle cx="50" cy="56" r="36" fill="#E8766A"/>
+          <path d="M15 36 L30 74 L44 50 L57 74 L84 20" stroke="#15161c" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+          <path d="M84 20 L68 22 M84 20 L82 37" stroke="#15161c" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        <span class="word">WIN</span>
+      </div>
       <h2>Scorecards</h2>
       <div class="nav-tabs">
         <button id="navScorecard" class="active">Scorecard</button>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 100" width="300" height="100" role="img" aria-label="WIN">
+  <circle cx="50" cy="52" r="36" fill="#E8766A"/>
+  <path d="M15 32 L30 70 L44 46 L57 70 L84 16" fill="none" stroke="#15161c" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M84 16 L68 18 M84 16 L82 33" fill="none" stroke="#15161c" stroke-width="9" stroke-linecap="round" stroke-linejoin="round"/>
+  <text x="108" y="71" font-family="'Plus Jakarta Sans', Helvetica, Arial, sans-serif" font-size="58" font-weight="800" letter-spacing="-1" fill="#15161c">WIN</text>
+</svg>
