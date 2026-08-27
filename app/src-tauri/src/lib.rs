@@ -423,6 +423,13 @@ async fn save_scorecard_week(app_handle: tauri::AppHandle, user_id: String, week
 }
 
 #[tauri::command]
+async fn delete_scorecard_week(app_handle: tauri::AppHandle, user_id: String, week_commencing: String) -> Result<(), String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::delete_scorecard_week(&base_url, &session.token, &user_id, &week_commencing).await
+}
+
+#[tauri::command]
 async fn get_scorecard_weeks_all(
     app_handle: tauri::AppHandle, since: Option<String>, until: Option<String>,
 ) -> Result<Vec<backend_client::ScorecardSummaryEntry>, String> {
@@ -1533,6 +1540,7 @@ pub fn run() {
       upsert_scorecard_week,
       save_scorecard_week,
       get_scorecard_weeks_all,
+      delete_scorecard_week,
       scorecard_migrate_preview,
       scorecard_migrate_commit,
       scrape_lead_email,

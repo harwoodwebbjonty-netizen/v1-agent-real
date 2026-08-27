@@ -195,6 +195,29 @@ def test_save_week_sets_saved_at_without_locking_edits(client):
     assert resp.json()["saved_at"] is not None  # save marker survives the edit
 
 
+def test_delete_week_removes_it_and_its_entries(isolated_db, client):
+    app, http = client
+    _as(app, MEMBER)
+    http.put("/scorecard/weeks/u1/2026-08-24", json={"entries": {"calls": {"actual": 10, "notes": "", "action": ""}}})
+    assert db.get_scorecard_week("u1", "2026-08-24") is not None
+
+    resp = http.delete("/scorecard/weeks/u1/2026-08-24")
+    assert resp.status_code == 200
+    assert db.get_scorecard_week("u1", "2026-08-24") is None
+
+    resp = http.delete("/scorecard/weeks/u1/2026-08-24")
+    assert resp.status_code == 404
+
+
+def test_member_cannot_delete_others_week(client):
+    app, http = client
+    _as(app, MANAGER)
+    http.put("/scorecard/weeks/mgr/2026-08-24", json={"entries": {"calls": {"actual": 10, "notes": "", "action": ""}}})
+    _as(app, MEMBER)
+    resp = http.delete("/scorecard/weeks/mgr/2026-08-24")
+    assert resp.status_code == 403
+
+
 # --- auto-tracking: Qualified Leads Passed + Mass Email Campaigns ---
 
 

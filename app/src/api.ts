@@ -1447,6 +1447,10 @@ export async function saveScorecardWeek(userId: string, weekCommencing: string):
   return invoke<ScorecardWeek>("save_scorecard_week", { userId, weekCommencing });
 }
 
+export async function deleteScorecardWeek(userId: string, weekCommencing: string): Promise<void> {
+  await invoke("delete_scorecard_week", { userId, weekCommencing });
+}
+
 export async function getScorecardWeeksAll(since?: string, until?: string): Promise<ScorecardSummaryEntry[]> {
   return invoke<ScorecardSummaryEntry[]>("get_scorecard_weeks_all", { since, until });
 }

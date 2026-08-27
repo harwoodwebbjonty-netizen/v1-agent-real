@@ -2988,6 +2988,19 @@ pub async fn save_scorecard_week(base_url: &str, token: &str, user_id: &str, wee
     handle_response(response).await
 }
 
+pub async fn delete_scorecard_week(base_url: &str, token: &str, user_id: &str, week_commencing: &str) -> Result<(), String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/weeks/{}/{}", base_url, user_id, week_commencing);
+    let response = client
+        .delete(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let _: serde_json::Value = handle_response(response).await?;
+    Ok(())
+}
+
 pub async fn get_scorecard_weeks_all(
     base_url: &str,
     token: &str,

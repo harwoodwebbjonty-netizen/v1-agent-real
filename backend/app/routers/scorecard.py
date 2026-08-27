@@ -193,6 +193,20 @@ def save_week(
     return _week_to_out(week_row, db.list_scorecard_entries_for_week(week_row["id"]))
 
 
+@router.delete("/weeks/{user_id}/{week_commencing}")
+def delete_week(
+    user_id: str,
+    week_commencing: str,
+    current_user: CurrentUser = Depends(require_permission("view_scorecard")),
+) -> dict:
+    _require_can_edit(user_id, current_user)
+    week_row = db.get_scorecard_week(user_id, week_commencing)
+    if week_row is None:
+        raise HTTPException(status_code=404, detail="No such week")
+    db.delete_scorecard_week(week_row["id"])
+    return {"deleted": True}
+
+
 @router.get("/weeks/all", response_model=ScorecardSummaryResponse)
 def get_weeks_all(
     since: Optional[str] = Query(None),

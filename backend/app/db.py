@@ -3321,6 +3321,12 @@ def mark_scorecard_week_saved(week_id: str, saved_at: str) -> None:
         )
 
 
+def delete_scorecard_week(week_id: str) -> None:
+    with get_connection() as conn:
+        conn.execute("DELETE FROM scorecard_entries WHERE week_id = ?", (week_id,))
+        conn.execute("DELETE FROM scorecard_weeks WHERE id = ?", (week_id,))
+
+
 def list_scorecard_entries_for_week(week_id: str) -> list[sqlite3.Row]:
     with get_connection() as conn:
         return conn.execute("SELECT * FROM scorecard_entries WHERE week_id = ?", (week_id,)).fetchall()
