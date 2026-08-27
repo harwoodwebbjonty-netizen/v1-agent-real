@@ -4990,6 +4990,14 @@ button.p-filter-chip.active {
 .sc-auto-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
 .sc-override-btn { padding: 3px 8px; font-size: var(--text-3xs); }
 
+.sc-migrate-panel { padding: 16px; }
+.sc-migrate-panel > p { margin: 0 0 12px; color: var(--text-muted); font-size: var(--text-sm); }
+.sc-migrate-panel .sc-import-browse { margin-bottom: 4px; }
+.sc-migrate-map-select {
+  padding: 5px 7px; border: 1px solid var(--border); border-radius: var(--radius-xs); font-size: var(--text-sm);
+  background: var(--surface, #fff); min-width: 160px;
+}
+
 /* coverage bars (Analytics data coverage + reusable) */
 .cov { padding: 6px 16px 14px; }
 .cov .row { display: grid; grid-template-columns: 1fr 120px 58px; align-items: center; gap: var(--space-3); padding: 9px 0; border-top: 1px solid #eef1f7; }

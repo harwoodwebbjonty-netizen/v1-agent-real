@@ -3,10 +3,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app import db
-from app.dependencies import CurrentUser, require_permission
+from app.dependencies import CurrentUser, require_admin, require_permission
 from app.schemas_scorecard import (
     ScorecardEntryOut,
     ScorecardMetricTargetOut,
+    ScorecardMigrateCommitRequest,
+    ScorecardMigrateCommitResponse,
+    ScorecardMigratePreviewRequest,
+    ScorecardMigratePreviewResponse,
+    ScorecardMigrateProfileSummary,
     ScorecardSettingsOut,
     ScorecardSummaryEntry,
     ScorecardSummaryResponse,
@@ -225,3 +230,26 @@ def get_weeks_all(
         )
 
     return ScorecardSummaryResponse(entries=list(merged.values()))
+
+
+@router.post("/migrate/preview", response_model=ScorecardMigratePreviewResponse)
+def migrate_preview(body: ScorecardMigratePreviewRequest, current_user: CurrentUser = Depends(require_admin)) -> ScorecardMigratePreviewResponse:
+    result = scorecard_service.preview_migration(body.backup_json)
+    return ScorecardMigratePreviewResponse(
+        profiles=[ScorecardMigrateProfileSummary(**p) for p in result["profiles"]],
+        total_weeks=result["total_weeks"],
+    )
+
+
+@router.post("/migrate/commit", response_model=ScorecardMigrateCommitResponse)
+def migrate_commit(body: ScorecardMigrateCommitRequest, current_user: CurrentUser = Depends(require_admin)) -> ScorecardMigrateCommitResponse:
+    result = scorecard_service.commit_migration(body.backup_json, body.mapping)
+    db.record_audit(
+        current_user.id,
+        current_user.name,
+        "scorecard_migrate",
+        "scorecard",
+        "",
+        detail=f"{result['profiles_imported']} profiles, {result['weeks_imported']} weeks",
+    )
+    return ScorecardMigrateCommitResponse(**result)

@@ -431,6 +431,24 @@ async fn get_scorecard_weeks_all(
     backend_client::get_scorecard_weeks_all(&base_url, &session.token, since.as_deref(), until.as_deref()).await
 }
 
+#[tauri::command]
+async fn scorecard_migrate_preview(
+    app_handle: tauri::AppHandle, backup_json: serde_json::Value,
+) -> Result<backend_client::ScorecardMigratePreviewResponse, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::scorecard_migrate_preview(&base_url, &session.token, backup_json).await
+}
+
+#[tauri::command]
+async fn scorecard_migrate_commit(
+    app_handle: tauri::AppHandle, backup_json: serde_json::Value, mapping: std::collections::HashMap<String, Option<String>>,
+) -> Result<backend_client::ScorecardMigrateCommitResponse, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::scorecard_migrate_commit(&base_url, &session.token, backup_json, mapping).await
+}
+
 /// Independent AI email scraper — manual trigger only, never runs as a side
 /// effect of the phone-lookup flow above.
 #[tauri::command]
@@ -1515,6 +1533,8 @@ pub fn run() {
       upsert_scorecard_week,
       save_scorecard_week,
       get_scorecard_weeks_all,
+      scorecard_migrate_preview,
+      scorecard_migrate_commit,
       scrape_lead_email,
       verify_lead_emails,
       generate_lead_intelligence,

@@ -1,4 +1,4 @@
-from typing import Dict, List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel
 
@@ -74,3 +74,38 @@ class UpdateScorecardSettingsRequest(BaseModel):
     qualifying_value: Optional[str] = None
     notes_visibility: Optional[NotesVisibility] = None
     targets: Optional[Dict[str, float]] = None
+
+
+# --- One-off Firestore -> SQLite data migration (Phase D). Accepts the raw
+# backup JSON loosely (as `dict`) rather than a strict nested model — this
+# is a dormant admin utility for a single historical import, not a
+# recurring API contract, so defensive .get()-based parsing in the service
+# layer matters more than strict validation here. ---
+
+
+class ScorecardMigratePreviewRequest(BaseModel):
+    backup_json: Dict[str, Any]
+
+
+class ScorecardMigrateProfileSummary(BaseModel):
+    profile_id: str
+    profile_name: str
+    week_count: int
+    suggested_user_id: Optional[str] = None
+    suggested_user_name: Optional[str] = None
+
+
+class ScorecardMigratePreviewResponse(BaseModel):
+    profiles: List[ScorecardMigrateProfileSummary]
+    total_weeks: int
+
+
+class ScorecardMigrateCommitRequest(BaseModel):
+    backup_json: Dict[str, Any]
+    mapping: Dict[str, Optional[str]]
+
+
+class ScorecardMigrateCommitResponse(BaseModel):
+    profiles_imported: int
+    weeks_imported: int
+    settings_imported: bool

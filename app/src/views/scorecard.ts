@@ -4,16 +4,19 @@ import {
   getScorecardWeeksAll,
   listTeamMembers,
   saveScorecardWeek,
+  scorecardMigrateCommit,
+  scorecardMigratePreview,
   updateScorecardSettings,
   upsertScorecardWeek,
   type ScorecardEntryInput,
   type ScorecardMetricKey,
+  type ScorecardMigratePreviewResult,
   type ScorecardSettings,
   type ScorecardSummaryEntry,
   type ScorecardWeek,
   type UserInfo,
 } from "../api";
-import { getCurrentUser, hasPermission, subscribeAuth } from "../auth";
+import { getCurrentUser, hasPermission, isAdmin, subscribeAuth } from "../auth";
 import { confirmDialog, openOverlay } from "../components/modal";
 import { showToast } from "../toast";
 import { escapeHtml } from "../utils";
@@ -473,6 +476,20 @@ export function initScorecard(): void {
         <div class="sc-actions">
           <button type="button" class="btn-primary" id="sc-settings-save-btn">Save settings</button>
         </div>
+
+        <div class="sec-head hidden" id="sc-migrate-section">
+          <span class="sec-num">03</span>
+          <h3 class="action-section-title">Import from legacy scorecard</h3>
+          <span class="sec-rule"></span>
+        </div>
+        <section class="panel sc-migrate-panel hidden" id="sc-migrate-panel">
+          <p>Admin-only, one-off tool: upload a backup JSON exported from the old wcf-scorecard.web.app site (Settings → Download backup) to import its history here.</p>
+          <label class="btn-ghost sc-import-browse">
+            Choose backup file
+            <input type="file" id="sc-migrate-file-input" accept=".json,application/json" class="hidden" />
+          </label>
+          <div id="sc-migrate-preview"></div>
+        </section>
       </div>
     </main>
   `;
@@ -502,6 +519,10 @@ export function initScorecard(): void {
   const mgrLeaderboardEl = container.querySelector<HTMLDivElement>("#sc-mgr-leaderboard")!;
   const importZoneEl = container.querySelector<HTMLDivElement>("#sc-import-zone")!;
   const importFileInput = container.querySelector<HTMLInputElement>("#sc-import-file-input")!;
+  const migrateSectionEl = container.querySelector<HTMLDivElement>("#sc-migrate-section")!;
+  const migratePanelEl = container.querySelector<HTMLDivElement>("#sc-migrate-panel")!;
+  const migrateFileInput = container.querySelector<HTMLInputElement>("#sc-migrate-file-input")!;
+  const migratePreviewEl = container.querySelector<HTMLDivElement>("#sc-migrate-preview")!;
 
   let currentWeek = toIsoDate(mondayOf(new Date()));
   let draft: Draft = emptyDraft();
@@ -1009,6 +1030,75 @@ export function initScorecard(): void {
     if (file) void handleImportFile(file);
   });
 
+  migrateFileInput.addEventListener("change", () => {
+    const file = migrateFileInput.files?.[0];
+    if (file) void handleMigrateFile(file);
+    migrateFileInput.value = "";
+  });
+
+  async function handleMigrateFile(file: File): Promise<void> {
+    let backupJson: unknown;
+    try {
+      backupJson = JSON.parse(await file.text());
+    } catch {
+      showToast("Couldn't parse that file as JSON.");
+      return;
+    }
+    let preview: ScorecardMigratePreviewResult;
+    try {
+      preview = await scorecardMigratePreview(backupJson);
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "Failed to read that backup");
+      return;
+    }
+    if (!preview.profiles.length) {
+      migratePreviewEl.innerHTML = `<p class="empty-hint">No profiles found in that file.</p>`;
+      return;
+    }
+
+    const memberOptionsHtml = (selected: string | null) =>
+      `<option value="">— skip —</option>` +
+      allMembers.map((u) => `<option value="${escapeHtml(u.id)}" ${u.id === selected ? "selected" : ""}>${escapeHtml(u.name)}</option>`).join("");
+
+    migratePreviewEl.innerHTML = `
+      <p class="conflict-modal-hint">${preview.profiles.length} profile${preview.profiles.length === 1 ? "" : "s"} found, ${preview.total_weeks} week${preview.total_weeks === 1 ? "" : "s"} total. Review the suggested match for each, then Import.</p>
+      <div class="scorecard-table-wrap">
+        <table class="scorecard-table">
+          <thead><tr><th>Legacy profile</th><th>Weeks</th><th>Import as</th></tr></thead>
+          <tbody>
+            ${preview.profiles
+              .map(
+                (p) => `
+              <tr data-profile-id="${escapeHtml(p.profile_id)}">
+                <td>${escapeHtml(p.profile_name)}</td>
+                <td class="mono">${p.week_count}</td>
+                <td><select class="sc-migrate-map-select">${memberOptionsHtml(p.suggested_user_id)}</select></td>
+              </tr>`
+              )
+              .join("")}
+          </tbody>
+        </table>
+      </div>
+      <div class="sc-actions"><button type="button" class="btn-primary" id="sc-migrate-commit-btn">Import</button></div>
+    `;
+
+    migratePreviewEl.querySelector<HTMLButtonElement>("#sc-migrate-commit-btn")!.addEventListener("click", async () => {
+      const mapping: Record<string, string | null> = {};
+      migratePreviewEl.querySelectorAll<HTMLTableRowElement>("tr[data-profile-id]").forEach((row) => {
+        const select = row.querySelector<HTMLSelectElement>(".sc-migrate-map-select")!;
+        mapping[row.dataset.profileId!] = select.value || null;
+      });
+      try {
+        const result = await scorecardMigrateCommit(backupJson, mapping);
+        showToast(`Imported ${result.profiles_imported} profile${result.profiles_imported === 1 ? "" : "s"}, ${result.weeks_imported} week${result.weeks_imported === 1 ? "" : "s"}`);
+        migratePreviewEl.innerHTML = "";
+        void loadTeamData();
+      } catch (err) {
+        showToast(err instanceof Error ? err.message : "Failed to import");
+      }
+    });
+  }
+
   type SubView = "entry" | "dashboard" | "manager" | "settings";
   function showSubView(target: SubView): void {
     container.querySelectorAll<HTMLButtonElement>(".sub-view-tab").forEach((b) => b.classList.toggle("active", b.dataset.sub === target));
@@ -1031,6 +1121,9 @@ export function initScorecard(): void {
     if (!canManage && (settingsView.classList.contains("hidden") === false || managerView.classList.contains("hidden") === false)) {
       showSubView("entry");
     }
+    const admin = isAdmin();
+    migrateSectionEl.classList.toggle("hidden", !admin);
+    migratePanelEl.classList.toggle("hidden", !admin);
   }
 
   subscribeAuth(() => {

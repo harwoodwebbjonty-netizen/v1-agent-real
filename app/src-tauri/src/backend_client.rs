@@ -3013,3 +3013,69 @@ pub async fn get_scorecard_weeks_all(
     let wrapper: ScorecardSummaryResponse = handle_response(response).await?;
     Ok(wrapper.entries)
 }
+
+// --- Scorecard: one-off legacy (Firestore) data migration, admin-only ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardMigrateProfileSummary {
+    pub profile_id: String,
+    pub profile_name: String,
+    pub week_count: i64,
+    pub suggested_user_id: Option<String>,
+    pub suggested_user_name: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardMigratePreviewResponse {
+    pub profiles: Vec<ScorecardMigrateProfileSummary>,
+    pub total_weeks: i64,
+}
+
+#[derive(Serialize)]
+struct ScorecardMigratePreviewRequest {
+    backup_json: serde_json::Value,
+}
+
+pub async fn scorecard_migrate_preview(base_url: &str, token: &str, backup_json: serde_json::Value) -> Result<ScorecardMigratePreviewResponse, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/migrate/preview", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&ScorecardMigratePreviewRequest { backup_json })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardMigrateCommitResponse {
+    pub profiles_imported: i64,
+    pub weeks_imported: i64,
+    pub settings_imported: bool,
+}
+
+#[derive(Serialize)]
+struct ScorecardMigrateCommitRequest {
+    backup_json: serde_json::Value,
+    mapping: HashMap<String, Option<String>>,
+}
+
+pub async fn scorecard_migrate_commit(
+    base_url: &str,
+    token: &str,
+    backup_json: serde_json::Value,
+    mapping: HashMap<String, Option<String>>,
+) -> Result<ScorecardMigrateCommitResponse, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/migrate/commit", base_url);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&ScorecardMigrateCommitRequest { backup_json, mapping })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}

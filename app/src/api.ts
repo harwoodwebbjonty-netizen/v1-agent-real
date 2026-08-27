@@ -1450,3 +1450,30 @@ export async function saveScorecardWeek(userId: string, weekCommencing: string):
 export async function getScorecardWeeksAll(since?: string, until?: string): Promise<ScorecardSummaryEntry[]> {
   return invoke<ScorecardSummaryEntry[]>("get_scorecard_weeks_all", { since, until });
 }
+
+export interface ScorecardMigrateProfileSummary {
+  profile_id: string;
+  profile_name: string;
+  week_count: number;
+  suggested_user_id: string | null;
+  suggested_user_name: string | null;
+}
+
+export interface ScorecardMigratePreviewResult {
+  profiles: ScorecardMigrateProfileSummary[];
+  total_weeks: number;
+}
+
+export interface ScorecardMigrateCommitResult {
+  profiles_imported: number;
+  weeks_imported: number;
+  settings_imported: boolean;
+}
+
+export async function scorecardMigratePreview(backupJson: unknown): Promise<ScorecardMigratePreviewResult> {
+  return invoke<ScorecardMigratePreviewResult>("scorecard_migrate_preview", { backupJson });
+}
+
+export async function scorecardMigrateCommit(backupJson: unknown, mapping: Record<string, string | null>): Promise<ScorecardMigrateCommitResult> {
+  return invoke<ScorecardMigrateCommitResult>("scorecard_migrate_commit", { backupJson, mapping });
+}
