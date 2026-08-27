@@ -4954,6 +4954,37 @@ button.p-filter-chip.active {
 .status-badge.rag-red { background: var(--danger-tint); color: var(--danger-deep); border-color: var(--danger-tint); }
 .status-badge.rag-none { background: transparent; color: var(--text-muted); border-color: var(--border); }
 
+.sc-period-select {
+  padding: 6px 9px; border: 1px solid var(--border); border-radius: var(--radius-xs); font-size: var(--text-sm);
+  background: var(--surface, #fff);
+}
+.sc-leaderboard { padding: 4px 0; }
+.sc-lb-row, .sc-attention-row {
+  display: flex; align-items: center; gap: var(--space-3); padding: 10px 16px; border-top: 1px solid var(--hairline);
+  cursor: pointer;
+}
+.sc-lb-row:first-child, .sc-attention-row:first-child { border-top: 0; }
+.sc-lb-row:hover, .sc-attention-row:hover { background: var(--panel-hover, rgba(0,0,0,0.02)); }
+.sc-lb-rank {
+  font-family: var(--font-mono); font-size: var(--text-xs); color: #8a8f9e; width: 22px; text-align: center;
+  flex-shrink: 0;
+}
+.sc-lb-rank.lead { color: var(--accent, #E31346); font-weight: 650; }
+.sc-lb-name { flex: 1; font-weight: 500; }
+.sc-attention-why { flex: 1; color: var(--text-muted); font-size: var(--text-sm); text-align: right; }
+.sc-prep-sheet { max-width: 560px; text-align: left; }
+.sc-prep-kpis { margin: var(--space-3) 0; }
+.sc-prep-spark { display: flex; justify-content: center; margin-bottom: var(--space-3); }
+
+.sc-import-zone {
+  padding: 22px 16px; text-align: center; border: 1px dashed var(--border); background: transparent;
+  transition: border-color 0.15s, background 0.15s;
+}
+.sc-import-zone.sc-import-drag { border-color: var(--accent, #E31346); background: var(--accent-glow, rgba(227,19,70,0.04)); }
+.sc-import-zone p { margin: 0 0 8px; color: var(--text-muted); font-size: var(--text-sm); }
+.sc-import-browse { display: inline-flex; cursor: pointer; }
+.sc-import-hint { margin-top: 12px !important; font-size: var(--text-2xs) !important; }
+
 /* coverage bars (Analytics data coverage + reusable) */
 .cov { padding: 6px 16px 14px; }
 .cov .row { display: grid; grid-template-columns: 1fr 120px 58px; align-items: center; gap: var(--space-3); padding: 9px 0; border-top: 1px solid #eef1f7; }
