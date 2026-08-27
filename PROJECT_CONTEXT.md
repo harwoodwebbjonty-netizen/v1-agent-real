@@ -43,17 +43,18 @@ SQLite at `/opt/v1-agent/backend/data/team.db` on the VPS, WAL mode. Migrations 
 
 # Current State
 
-App is at **v0.6.39**; backend schema is at **migration 041** (built and locally verified 2026-08-27 — **needs the VPS deploy command run** to go live, see Current Work). A multi-release frontend redesign (v0.5.0 → v0.6.4, ~10 releases) moved the whole CRM to an "editorial operations workspace" look matching an approved design artifact — presentation-only, no feature/backend changes. See `CLAUDE.md`'s Design section for the current visual system.
+App is at **v0.6.40**; backend schema is at **migration 041**, deployed and confirmed healthy as of the v0.6.38 deploy — **the v0.6.40 backend diff (new DELETE /scorecard/weeks endpoint) still needs a fresh VPS deploy**, see Current Work. A multi-release frontend redesign (v0.5.0 → v0.6.4, ~10 releases) moved the whole CRM to an "editorial operations workspace" look matching an approved design artifact — presentation-only, no feature/backend changes. See `CLAUDE.md`'s Design section for the current visual system.
 
 # Current Work
 
-**Scorecard merge — COMPLETE, all 4 phases shipped 2026-08-27 (v0.6.36–v0.6.39), pending VPS deploy.** Merged the standalone WCF weekly-performance scorecard (`WCF_BDE_Weekly_Scorecard_copy.html`, wcf-scorecard.web.app) into the CRM as a new `view_scorecard`-gated tab, replacing manual Firestore entry with a mix of manual and CRM-derived metrics:
+**Scorecard merge — COMPLETE, 5 rounds shipped 2026-08-27 (v0.6.36–v0.6.40).** Merged the standalone WCF weekly-performance scorecard (`WCF_BDE_Weekly_Scorecard_copy.html`, wcf-scorecard.web.app) into the CRM as a new `view_scorecard`-gated tab, replacing manual Firestore entry with a mix of manual and CRM-derived metrics:
 - **Phase A (v0.6.36)**: schema + manual-entry Scorecard/Settings sub-tabs, RBAC (`view_scorecard`/`view_scorecard_manager`).
-- **Phase B (v0.6.37)**: Dashboard (open to all) + Manager (manager-only) sub-tabs — leaderboard, RAG, streak/trend/consistency, needs-attention list, per-person prep-sheet modal; CSV "Import calls" bulk-fill.
+- **Phase B (v0.6.37)**: Dashboard + Manager sub-tabs, CSV "Import calls" bulk-fill.
 - **Phase C (v0.6.38)**: auto-tracks **Qualified Leads Passed** (first `opportunity_stage→"opportunity"` transition per lead, via new `lead_status_history` log populated from `leads.py`'s `update_lead`) and **Mass Email Campaigns** (distinct sent `list_email_campaigns` per rep per week via existing `email_drafts`). Recomputed on read, never persisted; a manual edit always overrides. Calls/Talk Time/Follow-up %/CRM Compliance % stay manual — no honest CRM signal exists for them.
-- **Phase D (v0.6.39)**: admin-only migration tool (`/scorecard/migrate/preview` + `/commit`) to import the old Firestore backup JSON, with name-matching + an admin-reviewed mapping UI.
-- **Backend verification**: all migration/aggregation/router/permission logic was tested via direct DB round-trips + FastAPI `TestClient` (this Mac's local venv is Python 3.9 and can't import `leads.py`, see below) — no live browser/Tauri-app testing was done, since that needs a running backend + login session.
-- **Remaining manual steps** (see Next Steps): deploy the backend, run the real Firestore export through the migration tool, spot-check imported history, then decommission the old Firebase site.
+- **Phase D (v0.6.39)**: admin-only migration tool (`/scorecard/migrate/preview` + `/commit`) for the old Firestore backup JSON.
+- **v0.6.40 — full-parity rebuild**: Phase B's Dashboard/Manager had silently simplified away most of the source app's actual content despite the plan calling for full parity — user pushback ("it needs to be the exact same") triggered a full re-read of the ~2800-line source and a rebuild covering: Dashboard person/metric/date-range filters + group-by-month, weekly summary card, all 3 original Chart.js charts (RAG doughnut, avg-% bar, trend line), full snapshot table, per-person history with delete-week; Manager's exact KPI wording, full-detail leaderboard rows (ribbons/streak/consistency/sparkline/trend), team-metric rollup with per-person columns + callout, effort/conversion card grid, inline (not modal) prep sheet with talking points + actions review + present-to-BDE fullscreen mode; plus weight column, review date, print, backup export, reset-defaults. See `[[feedback_full_parity_on_ports]]` memory for the lesson. Added `DELETE /scorecard/weeks/{user_id}/{week_commencing}` (was missing).
+- **Backend verification**: all migration/aggregation/router/permission logic tested via direct DB round-trips + FastAPI `TestClient` (`backend/tests/test_scorecard.py`, 26/27 local pass — the 1 failure needs Python 3.10+, passes on CI) — no live browser/Tauri-app testing was done.
+- **Remaining manual steps** (see Next Steps): deploy the v0.6.40 backend diff, run the real Firestore export through the migration tool, spot-check imported history, then decommission the old Firebase site.
 
 ---
 
@@ -93,7 +94,7 @@ Also executing a full product/SaaS-readiness audit's roadmap (`audit/08-prioriti
 
 # Next Steps
 
-1. **Deploy the scorecard backend to the VPS** (rsync `backend/app/` + `requirements.txt`, restart `phone-lookup-backend` — migrations 040/041 run automatically) — nothing scorecard-related is live in production yet, only built and locally verified.
+1. **Deploy the v0.6.40 scorecard backend diff to the VPS** (rsync `backend/app/` + `requirements.txt`, restart `phone-lookup-backend`) — migrations 040/041 are already live (deployed with v0.6.38); this deploy is just the new `DELETE /scorecard/weeks` endpoint, no new migration.
 2. **Run the real scorecard migration**: export the backup JSON from wcf-scorecard.web.app (Settings → Download backup), upload it via the new admin-only Settings → Import panel, review the proposed name mapping, confirm. Spot-check a few imported weeks against the live Firestore data before decommissioning the old site/Firebase project.
 3. **Confirm the DB-growth lead**: `SELECT COUNT(*) FROM ch_charge_feed` on the VPS to check whether that table's self-prune is actually working (see Known Issues). One remaining console step regardless: Google Calendar API / Microsoft `Calendars.ReadWrite` must be enabled as a *permission* on the existing app registration(s) (not a redirect-URI issue, that part's self-service — see Stage 4); Microsoft's registration currently only has `Mail.Send`.
 4. Install the backup cron (spec'd, needs user sign-off — see Current Work / Stage 0).
