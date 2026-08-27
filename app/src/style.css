@@ -4985,6 +4985,11 @@ button.p-filter-chip.active {
 .sc-import-browse { display: inline-flex; cursor: pointer; }
 .sc-import-hint { margin-top: 12px !important; font-size: var(--text-2xs) !important; }
 
+.sc-auto-badge { margin-left: 6px; font-size: var(--text-3xs) !important; text-transform: uppercase; letter-spacing: 0.04em; }
+.sc-actual-cell { display: flex; align-items: center; gap: 8px; white-space: nowrap; }
+.sc-auto-value { font-family: var(--font-mono); font-variant-numeric: tabular-nums; font-weight: 600; }
+.sc-override-btn { padding: 3px 8px; font-size: var(--text-3xs); }
+
 /* coverage bars (Analytics data coverage + reusable) */
 .cov { padding: 6px 16px 14px; }
 .cov .row { display: grid; grid-template-columns: 1fr 120px 58px; align-items: center; gap: var(--space-3); padding: 9px 0; border-top: 1px solid #eef1f7; }

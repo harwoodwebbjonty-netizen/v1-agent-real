@@ -34,13 +34,13 @@ const METRICS: { key: ScorecardMetricKey; name: string; unit: string; isPercent?
   { key: "crm", name: "CRM Compliance", unit: "%", isPercent: true, weight: 0 },
 ];
 
-type Draft = Record<ScorecardMetricKey, { actual: number | null; notes: string; action: string }>;
+type Draft = Record<ScorecardMetricKey, { actual: number | null; notes: string; action: string; source: "manual" | "auto" }>;
 type Period = "week" | "month" | "quarter" | "all";
 type Rag = "green" | "amber" | "red" | "none";
 
 function emptyDraft(): Draft {
   const draft = {} as Draft;
-  for (const m of METRICS) draft[m.key] = { actual: null, notes: "", action: "" };
+  for (const m of METRICS) draft[m.key] = { actual: null, notes: "", action: "", source: "manual" };
   return draft;
 }
 
@@ -507,6 +507,7 @@ export function initScorecard(): void {
   let draft: Draft = emptyDraft();
   let savedAt: string | null = null;
   let settings: ScorecardSettings | null = null;
+  let overriddenKeys = new Set<ScorecardMetricKey>();
   let loadToken = 0;
   let people: PersonSeries[] = [];
   let allMembers: UserInfo[] = [];
@@ -526,11 +527,16 @@ export function initScorecard(): void {
       const entry = draft[m.key];
       const pct = computeCellPct(m, entry.actual, target);
       const rag = ragClass(pct, green, amber);
+      const isAutoBadge = entry.source === "auto" && !overriddenKeys.has(m.key);
+      const actualCell = isAutoBadge
+        ? `<span class="sc-auto-value" title="Auto-tracked from the CRM">${entry.actual ?? 0}</span>
+           <button type="button" class="btn-ghost sc-override-btn" data-metric="${m.key}">Override</button>`
+        : `<input type="number" class="sc-actual-input" data-metric="${m.key}" value="${entry.actual ?? ""}" />`;
       return `
         <tr data-metric="${m.key}">
-          <td>${escapeHtml(m.name)}</td>
+          <td>${escapeHtml(m.name)}${isAutoBadge ? ` <span class="status-badge rag-none sc-auto-badge">Auto (CRM)</span>` : ""}</td>
           <td class="mono">${target}${m.unit}</td>
-          <td><input type="number" class="sc-actual-input" data-metric="${m.key}" value="${entry.actual ?? ""}" /></td>
+          <td class="sc-actual-cell">${actualCell}</td>
           <td class="mono">${pctText(pct)}</td>
           <td><span class="status-badge rag-${rag}">${ragLabel(rag)}</span></td>
           <td><input type="text" class="sc-notes-input" data-metric="${m.key}" value="${escapeHtml(entry.notes)}" /></td>
@@ -544,6 +550,12 @@ export function initScorecard(): void {
         draft[key].actual = el.value === "" ? null : Number(el.value);
       });
       el.addEventListener("change", renderRows);
+    });
+    rowsEl.querySelectorAll<HTMLButtonElement>(".sc-override-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        overriddenKeys.add(btn.dataset.metric as ScorecardMetricKey);
+        renderRows();
+      });
     });
     rowsEl.querySelectorAll<HTMLInputElement>(".sc-notes-input").forEach((el) => {
       el.addEventListener("input", () => {
@@ -559,11 +571,12 @@ export function initScorecard(): void {
 
   function applyWeekToDraft(week: ScorecardWeek | undefined): void {
     draft = emptyDraft();
+    overriddenKeys = new Set();
     savedAt = week?.saved_at ?? null;
     if (week) {
       for (const m of METRICS) {
         const e = week.entries[m.key];
-        if (e) draft[m.key] = { actual: e.actual, notes: e.notes, action: e.action };
+        if (e) draft[m.key] = { actual: e.actual, notes: e.notes, action: e.action, source: e.source };
       }
     }
     savedLabelEl.textContent = savedAt ? `Saved ${new Date(savedAt).toLocaleString("en-GB")}` : "Not saved yet";
@@ -912,7 +925,15 @@ export function initScorecard(): void {
     saveBtn.disabled = true;
     try {
       const entries: Record<string, ScorecardEntryInput> = {};
-      for (const m of METRICS) entries[m.key] = draft[m.key];
+      for (const m of METRICS) {
+        const entry = draft[m.key];
+        // An auto-tracked metric the rep never overrode is left out of the
+        // payload entirely — the backend only persists keys present here,
+        // so omitting it keeps it recomputing live forever instead of
+        // freezing it at today's snapshot value.
+        if (entry.source === "auto" && !overriddenKeys.has(m.key)) continue;
+        entries[m.key] = entry;
+      }
       await upsertScorecardWeek(user.id, currentWeek, "", entries);
       const saved = await saveScorecardWeek(user.id, currentWeek);
       applyWeekToDraft(saved);

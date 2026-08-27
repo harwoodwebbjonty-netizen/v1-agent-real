@@ -23,7 +23,7 @@ router = APIRouter(prefix="/scorecard", tags=["scorecard"])
 METRIC_KEYS = scorecard_service.METRIC_KEYS
 
 
-def _week_to_out(week_row, entries_rows) -> ScorecardWeekOut:
+def _week_to_out(week_row, entries_rows, auto_values=None) -> ScorecardWeekOut:
     entries = {
         e["metric_key"]: ScorecardEntryOut(
             metric_key=e["metric_key"],
@@ -35,6 +35,7 @@ def _week_to_out(week_row, entries_rows) -> ScorecardWeekOut:
         )
         for e in entries_rows
     }
+    _apply_auto_tracking(entries, week_row["user_id"], week_row["week_commencing"], auto_values)
     return ScorecardWeekOut(
         id=week_row["id"],
         user_id=week_row["user_id"],
@@ -43,6 +44,22 @@ def _week_to_out(week_row, entries_rows) -> ScorecardWeekOut:
         saved_at=week_row["saved_at"],
         entries=entries,
     )
+
+
+def _apply_auto_tracking(entries: dict, user_id: str, week_commencing: str, auto_values=None) -> None:
+    """Fills in any auto-tracked metric that has no manual override for this
+    week — a stored entry always wins (every stored entry is manual by
+    construction; nothing here is ever persisted). Computed values default
+    to 0 rather than being omitted: once a metric is auto-tracked, "0 this
+    week" is a real, known fact, not an absence of data."""
+    if auto_values is None:
+        auto_values = scorecard_service.compute_auto_values()
+    now = now_iso()
+    for metric_key in scorecard_service.auto_tracked_metric_keys():
+        if metric_key in entries:
+            continue
+        value = auto_values.get((user_id, week_commencing, metric_key), 0.0)
+        entries[metric_key] = ScorecardEntryOut(metric_key=metric_key, actual=value, notes="", action="", source="auto", updated_at=now)
 
 
 def _require_can_view(target_user_id: str, current_user: CurrentUser) -> None:
@@ -115,8 +132,19 @@ def get_weeks(
     current_user: CurrentUser = Depends(require_permission("view_scorecard")),
 ) -> ScorecardWeeksResponse:
     _require_can_view(user_id, current_user)
+    auto_values = scorecard_service.compute_auto_values()
     weeks = db.list_scorecard_weeks_for_user(user_id, since, until)
-    out = [_week_to_out(w, db.list_scorecard_entries_for_week(w["id"])) for w in weeks]
+    out = [_week_to_out(w, db.list_scorecard_entries_for_week(w["id"]), auto_values) for w in weeks]
+
+    # A single specific week (the entry form's own request shape) with no
+    # stored row yet still needs to surface auto-tracked values, so a rep
+    # who's never opened the Scorecard tab this week still sees them.
+    if since and until and since == until and not any(w.week_commencing == since for w in out):
+        has_auto_data = any(key[0] == user_id and key[1] == since for key in auto_values)
+        if has_auto_data:
+            virtual = {"id": "", "user_id": user_id, "week_commencing": since, "review_date": "", "saved_at": None}
+            out.append(_week_to_out(virtual, [], auto_values))
+
     return ScorecardWeeksResponse(weeks=out)
 
 
@@ -166,9 +194,10 @@ def get_weeks_all(
     until: Optional[str] = Query(None),
     current_user: CurrentUser = Depends(require_permission("view_scorecard")),
 ) -> ScorecardSummaryResponse:
-    rows = db.list_scorecard_weeks_all_summary(since, until)
-    entries = [
-        ScorecardSummaryEntry(
+    stored_rows = db.list_scorecard_weeks_all_summary(since, until)
+    merged: dict = {}
+    for r in stored_rows:
+        merged[(r["user_id"], r["week_commencing"], r["metric_key"])] = ScorecardSummaryEntry(
             user_id=r["user_id"],
             week_commencing=r["week_commencing"],
             saved_at=r["saved_at"],
@@ -176,6 +205,23 @@ def get_weeks_all(
             actual=r["actual"],
             source=r["source"],
         )
-        for r in rows
-    ]
-    return ScorecardSummaryResponse(entries=entries)
+
+    # Auto-tracked activity surfaces on the team leaderboard/manager view
+    # even for a rep who's never opened the Scorecard tab that week — that's
+    # the whole point of auto-tracking. A manual override always wins.
+    auto_tracked_keys = scorecard_service.auto_tracked_metric_keys()
+    for (user_id, week_commencing, metric_key), value in scorecard_service.compute_auto_values().items():
+        if metric_key not in auto_tracked_keys:
+            continue
+        if since and week_commencing < since:
+            continue
+        if until and week_commencing > until:
+            continue
+        key = (user_id, week_commencing, metric_key)
+        if key in merged:
+            continue
+        merged[key] = ScorecardSummaryEntry(
+            user_id=user_id, week_commencing=week_commencing, saved_at=None, metric_key=metric_key, actual=value, source="auto"
+        )
+
+    return ScorecardSummaryResponse(entries=list(merged.values()))

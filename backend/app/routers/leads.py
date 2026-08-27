@@ -335,8 +335,23 @@ def update_lead(
     _require_lead_access(row, current_user)
 
     fields = {k: v for k, v in body.model_dump().items() if v is not None}
-    db.update_lead_fields(lead_id, fields, now_iso())
+    now = now_iso()
+    db.update_lead_fields(lead_id, fields, now)
     db.record_audit(current_user.id, current_user.name, "update", "lead", lead_id, detail=", ".join(fields.keys()))
+
+    # Scorecard auto-tracking ("Qualified Leads Passed") needs a real
+    # from/to transition log, not just the lead's current value — see
+    # lead_status_history (migration 041). Deliberately scoped to this
+    # direct-edit path only, not the dedup-merge path, so an automated
+    # merge can't farm scorecard credit for a rep.
+    for status_field in ("contact_status", "opportunity_stage"):
+        new_value = fields.get(status_field)
+        if new_value is None:
+            continue
+        old_value = row[status_field] or ""
+        if new_value == old_value:
+            continue
+        db.record_lead_status_change(new_id(), lead_id, status_field, old_value, new_value, current_user.id, now)
 
     updated = db.get_lead(lead_id)
     return _to_lead_out(updated, _user_name_map(), activity)

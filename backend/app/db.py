@@ -1014,6 +1014,42 @@ def _migration_040_scorecard(conn: sqlite3.Connection) -> None:
             conn.execute("UPDATE roles SET permissions = ? WHERE id = ?", (json.dumps(current), role_id))
 
 
+def _migration_041_lead_status_history(conn: sqlite3.Connection) -> None:
+    """Narrow append-only log of contact_status/opportunity_stage
+    transitions, added specifically to auto-track the scorecard's
+    "Qualified Leads Passed" metric honestly. leads.updated_at was
+    considered and rejected as a cheaper alternative: it's touched by ANY
+    field edit (notes, industry, contact name...), not just status changes,
+    so a lead touched twice in a week by two different people would
+    silently keep only the last editor's credit, and an unrelated edit to
+    an already-qualified lead would be miscounted as newly qualified. This
+    table records real from/to transitions with a timestamp and the acting
+    user, populated from update_lead (leads.py) — deliberately NOT from the
+    dedup-merge path, so an automated merge can't farm scorecard credit."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS lead_status_history (
+            id TEXT PRIMARY KEY,
+            lead_id TEXT NOT NULL,
+            field TEXT NOT NULL,
+            from_value TEXT NOT NULL DEFAULT '',
+            to_value TEXT NOT NULL,
+            changed_by TEXT NOT NULL,
+            created_at TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_lead_status_history_lead_id ON lead_status_history(lead_id);
+        CREATE INDEX IF NOT EXISTS idx_lead_status_history_changed_by ON lead_status_history(changed_by);
+        CREATE INDEX IF NOT EXISTS idx_lead_status_history_created_at ON lead_status_history(created_at);
+        """
+    )
+    now = datetime.now(timezone.utc).isoformat()
+    for metric_key in ("leads", "campaigns"):
+        conn.execute(
+            "UPDATE scorecard_metric_targets SET auto_tracked = 1, updated_at = ? WHERE metric_key = ?",
+            (now, metric_key),
+        )
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -1057,8 +1093,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (38, _migration_038_oauth_state_purpose),
     (39, _migration_039_list_campaign_lead_ids),
     (40, _migration_040_scorecard),
+    (41, _migration_041_lead_status_history),
 ]
-CURRENT_SCHEMA_VERSION = 40
+CURRENT_SCHEMA_VERSION = 41
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -3367,3 +3404,61 @@ def set_scorecard_metric_auto_tracked(metric_key: str, auto_tracked: bool, updat
             "UPDATE scorecard_metric_targets SET auto_tracked = ?, updated_at = ? WHERE metric_key = ?",
             (1 if auto_tracked else 0, updated_at, metric_key),
         )
+
+
+def record_lead_status_change(id: str, lead_id: str, field: str, from_value: str, to_value: str, changed_by: str, created_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO lead_status_history (id, lead_id, field, from_value, to_value, changed_by, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (id, lead_id, field, from_value, to_value, changed_by, created_at),
+        )
+
+
+# SQLite week-bucketing: strftime('%w', ts) is 0=Sunday..6=Saturday; shifting
+# by (weekday+6)%7 days back always lands on that timestamp's Monday, so two
+# events in the same Mon-Sun week always bucket to the same week_commencing
+# used throughout the rest of the scorecard schema.
+_WEEK_COMMENCING_EXPR = "date({col}, '-' || ((strftime('%w', {col}) + 6) % 7) || ' days')"
+
+
+def qualified_leads_passed_by_week(qualifying_field: str, qualifying_value: str) -> list[sqlite3.Row]:
+    """One row per (user_id, week_commencing): how many leads FIRST reached
+    the qualifying value during that week, credited to whoever made that
+    specific transition. Relies on SQLite's documented bare-column behaviour
+    for a single-aggregate GROUP BY — with exactly one MIN()/MAX() in the
+    query, bare columns are taken from the row that produced it, so
+    `changed_by` here always matches the row whose created_at is the MIN."""
+    week_expr = _WEEK_COMMENCING_EXPR.format(col="qualified_at")
+    with get_connection() as conn:
+        return conn.execute(
+            f"""
+            SELECT changed_by AS user_id, {week_expr} AS week_commencing, COUNT(*) AS value
+            FROM (
+                SELECT lead_id, changed_by, MIN(created_at) AS qualified_at
+                FROM lead_status_history
+                WHERE field = ? AND to_value = ?
+                GROUP BY lead_id
+            )
+            GROUP BY changed_by, week_commencing
+            """,
+            (qualifying_field, qualifying_value),
+        ).fetchall()
+
+
+def campaigns_sent_by_week() -> list[sqlite3.Row]:
+    """One row per (user_id, week_commencing): distinct list-email campaigns
+    with at least one draft actually sent (status='sent', real sent_at) that
+    week. Win-back is deliberately excluded — it sends exclusively via
+    Mailchimp export, so there's no reliable in-CRM sent timestamp to count
+    against; sequence enrollments (campaign_id NULL) are excluded from v1."""
+    week_expr = _WEEK_COMMENCING_EXPR.format(col="sent_at")
+    with get_connection() as conn:
+        return conn.execute(
+            f"""
+            SELECT owner_user_id AS user_id, {week_expr} AS week_commencing, COUNT(DISTINCT campaign_id) AS value
+            FROM email_drafts
+            WHERE campaign_id IS NOT NULL AND campaign_id != '' AND status = 'sent' AND sent_at IS NOT NULL
+            GROUP BY owner_user_id, week_commencing
+            """
+        ).fetchall()
