@@ -20,6 +20,8 @@ PERMISSION_CATALOGUE = [
             {"key": "view_prospecting", "label": "AI Prospecting"},
             {"key": "view_win_back", "label": "Win-back"},
             {"key": "view_settings", "label": "Settings"},
+            {"key": "view_scorecard", "label": "Weekly Scorecard"},
+            {"key": "view_scorecard_manager", "label": "Scorecard: Manager view"},
         ],
     },
     {
@@ -52,6 +54,7 @@ MEMBER_PERMISSIONS = [
     "view_calendar",
     "view_analytics",
     "send_email",
+    "view_scorecard",
 ]
 
 LEAD_SCOPES = ("all_shared", "own_assigned")

@@ -29,6 +29,7 @@ import { initSalesIntelligence } from "./views/salesIntelligence";
 import { initSequences } from "./views/sequences";
 import { initListCampaign } from "./views/listCampaign";
 import { initOutreach } from "./views/outreach";
+import { initScorecard } from "./views/scorecard";
 import { initSettings } from "./views/settings";
 import { initWinBackCampaign } from "./views/winBackCampaign";
 
@@ -52,6 +53,7 @@ initOutreach(emailWriterHandle, listCampaignHandle, sequencesHandle);
 initWinBackCampaign();
 initCalendar();
 initAnalytics();
+initScorecard();
 initSettings();
 initConnectors();
 initTabBar();

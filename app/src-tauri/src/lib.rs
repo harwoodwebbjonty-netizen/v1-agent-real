@@ -365,6 +365,72 @@ async fn set_lead_custom_field_value(
     backend_client::set_lead_custom_field_value(&base_url, &session.token, &lead_id, &field_id, &value).await
 }
 
+// --- Scorecard (weekly BDE performance tracking) ---
+
+#[tauri::command]
+async fn get_scorecard_settings(app_handle: tauri::AppHandle) -> Result<backend_client::ScorecardSettings, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_scorecard_settings(&base_url, &session.token).await
+}
+
+#[allow(clippy::too_many_arguments)]
+#[tauri::command]
+async fn update_scorecard_settings(
+    app_handle: tauri::AppHandle,
+    green_threshold: Option<f64>,
+    amber_threshold: Option<f64>,
+    qualifying_field: Option<String>,
+    qualifying_value: Option<String>,
+    notes_visibility: Option<String>,
+    targets: Option<std::collections::HashMap<String, f64>>,
+) -> Result<backend_client::ScorecardSettings, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::update_scorecard_settings(
+        &base_url, &session.token, green_threshold, amber_threshold, qualifying_field, qualifying_value, notes_visibility, targets,
+    )
+    .await
+}
+
+#[tauri::command]
+async fn get_scorecard_weeks(
+    app_handle: tauri::AppHandle, user_id: String, since: Option<String>, until: Option<String>,
+) -> Result<Vec<backend_client::ScorecardWeek>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_scorecard_weeks(&base_url, &session.token, &user_id, since.as_deref(), until.as_deref()).await
+}
+
+#[tauri::command]
+async fn upsert_scorecard_week(
+    app_handle: tauri::AppHandle,
+    user_id: String,
+    week_commencing: String,
+    review_date: String,
+    entries: std::collections::HashMap<String, backend_client::ScorecardEntryInput>,
+) -> Result<backend_client::ScorecardWeek, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::upsert_scorecard_week(&base_url, &session.token, &user_id, &week_commencing, &review_date, entries).await
+}
+
+#[tauri::command]
+async fn save_scorecard_week(app_handle: tauri::AppHandle, user_id: String, week_commencing: String) -> Result<backend_client::ScorecardWeek, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::save_scorecard_week(&base_url, &session.token, &user_id, &week_commencing).await
+}
+
+#[tauri::command]
+async fn get_scorecard_weeks_all(
+    app_handle: tauri::AppHandle, since: Option<String>, until: Option<String>,
+) -> Result<Vec<backend_client::ScorecardSummaryEntry>, String> {
+    let session = require_session(&app_handle)?;
+    let base_url = app_state::resolve_base_url(&app_handle);
+    backend_client::get_scorecard_weeks_all(&base_url, &session.token, since.as_deref(), until.as_deref()).await
+}
+
 /// Independent AI email scraper — manual trigger only, never runs as a side
 /// effect of the phone-lookup flow above.
 #[tauri::command]
@@ -1443,6 +1509,12 @@ pub fn run() {
       create_custom_field,
       delete_custom_field,
       set_lead_custom_field_value,
+      get_scorecard_settings,
+      update_scorecard_settings,
+      get_scorecard_weeks,
+      upsert_scorecard_week,
+      save_scorecard_week,
+      get_scorecard_weeks_all,
       scrape_lead_email,
       verify_lead_emails,
       generate_lead_intelligence,

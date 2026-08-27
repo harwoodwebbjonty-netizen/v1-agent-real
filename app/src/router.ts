@@ -14,6 +14,7 @@ const ALL_VIEWS: ViewName[] = [
   "calendar",
   "outreach",
   "analytics",
+  "scorecard",
   "settings",
   "connectors",
 ];

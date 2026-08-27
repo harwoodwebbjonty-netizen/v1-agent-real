@@ -2790,3 +2790,226 @@ pub async fn send_all_list_campaign(base_url: &str, token: &str, campaign_id: &s
         .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
     handle_response(response).await
 }
+
+// --- Scorecard (weekly BDE performance tracking) ---
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardEntry {
+    pub metric_key: String,
+    pub actual: Option<f64>,
+    pub notes: String,
+    pub action: String,
+    pub source: String,
+    pub updated_at: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardWeek {
+    pub id: String,
+    pub user_id: String,
+    pub week_commencing: String,
+    pub review_date: String,
+    pub saved_at: Option<String>,
+    pub entries: HashMap<String, ScorecardEntry>,
+}
+
+#[derive(Deserialize)]
+struct ScorecardWeeksResponse {
+    weeks: Vec<ScorecardWeek>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardSummaryEntry {
+    pub user_id: String,
+    pub week_commencing: String,
+    pub saved_at: Option<String>,
+    pub metric_key: String,
+    pub actual: Option<f64>,
+    pub source: String,
+}
+
+#[derive(Deserialize)]
+struct ScorecardSummaryResponse {
+    entries: Vec<ScorecardSummaryEntry>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardMetricTarget {
+    pub metric_key: String,
+    pub target_value: f64,
+    pub auto_tracked: bool,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardSettings {
+    pub green_threshold: f64,
+    pub amber_threshold: f64,
+    pub qualifying_field: String,
+    pub qualifying_value: String,
+    pub notes_visibility: String,
+    pub targets: Vec<ScorecardMetricTarget>,
+}
+
+pub async fn get_scorecard_settings(base_url: &str, token: &str) -> Result<ScorecardSettings, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/settings", base_url);
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+#[derive(Serialize)]
+struct UpdateScorecardSettingsRequest {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    green_threshold: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    amber_threshold: Option<f64>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qualifying_field: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    qualifying_value: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    notes_visibility: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    targets: Option<HashMap<String, f64>>,
+}
+
+#[allow(clippy::too_many_arguments)]
+pub async fn update_scorecard_settings(
+    base_url: &str,
+    token: &str,
+    green_threshold: Option<f64>,
+    amber_threshold: Option<f64>,
+    qualifying_field: Option<String>,
+    qualifying_value: Option<String>,
+    notes_visibility: Option<String>,
+    targets: Option<HashMap<String, f64>>,
+) -> Result<ScorecardSettings, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/settings", base_url);
+    let response = client
+        .put(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&UpdateScorecardSettingsRequest {
+            green_threshold,
+            amber_threshold,
+            qualifying_field,
+            qualifying_value,
+            notes_visibility,
+            targets,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn get_scorecard_weeks(
+    base_url: &str,
+    token: &str,
+    user_id: &str,
+    since: Option<&str>,
+    until: Option<&str>,
+) -> Result<Vec<ScorecardWeek>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/weeks", base_url);
+    let mut params: Vec<(&str, &str)> = vec![("user_id", user_id)];
+    if let Some(s) = since {
+        params.push(("since", s));
+    }
+    if let Some(u) = until {
+        params.push(("until", u));
+    }
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: ScorecardWeeksResponse = handle_response(response).await?;
+    Ok(wrapper.weeks)
+}
+
+// Deserialize (incoming from the JS side via a Tauri command arg) and
+// Serialize (outgoing straight into the backend HTTP request body) — one
+// shape serves both directions, no tuple/struct reshaping in between.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScorecardEntryInput {
+    pub actual: Option<f64>,
+    #[serde(default)]
+    pub notes: String,
+    #[serde(default)]
+    pub action: String,
+}
+
+#[derive(Serialize)]
+struct UpsertScorecardWeekRequest {
+    review_date: String,
+    entries: HashMap<String, ScorecardEntryInput>,
+}
+
+pub async fn upsert_scorecard_week(
+    base_url: &str,
+    token: &str,
+    user_id: &str,
+    week_commencing: &str,
+    review_date: &str,
+    entries: HashMap<String, ScorecardEntryInput>,
+) -> Result<ScorecardWeek, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/weeks/{}/{}", base_url, user_id, week_commencing);
+    let response = client
+        .put(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .json(&UpsertScorecardWeekRequest {
+            review_date: review_date.to_string(),
+            entries,
+        })
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn save_scorecard_week(base_url: &str, token: &str, user_id: &str, week_commencing: &str) -> Result<ScorecardWeek, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/weeks/{}/{}/save", base_url, user_id, week_commencing);
+    let response = client
+        .post(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    handle_response(response).await
+}
+
+pub async fn get_scorecard_weeks_all(
+    base_url: &str,
+    token: &str,
+    since: Option<&str>,
+    until: Option<&str>,
+) -> Result<Vec<ScorecardSummaryEntry>, String> {
+    let client = reqwest::Client::new();
+    let url = format!("{}/scorecard/weeks/all", base_url);
+    let mut params: Vec<(&str, &str)> = vec![];
+    if let Some(s) = since {
+        params.push(("since", s));
+    }
+    if let Some(u) = until {
+        params.push(("until", u));
+    }
+    let response = client
+        .get(&url)
+        .header("Authorization", format!("Bearer {}", token))
+        .query(&params)
+        .send()
+        .await
+        .map_err(|e| format!("Failed to reach backend at {}: {}", url, e))?;
+    let wrapper: ScorecardSummaryResponse = handle_response(response).await?;
+    Ok(wrapper.entries)
+}

@@ -32,6 +32,7 @@ from app.routers import (
     list_campaigns,
     roles,
     saved_views,
+    scorecard,
     sequences,
     users,
     win_back,
@@ -94,6 +95,7 @@ app.include_router(audit.router)
 app.include_router(roles.router)
 app.include_router(saved_views.router)
 app.include_router(custom_fields.router)
+app.include_router(scorecard.router)
 
 
 async def _sequence_scheduler_loop() -> None:

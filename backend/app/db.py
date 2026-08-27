@@ -911,6 +911,109 @@ def _migration_026_lead_priority(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE leads ADD COLUMN priority_breakdown TEXT NOT NULL DEFAULT '{}'")
 
 
+def _migration_040_scorecard(conn: sqlite3.Connection) -> None:
+    """Weekly BDE performance scorecard, merged in from the standalone
+    wcf-scorecard.web.app Firebase app. One row per (user, week), directly
+    editable at any time — no current/history split like the Firestore
+    original had (that existed only to make partial cloud syncs safe with no
+    real backend). `saved_at` preserves the "Save this week" action as an
+    explicit checkpoint (by user decision) but never locks the row from
+    further edits. Metric names/units/weights stay hardcoded frontend
+    constants, matching the source app — only the numeric target and RAG
+    thresholds were ever actually editable in its Settings tab, so that's
+    all scorecard_metric_targets/scorecard_settings store."""
+    conn.executescript(
+        """
+        CREATE TABLE IF NOT EXISTS scorecard_weeks (
+            id TEXT PRIMARY KEY,
+            user_id TEXT NOT NULL,
+            week_commencing TEXT NOT NULL,
+            review_date TEXT NOT NULL DEFAULT '',
+            saved_at TEXT,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL,
+            UNIQUE(user_id, week_commencing)
+        );
+        CREATE INDEX IF NOT EXISTS idx_scorecard_weeks_user_id ON scorecard_weeks(user_id);
+        CREATE INDEX IF NOT EXISTS idx_scorecard_weeks_week_commencing ON scorecard_weeks(week_commencing);
+
+        CREATE TABLE IF NOT EXISTS scorecard_entries (
+            id TEXT PRIMARY KEY,
+            week_id TEXT NOT NULL,
+            metric_key TEXT NOT NULL,
+            actual REAL,
+            notes TEXT NOT NULL DEFAULT '',
+            action TEXT NOT NULL DEFAULT '',
+            source TEXT NOT NULL DEFAULT 'manual',
+            updated_at TEXT NOT NULL,
+            UNIQUE(week_id, metric_key)
+        );
+        CREATE INDEX IF NOT EXISTS idx_scorecard_entries_week_id ON scorecard_entries(week_id);
+
+        CREATE TABLE IF NOT EXISTS scorecard_metric_targets (
+            metric_key TEXT PRIMARY KEY,
+            target_value REAL NOT NULL,
+            auto_tracked INTEGER NOT NULL DEFAULT 0,
+            updated_at TEXT NOT NULL
+        );
+
+        CREATE TABLE IF NOT EXISTS scorecard_settings (
+            id TEXT PRIMARY KEY DEFAULT 'global',
+            green_threshold REAL NOT NULL DEFAULT 100,
+            amber_threshold REAL NOT NULL DEFAULT 85,
+            qualifying_field TEXT NOT NULL DEFAULT 'opportunity_stage',
+            qualifying_value TEXT NOT NULL DEFAULT 'opportunity',
+            notes_visibility TEXT NOT NULL DEFAULT 'manager_only',
+            updated_at TEXT NOT NULL
+        );
+        """
+    )
+
+    now = datetime.now(timezone.utc).isoformat()
+    default_targets = {
+        "calls": 675,
+        "talk_time": 10,
+        "leads": 3,
+        "campaigns": 3,
+        "follow_up": 100,
+        "crm": 100,
+    }
+    for key, target in default_targets.items():
+        conn.execute(
+            "INSERT OR IGNORE INTO scorecard_metric_targets (metric_key, target_value, auto_tracked, updated_at) "
+            "VALUES (?, ?, 0, ?)",
+            (key, target, now),
+        )
+    conn.execute(
+        "INSERT OR IGNORE INTO scorecard_settings "
+        "(id, green_threshold, amber_threshold, qualifying_field, qualifying_value, notes_visibility, updated_at) "
+        "VALUES ('global', 100, 85, 'opportunity_stage', 'opportunity', 'manager_only', ?)",
+        (now,),
+    )
+
+    # Grant the new permissions on the live, already-seeded built-in roles —
+    # editing permissions.py's constants alone does nothing here, since
+    # resolve_user_access() reads the roles table's stored `permissions`
+    # JSON, not the Python constants (those were only used at migration
+    # 031's one-time seed). Without this, existing Members would silently
+    # lose the new nav item until an admin manually re-granted it.
+    for role_id, new_perms in (
+        ("role-member", ["view_scorecard"]),
+        ("role-admin", ["view_scorecard", "view_scorecard_manager"]),
+    ):
+        row = conn.execute("SELECT permissions FROM roles WHERE id = ?", (role_id,)).fetchone()
+        if row is None:
+            continue
+        current = json.loads(row["permissions"])
+        changed = False
+        for perm in new_perms:
+            if perm not in current:
+                current.append(perm)
+                changed = True
+        if changed:
+            conn.execute("UPDATE roles SET permissions = ? WHERE id = ?", (json.dumps(current), role_id))
+
+
 # Ordered (version, migration_fn) pairs. Append new entries here for future
 # schema changes — never edit or remove an existing entry once released.
 MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
@@ -953,8 +1056,9 @@ MIGRATIONS: list[tuple[int, Callable[[sqlite3.Connection], None]]] = [
     (37, _migration_037_calendar_oauth),
     (38, _migration_038_oauth_state_purpose),
     (39, _migration_039_list_campaign_lead_ids),
+    (40, _migration_040_scorecard),
 ]
-CURRENT_SCHEMA_VERSION = 39
+CURRENT_SCHEMA_VERSION = 40
 
 
 def get_schema_version(conn: sqlite3.Connection) -> int:
@@ -3124,3 +3228,142 @@ def get_company_name_from_leads(company_number: str) -> Optional[str]:
             "SELECT company FROM leads WHERE company_number = ? LIMIT 1", (company_number,)
         ).fetchone()
         return row["company"] if row else None
+
+
+# ---------------------------------------------------------------------------
+# Scorecard
+# ---------------------------------------------------------------------------
+
+def create_scorecard_week(id: str, user_id: str, week_commencing: str, created_at: str, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "INSERT INTO scorecard_weeks (id, user_id, week_commencing, review_date, saved_at, created_at, updated_at) "
+            "VALUES (?, ?, ?, '', NULL, ?, ?)",
+            (id, user_id, week_commencing, created_at, updated_at),
+        )
+
+
+def get_scorecard_week(user_id: str, week_commencing: str) -> Optional[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute(
+            "SELECT * FROM scorecard_weeks WHERE user_id = ? AND week_commencing = ?",
+            (user_id, week_commencing),
+        ).fetchone()
+
+
+def list_scorecard_weeks_for_user(
+    user_id: str, since: Optional[str] = None, until: Optional[str] = None
+) -> list[sqlite3.Row]:
+    clauses = ["user_id = ?"]
+    params: list = [user_id]
+    if since:
+        clauses.append("week_commencing >= ?")
+        params.append(since)
+    if until:
+        clauses.append("week_commencing <= ?")
+        params.append(until)
+    with get_connection() as conn:
+        return conn.execute(
+            f"SELECT * FROM scorecard_weeks WHERE {' AND '.join(clauses)} ORDER BY week_commencing",
+            params,
+        ).fetchall()
+
+
+def update_scorecard_week_review_date(week_id: str, review_date: str, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE scorecard_weeks SET review_date = ?, updated_at = ? WHERE id = ?",
+            (review_date, updated_at, week_id),
+        )
+
+
+def mark_scorecard_week_saved(week_id: str, saved_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE scorecard_weeks SET saved_at = ?, updated_at = ? WHERE id = ?", (saved_at, saved_at, week_id)
+        )
+
+
+def list_scorecard_entries_for_week(week_id: str) -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM scorecard_entries WHERE week_id = ?", (week_id,)).fetchall()
+
+
+def upsert_scorecard_entry(
+    id: str, week_id: str, metric_key: str, actual: Optional[float], notes: str, action: str, source: str, updated_at: str
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """INSERT INTO scorecard_entries (id, week_id, metric_key, actual, notes, action, source, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+               ON CONFLICT(week_id, metric_key) DO UPDATE SET
+                 actual = excluded.actual, notes = excluded.notes, action = excluded.action,
+                 source = excluded.source, updated_at = excluded.updated_at""",
+            (id, week_id, metric_key, actual, notes, action, source, updated_at),
+        )
+
+
+def list_scorecard_weeks_all_summary(since: Optional[str] = None, until: Optional[str] = None) -> list[sqlite3.Row]:
+    """Numeric actuals only, every user — backs the team-wide Dashboard/
+    Manager widgets without exposing anyone's private notes/action text
+    (that stays behind the per-user GET /scorecard/weeks endpoint's own
+    access check)."""
+    clauses = []
+    params: list = []
+    if since:
+        clauses.append("w.week_commencing >= ?")
+        params.append(since)
+    if until:
+        clauses.append("w.week_commencing <= ?")
+        params.append(until)
+    where = f"WHERE {' AND '.join(clauses)}" if clauses else ""
+    with get_connection() as conn:
+        return conn.execute(
+            f"""SELECT w.user_id, w.week_commencing, w.saved_at, e.metric_key, e.actual, e.source
+                FROM scorecard_weeks w JOIN scorecard_entries e ON e.week_id = w.id
+                {where}
+                ORDER BY w.week_commencing""",
+            params,
+        ).fetchall()
+
+
+def get_scorecard_settings() -> sqlite3.Row:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM scorecard_settings WHERE id = 'global'").fetchone()
+
+
+def update_scorecard_settings(
+    green_threshold: float,
+    amber_threshold: float,
+    qualifying_field: str,
+    qualifying_value: str,
+    notes_visibility: str,
+    updated_at: str,
+) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            """UPDATE scorecard_settings SET green_threshold = ?, amber_threshold = ?, qualifying_field = ?,
+               qualifying_value = ?, notes_visibility = ?, updated_at = ? WHERE id = 'global'""",
+            (green_threshold, amber_threshold, qualifying_field, qualifying_value, notes_visibility, updated_at),
+        )
+
+
+def list_scorecard_metric_targets() -> list[sqlite3.Row]:
+    with get_connection() as conn:
+        return conn.execute("SELECT * FROM scorecard_metric_targets").fetchall()
+
+
+def update_scorecard_metric_target(metric_key: str, target_value: float, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE scorecard_metric_targets SET target_value = ?, updated_at = ? WHERE metric_key = ?",
+            (target_value, updated_at, metric_key),
+        )
+
+
+def set_scorecard_metric_auto_tracked(metric_key: str, auto_tracked: bool, updated_at: str) -> None:
+    with get_connection() as conn:
+        conn.execute(
+            "UPDATE scorecard_metric_targets SET auto_tracked = ?, updated_at = ? WHERE metric_key = ?",
+            (1 if auto_tracked else 0, updated_at, metric_key),
+        )

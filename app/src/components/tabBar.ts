@@ -21,6 +21,7 @@ export const NAV_PERMISSIONS: Partial<Record<ViewName, string>> = {
   "win-back": "view_win_back",
   calendar: "view_calendar",
   analytics: "view_analytics",
+  scorecard: "view_scorecard",
   settings: "view_settings",
 };
 
@@ -40,6 +41,7 @@ export const NAV_TITLES: Record<ViewName, string> = {
   "win-back": "Win-back",
   calendar: "Calendar",
   analytics: "Analytics",
+  scorecard: "Scorecard",
   settings: "Settings",
   connectors: "Connectors",
 };

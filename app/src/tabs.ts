@@ -14,6 +14,7 @@ export type ViewName =
   | "outreach"
   | "win-back"
   | "analytics"
+  | "scorecard"
   | "settings"
   | "connectors";
 

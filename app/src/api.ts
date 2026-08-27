@@ -1361,3 +1361,92 @@ export async function sendAllListCampaign(
 ): Promise<{ sent: number; failed: number; skipped: number }> {
   return invoke<{ sent: number; failed: number; skipped: number }>("send_all_list_campaign", { campaignId, provider });
 }
+
+// --- Scorecard (weekly BDE performance tracking) ---
+
+export type ScorecardMetricKey = "calls" | "talk_time" | "leads" | "campaigns" | "follow_up" | "crm";
+export type ScorecardNotesVisibility = "team" | "manager_only";
+
+export interface ScorecardEntry {
+  metric_key: string;
+  actual: number | null;
+  notes: string;
+  action: string;
+  source: "manual" | "auto";
+  updated_at: string;
+}
+
+export interface ScorecardEntryInput {
+  actual: number | null;
+  notes: string;
+  action: string;
+}
+
+export interface ScorecardWeek {
+  id: string;
+  user_id: string;
+  week_commencing: string;
+  review_date: string;
+  saved_at: string | null;
+  entries: Record<string, ScorecardEntry>;
+}
+
+export interface ScorecardSummaryEntry {
+  user_id: string;
+  week_commencing: string;
+  saved_at: string | null;
+  metric_key: string;
+  actual: number | null;
+  source: "manual" | "auto";
+}
+
+export interface ScorecardMetricTarget {
+  metric_key: string;
+  target_value: number;
+  auto_tracked: boolean;
+}
+
+export interface ScorecardSettings {
+  green_threshold: number;
+  amber_threshold: number;
+  qualifying_field: string;
+  qualifying_value: string;
+  notes_visibility: ScorecardNotesVisibility;
+  targets: ScorecardMetricTarget[];
+}
+
+export async function getScorecardSettings(): Promise<ScorecardSettings> {
+  return invoke<ScorecardSettings>("get_scorecard_settings");
+}
+
+export async function updateScorecardSettings(update: {
+  greenThreshold?: number;
+  amberThreshold?: number;
+  qualifyingField?: string;
+  qualifyingValue?: string;
+  notesVisibility?: ScorecardNotesVisibility;
+  targets?: Record<string, number>;
+}): Promise<ScorecardSettings> {
+  return invoke<ScorecardSettings>("update_scorecard_settings", update);
+}
+
+export async function getScorecardWeeks(userId: string, since?: string, until?: string): Promise<ScorecardWeek[]> {
+  return invoke<ScorecardWeek[]>("get_scorecard_weeks", { userId, since, until });
+}
+
+export async function upsertScorecardWeek(
+  userId: string,
+  weekCommencing: string,
+  reviewDate: string,
+  entries: Record<string, ScorecardEntryInput>,
+): Promise<ScorecardWeek> {
+  return invoke<ScorecardWeek>("upsert_scorecard_week", { userId, weekCommencing, reviewDate, entries });
+}
+
+export async function saveScorecardWeek(userId: string, weekCommencing: string): Promise<ScorecardWeek> {
+  return invoke<ScorecardWeek>("save_scorecard_week", { userId, weekCommencing });
+}
+
+export async function getScorecardWeeksAll(since?: string, until?: string): Promise<ScorecardSummaryEntry[]> {
+  return invoke<ScorecardSummaryEntry[]>("get_scorecard_weeks_all", { since, until });
+}
