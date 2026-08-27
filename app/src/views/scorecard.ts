@@ -124,9 +124,13 @@ interface PersonSeries {
 /** A single week, or a month with several weeks summed/averaged into it
  * (weekCount tracks how many, needed to un-scale non-percent metric
  * targets — see computeCellPctForEntry). weekKey is only set for a real,
- * single, deletable week. */
+ * single, deletable week. sortKey is always chronologically sortable
+ * (YYYY-MM-DD or YYYY-MM) — label is a display string ("24 Aug 2026" /
+ * "Aug 2026") and must never be used for ordering, since alphabetical
+ * order on formatted dates doesn't match calendar order. */
 interface FilterEntry {
   label: string;
+  sortKey: string;
   rows: PersonWeek["rows"];
   weekCount: number;
   weekKey?: string;
@@ -320,13 +324,19 @@ function monthlyAggregated(person: PersonSeries, from: string, to: string): Filt
         if (!cell) continue;
         rows[m.key] = m.isPercent ? cell.sum / cell.count : cell.sum;
       }
-      return { label: monthLabel(mk), rows, weekCount: data.weekCount };
+      return { label: monthLabel(mk), sortKey: mk, rows, weekCount: data.weekCount };
     });
 }
 
 function filteredEntries(person: PersonSeries, from: string, to: string, groupByMonth: boolean): FilterEntry[] {
   if (groupByMonth) return monthlyAggregated(person, from, to);
-  return weeksInRange(person, from, to).map((w) => ({ label: formatWeekLabel(w.week_commencing), rows: w.rows, weekCount: 1, weekKey: w.week_commencing }));
+  return weeksInRange(person, from, to).map((w) => ({
+    label: formatWeekLabel(w.week_commencing),
+    sortKey: w.week_commencing,
+    rows: w.rows,
+    weekCount: 1,
+    weekKey: w.week_commencing,
+  }));
 }
 
 function avgWeightedScoreInRange(person: PersonSeries, from: string, to: string, groupByMonth: boolean, targets: Record<string, number>): number | null {
@@ -1090,14 +1100,16 @@ export function initScorecard(): void {
       },
     });
 
-    // Trend over time
-    const trendMap = new Map<string, number[]>();
+    // Trend over time — keyed by sortKey (always chronologically sortable),
+    // not by the display label, since alphabetically sorting formatted date
+    // strings ("10 Aug" before "13 Jul") does not match calendar order.
+    const trendMap = new Map<string, { label: string; vals: number[] }>();
     for (const p of profiles) {
       for (const e of filteredEntries(p, dashDateFrom, dashDateTo, dashGroupByMonth)) {
         const avg = avgPctForEntry(e.rows, e.weekCount, metrics, targets);
         if (avg === null) continue;
-        if (!trendMap.has(e.label)) trendMap.set(e.label, []);
-        trendMap.get(e.label)!.push(avg);
+        if (!trendMap.has(e.sortKey)) trendMap.set(e.sortKey, { label: e.label, vals: [] });
+        trendMap.get(e.sortKey)!.vals.push(avg);
       }
     }
     const trendKeys = [...trendMap.keys()].sort();
@@ -1105,12 +1117,12 @@ export function initScorecard(): void {
     trendChart = new Chart(trendChartCanvas, {
       type: "line",
       data: {
-        labels: trendKeys,
+        labels: trendKeys.map((k) => trendMap.get(k)!.label),
         datasets: [
           {
             label: profiles.length === 1 ? `${profiles[0].name}'s average % of target` : "Team average % of target",
             data: trendKeys.map((k) => {
-              const vals = trendMap.get(k)!;
+              const vals = trendMap.get(k)!.vals;
               return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
             }),
             borderColor: "#E31346",

@@ -4924,7 +4924,33 @@ button.p-filter-chip.active {
 @media (max-width: 520px) { .metrics { grid-template-columns: 1fr; } .metrics .m { border-left: 0; border-top: 1px solid var(--hairline); } .metrics .m:first-child { border-top: 0; } }
 
 /* Scorecard */
-.scorecard-table-wrap { overflow-x: auto; }
+/* These tables routinely have 8-9 columns, and at the app's narrower window
+   widths (min 960px) macOS/WKWebView's default auto-hide overlay scrollbar
+   gives zero visual cue that a column is clipped off the right edge until
+   the user happens to scroll or hover with a trackpad. Two independent
+   fixes, since neither alone is fully reliable across renderers:
+   (1) an explicit always-visible thin scrollbar (matches .top-nav's
+   existing pattern), and (2) a CSS-only "scroll shadow" — background
+   gradients that only appear while there's more content in that direction,
+   via the local/scroll background-attachment trick (no JS needed). */
+.scorecard-table-wrap {
+  overflow-x: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(18, 21, 38, 0.22) transparent;
+  background-image:
+    linear-gradient(to right, var(--surface, #fff) 0%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(to left, var(--surface, #fff) 0%, rgba(255, 255, 255, 0) 100%),
+    linear-gradient(to right, rgba(18, 21, 38, 0.28), rgba(18, 21, 38, 0)),
+    linear-gradient(to left, rgba(18, 21, 38, 0.28), rgba(18, 21, 38, 0));
+  background-position: left, right, left, right;
+  background-repeat: no-repeat;
+  background-size: 30px 100%, 30px 100%, 18px 100%, 18px 100%;
+  background-attachment: local, local, scroll, scroll;
+}
+.scorecard-table-wrap::-webkit-scrollbar { height: 8px; }
+.scorecard-table-wrap::-webkit-scrollbar-track { background: transparent; }
+.scorecard-table-wrap::-webkit-scrollbar-thumb { background: rgba(18, 21, 38, 0.22); border-radius: 4px; }
+.scorecard-table-wrap::-webkit-scrollbar-thumb:hover { background: rgba(18, 21, 38, 0.35); }
 .scorecard-table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: var(--text-sm); }
 .scorecard-table thead th {
   text-align: left; padding: 10px 14px; font-family: var(--font-mono); font-size: var(--text-3xs);
