@@ -546,10 +546,10 @@ export function initScorecard(): void {
           <span class="sec-rule"></span>
         </div>
         <div class="sc-chart-grid">
-          <section class="panel sc-chart-card"><h4>RAG distribution</h4><div class="sc-chart-wrap"><canvas id="sc-rag-chart"></canvas></div></section>
-          <section class="panel sc-chart-card"><h4 id="sc-bar-chart-title">Average % of target by person</h4><div class="sc-chart-wrap"><canvas id="sc-bar-chart"></canvas></div></section>
+          <section class="panel sc-chart-card"><h4>RAG distribution</h4><div class="sc-chart-wrap"><canvas id="sc-rag-chart"></canvas><p class="sc-chart-empty hidden" id="sc-rag-chart-empty">No saved weeks yet — this fills in once the team starts entering scores.</p></div></section>
+          <section class="panel sc-chart-card"><h4 id="sc-bar-chart-title">Average % of target by person</h4><div class="sc-chart-wrap"><canvas id="sc-bar-chart"></canvas><p class="sc-chart-empty hidden" id="sc-bar-chart-empty">No saved weeks yet — this fills in once the team starts entering scores.</p></div></section>
         </div>
-        <section class="panel sc-chart-card sc-chart-card-wide"><h4 id="sc-trend-chart-title">Trend over time</h4><div class="sc-chart-wrap"><canvas id="sc-trend-chart"></canvas></div></section>
+        <section class="panel sc-chart-card sc-chart-card-wide"><h4 id="sc-trend-chart-title">Trend over time</h4><div class="sc-chart-wrap"><canvas id="sc-trend-chart"></canvas><p class="sc-chart-empty hidden" id="sc-trend-chart-empty">No saved weeks yet — this fills in once the team starts entering scores.</p></div></section>
 
         <div class="sec-head">
           <span class="sec-num">03</span>
@@ -759,6 +759,9 @@ export function initScorecard(): void {
   const ragChartCanvas = container.querySelector<HTMLCanvasElement>("#sc-rag-chart")!;
   const barChartCanvas = container.querySelector<HTMLCanvasElement>("#sc-bar-chart")!;
   const trendChartCanvas = container.querySelector<HTMLCanvasElement>("#sc-trend-chart")!;
+  const ragChartEmptyEl = container.querySelector<HTMLParagraphElement>("#sc-rag-chart-empty")!;
+  const barChartEmptyEl = container.querySelector<HTMLParagraphElement>("#sc-bar-chart-empty")!;
+  const trendChartEmptyEl = container.querySelector<HTMLParagraphElement>("#sc-trend-chart-empty")!;
 
   const mgrPeriodEl = container.querySelector<HTMLDivElement>("#sc-mgr-period")!;
   const mgrSubEl = container.querySelector<HTMLParagraphElement>("#sc-mgr-sub")!;
@@ -1060,11 +1063,16 @@ export function initScorecard(): void {
       }
     }
     ragChart?.destroy();
-    ragChart = new Chart(ragChartCanvas, {
-      type: "doughnut",
-      data: { labels: ["Green", "Amber", "Red"], datasets: [{ data: [tallies.green, tallies.amber, tallies.red], backgroundColor: ["#25A976", "#E69D26", "#E31346"], borderWidth: 2 }] },
-      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } },
-    });
+    const ragTotal = tallies.green + tallies.amber + tallies.red;
+    ragChartCanvas.classList.toggle("hidden", ragTotal === 0);
+    ragChartEmptyEl.classList.toggle("hidden", ragTotal > 0);
+    if (ragTotal > 0) {
+      ragChart = new Chart(ragChartCanvas, {
+        type: "doughnut",
+        data: { labels: ["Green", "Amber", "Red"], datasets: [{ data: [tallies.green, tallies.amber, tallies.red], backgroundColor: ["#25A976", "#E69D26", "#E31346"], borderWidth: 2 }] },
+        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: "bottom" } } },
+      });
+    }
 
     // Average % of target — by metric (single person) or by person (team)
     let barData: { label: string; avg: number }[];
@@ -1086,19 +1094,23 @@ export function initScorecard(): void {
         .filter((d): d is { label: string; avg: number } => d.avg !== null);
     }
     barChart?.destroy();
-    barChart = new Chart(barChartCanvas, {
-      type: "bar",
-      data: {
-        labels: barData.map((d) => d.label),
-        datasets: [{ label: "Avg % of target", data: barData.map((d) => Math.round(d.avg)), backgroundColor: barData.map((d) => (d.avg >= green ? "#25A976" : d.avg >= amber ? "#E69D26" : "#E31346")), borderRadius: 6, maxBarThickness: 48 }],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y}% of target` } } },
-        scales: { y: { beginAtZero: true, suggestedMax: 120, ticks: { callback: (v) => `${v}%` } } },
-      },
-    });
+    barChartCanvas.classList.toggle("hidden", barData.length === 0);
+    barChartEmptyEl.classList.toggle("hidden", barData.length > 0);
+    if (barData.length > 0) {
+      barChart = new Chart(barChartCanvas, {
+        type: "bar",
+        data: {
+          labels: barData.map((d) => d.label),
+          datasets: [{ label: "Avg % of target", data: barData.map((d) => Math.round(d.avg)), backgroundColor: barData.map((d) => (d.avg >= green ? "#25A976" : d.avg >= amber ? "#E69D26" : "#E31346")), borderRadius: 6, maxBarThickness: 48 }],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y}% of target` } } },
+          scales: { y: { beginAtZero: true, suggestedMax: 120, ticks: { callback: (v) => `${v}%` } } },
+        },
+      });
+    }
 
     // Trend over time — keyed by sortKey (always chronologically sortable),
     // not by the display label, since alphabetically sorting formatted date
@@ -1114,33 +1126,37 @@ export function initScorecard(): void {
     }
     const trendKeys = [...trendMap.keys()].sort();
     trendChart?.destroy();
-    trendChart = new Chart(trendChartCanvas, {
-      type: "line",
-      data: {
-        labels: trendKeys.map((k) => trendMap.get(k)!.label),
-        datasets: [
-          {
-            label: profiles.length === 1 ? `${profiles[0].name}'s average % of target` : "Team average % of target",
-            data: trendKeys.map((k) => {
-              const vals = trendMap.get(k)!.vals;
-              return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
-            }),
-            borderColor: "#E31346",
-            backgroundColor: "rgba(227,19,70,0.12)",
-            fill: true,
-            tension: 0.3,
-            borderWidth: 2.5,
-            pointRadius: 3,
-          },
-        ],
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y}% of target` } } },
-        scales: { y: { beginAtZero: true, suggestedMax: 120, ticks: { callback: (v) => `${v}%` } } },
-      },
-    });
+    trendChartCanvas.classList.toggle("hidden", trendKeys.length === 0);
+    trendChartEmptyEl.classList.toggle("hidden", trendKeys.length > 0);
+    if (trendKeys.length > 0) {
+      trendChart = new Chart(trendChartCanvas, {
+        type: "line",
+        data: {
+          labels: trendKeys.map((k) => trendMap.get(k)!.label),
+          datasets: [
+            {
+              label: profiles.length === 1 ? `${profiles[0].name}'s average % of target` : "Team average % of target",
+              data: trendKeys.map((k) => {
+                const vals = trendMap.get(k)!.vals;
+                return Math.round(vals.reduce((a, b) => a + b, 0) / vals.length);
+              }),
+              borderColor: "#E31346",
+              backgroundColor: "rgba(227,19,70,0.12)",
+              fill: true,
+              tension: 0.3,
+              borderWidth: 2.5,
+              pointRadius: 3,
+            },
+          ],
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: (c) => ` ${c.parsed.y}% of target` } } },
+          scales: { y: { beginAtZero: true, suggestedMax: 120, ticks: { callback: (v) => `${v}%` } } },
+        },
+      });
+    }
   }
 
   function renderSnapshot(profiles: PersonSeries[], targets: Record<string, number>): void {
