@@ -4951,12 +4951,13 @@ button.p-filter-chip.active {
 .scorecard-table-wrap::-webkit-scrollbar-track { background: transparent; }
 .scorecard-table-wrap::-webkit-scrollbar-thumb { background: rgba(18, 21, 38, 0.22); border-radius: 4px; }
 .scorecard-table-wrap::-webkit-scrollbar-thumb:hover { background: rgba(18, 21, 38, 0.35); }
-.scorecard-table { width: 100%; min-width: max-content; border-collapse: collapse; font-size: var(--text-sm); }
+.scorecard-table { width: 100%; border-collapse: collapse; font-size: var(--text-sm); table-layout: auto; }
 .scorecard-table thead th {
-  text-align: left; padding: 10px 14px; font-family: var(--font-mono); font-size: var(--text-3xs);
+  text-align: left; padding: 10px 10px; font-family: var(--font-mono); font-size: var(--text-3xs);
   letter-spacing: 0.06em; text-transform: uppercase; color: #8a8f9e; border-bottom: 1px solid var(--hairline);
+  white-space: normal; word-break: normal;
 }
-.scorecard-table tbody td { padding: 8px 14px; border-top: 1px solid var(--hairline); vertical-align: middle; }
+.scorecard-table tbody td { padding: 8px 10px; border-top: 1px solid var(--hairline); vertical-align: middle; }
 .scorecard-table tbody tr:first-child td { border-top: 0; }
 .scorecard-table input[type="number"],
 .scorecard-table input[type="text"] {
@@ -5057,6 +5058,7 @@ button.p-filter-chip.active {
   position: absolute; inset: 0; margin: 0; display: flex; align-items: center; justify-content: center; text-align: center;
   padding: 0 24px; color: #8a8f9e; font-size: var(--text-sm); line-height: 1.5;
 }
+.sc-chart-empty.hidden { display: none; }
 
 /* Scorecard: snapshot / history tables */
 .sc-cell-actual { font-size: var(--text-3xs); color: #8a8f9e; margin-top: 2px; font-family: var(--font-mono); }
